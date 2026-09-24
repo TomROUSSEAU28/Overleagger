@@ -1,5 +1,6 @@
 import {
   GRID,
+  ROLE_LABELS,
   allowedScales,
   expandSelection,
   resolveComponent,
@@ -40,9 +41,10 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  UserCog,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheetElements, useSheets } from '../editor/context';
-import { useCanEdit } from '../cloud/hooks';
+import { useCanEdit, useSession } from '../cloud/hooks';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 import { Field, IconButton } from './common';
@@ -135,6 +137,7 @@ function SheetProps() {
           </label>
         </div>
       )}
+      {sheet && <SheetAccessInfo sheetId={sheet.id} />}
       <h3>Project</h3>
       <Field label="Drawing standard">
         <select
@@ -154,6 +157,42 @@ function SheetProps() {
         Tip: select an element to edit it. Press <kbd className="kbd">A</kbd> to quickly add a part.
       </p>
     </>
+  );
+}
+
+/** Shared projects: who may do what on this sheet. */
+function SheetAccessInfo({ sheetId }: { sheetId: string }) {
+  const ed = useEditor();
+  const role = useSession((s) => s.role);
+  const rules = useSession((s) => s.rules);
+  if (!ed.session) return null;
+  if (role === 'owner') {
+    const n = rules.filter((r) => r.sheetId === sheetId).length;
+    return (
+      <div className="sheet-access-info">
+        <span className="field-label">Access</span>
+        <span className="muted small">
+          {n
+            ? `Special access for ${n} ${n === 1 ? 'person or team' : 'people or teams'}`
+            : 'Everyone keeps their role'}
+        </span>
+        <button
+          type="button"
+          className="btn small-btn"
+          onClick={() => useUI.getState().set({ shareOpen: { sheetId } })}
+          data-testid="manage-sheet-access"
+        >
+          <UserCog size={13} /> Manage access
+        </button>
+      </div>
+    );
+  }
+  const level = ed.session.levelOf(sheetId);
+  return (
+    <div className="sheet-access-info">
+      <span className="field-label">Your access here</span>
+      <span className="small">{level === 'hidden' ? 'Hidden' : ROLE_LABELS[level]}</span>
+    </div>
   );
 }
 

@@ -144,6 +144,8 @@ export interface UIState extends Settings {
   lineDraftEnds: { from?: Anchor; to?: Anchor } | null;
   /** Comment thread shown in its popup. */
   openThread: string | null;
+  /** Share window open (on the "access per sheet" of this sheet when given). */
+  shareOpen: { sheetId?: string } | null;
   /** Short message shown at the bottom of the editor. */
   toast: { text: string; at: number; action?: { label: string; run: () => void } } | null;
   /** Comment bubble being dragged, and where it is now (saved when released). */
@@ -222,6 +224,7 @@ const transient = {
   openThread: null,
   commentDrag: null,
   toast: null,
+  shareOpen: null,
   anchorHover: null,
   lineDraftEnds: null,
 };

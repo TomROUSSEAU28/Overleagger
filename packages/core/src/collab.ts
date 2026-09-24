@@ -20,12 +20,82 @@ export function roleAtLeast(role: Role | undefined, min: Role): boolean {
   return ROLES.indexOf(role) <= ROLES.indexOf(min);
 }
 
+// ---------------------------------------------------------------------------
+// Rights per sheet
+// ---------------------------------------------------------------------------
+
+/** What a person may do on one sheet (set by the project owner). */
+export type SheetLevel = 'editor' | 'commenter' | 'viewer' | 'hidden';
+/** From the most to the least powerful. */
+export const SHEET_LEVELS: SheetLevel[] = ['editor', 'commenter', 'viewer', 'hidden'];
+export const LEVEL_LABELS: Record<SheetLevel, string> = {
+  editor: 'Can edit',
+  commenter: 'Can comment',
+  viewer: 'Can view',
+  hidden: 'Hidden',
+};
+
+/** A rule on a sheet (and its sub-sheets) for a person or a team. */
+export interface SheetRule {
+  sheetId: Id;
+  principal: 'user' | 'team';
+  principalId: string;
+  level: SheetLevel;
+}
+
+/** Access to a sheet: a project role, or hidden. */
+export type Access = Role | 'hidden';
+
+/** At least `min` (hidden is below everything). */
+export function accessAtLeast(access: Access | undefined, min: Role): boolean {
+  return access !== undefined && access !== 'hidden' && roleAtLeast(access, min);
+}
+
+/**
+ * Access of a person to a sheet. The nearest sheet (itself, then its parents) that has rules
+ * for the person decides: their own rule first, otherwise the best rule of their teams. Without
+ * any rule, the project role applies. The owner always has every right.
+ *
+ * `rules` are the rules that apply to this person (theirs and their teams').
+ */
+export function effectiveLevel(
+  sheetId: Id,
+  role: Role,
+  rules: readonly SheetRule[],
+  parentOf: (sheetId: Id) => Id | undefined,
+): Access {
+  if (role === 'owner' || !rules.length) return role;
+  const seen = new Set<Id>();
+  for (let s: Id | undefined = sheetId; s && !seen.has(s); s = parentOf(s)) {
+    seen.add(s);
+    const here = rules.filter((r) => r.sheetId === s);
+    if (!here.length) continue;
+    const own = here.find((r) => r.principal === 'user');
+    if (own) return own.level;
+    return here.reduce((a, b) =>
+      SHEET_LEVELS.indexOf(b.level) < SHEET_LEVELS.indexOf(a.level) ? b : a,
+    ).level;
+  }
+  return role;
+}
+
+/** Can this person edit (or comment on) at least one sheet? */
+export function writesSomewhere(role: Role, rules: readonly SheetRule[], min: Role = 'editor') {
+  return (
+    roleAtLeast(role, min) || rules.some((r) => r.level !== 'hidden' && roleAtLeast(r.level, min))
+  );
+}
+
 /** Parts of a project document changed by an update. */
 export interface TouchedScopes {
   /** Root maps: meta, sheets, symbols, comments, locks. */
   roots: Set<string>;
   /** Sheets whose content (or existence) changed. */
   sheets: Set<Id>;
+  /** Sheets of the comment threads the update changes. */
+  commentSheets: Set<Id>;
+  /** Parent of each touched sheet (new sheets included), to find their rules. */
+  parents: Map<Id, Id | undefined>;
 }
 
 function rootName(doc: Y.Doc, type: Y.AbstractType<unknown>): string {
@@ -42,7 +112,13 @@ export function touchedScopes(doc: Y.Doc, update: Uint8Array): TouchedScopes {
   Y.applyUpdate(copy, Y.encodeStateAsUpdate(doc));
   // Make sure the root types exist so nested items resolve to them by name.
   for (const name of ['meta', 'sheets', 'symbols', 'comments', 'locks']) copy.getMap(name);
-  const out: TouchedScopes = { roots: new Set(), sheets: new Set() };
+  const out: TouchedScopes = {
+    roots: new Set(),
+    sheets: new Set(),
+    commentSheets: new Set(),
+    parents: new Map(),
+  };
+  const threads = new Set<string>();
   copy.on('afterTransaction', (tr: Y.Transaction) => {
     for (const [type, keys] of tr.changed) {
       let cur = type as Y.AbstractType<unknown>;
@@ -53,38 +129,82 @@ export function touchedScopes(doc: Y.Doc, update: Uint8Array): TouchedScopes {
       }
       const root = rootName(copy, cur);
       out.roots.add(root);
-      if (root !== 'sheets') continue;
+      const touched = root === 'sheets' ? out.sheets : root === 'comments' ? threads : null;
+      if (!touched) continue;
       if (cur === type) {
-        // Sheets added or removed.
-        for (const k of keys) if (k) out.sheets.add(k);
-      } else if (key) out.sheets.add(key);
+        // Entries added or removed.
+        for (const k of keys) if (k) touched.add(k);
+      } else if (key) touched.add(key);
     }
   });
   Y.applyUpdate(copy, update);
+  // After the update, or before it for what the update deleted.
+  const field = (root: string, id: string, name: string) =>
+    ((copy.getMap(root).get(id) as Y.Map<unknown> | undefined)?.get(name) ??
+      (doc.getMap(root).get(id) as Y.Map<unknown> | undefined)?.get(name)) as string | undefined;
+  for (const s of out.sheets) out.parents.set(s, field('sheets', s, 'parentSheetId'));
+  for (const t of threads) {
+    const s = field('comments', t, 'sheetId');
+    if (s) out.commentSheets.add(s);
+  }
   copy.destroy();
   return out;
 }
 
+type Verdict = { ok: true } | { ok: false; reason: string };
+
 /**
  * May a user with `role` send an update touching `scopes`? Viewers may change nothing,
  * commenters only comments, editors anything but locks and locked sheets, owners everything.
+ * (Project-wide rights: see `updateAllowedFor` for rights per sheet.)
  */
 export function updateAllowed(
   role: Role,
   scopes: TouchedScopes,
   lockedSheets: Iterable<Id>,
-): { ok: true } | { ok: false; reason: string } {
+): Verdict {
+  return updateAllowedFor(role, () => role, scopes, lockedSheets);
+}
+
+/**
+ * May a person send an update touching `scopes`, given their project `role` and their access
+ * to each sheet (`levelOf`, from `effectiveLevel`)? Each changed sheet needs "Can edit", each
+ * changed comment "Can comment" on its sheet; the project name needs the project role
+ * "Can edit"; locks are for the owner.
+ */
+export function updateAllowedFor(
+  role: Role,
+  levelOf: (sheetId: Id) => Access,
+  scopes: TouchedScopes,
+  lockedSheets: Iterable<Id>,
+): Verdict {
   if (role === 'owner') return { ok: true };
-  if (role === 'viewer') return { ok: false, reason: 'Viewers cannot edit.' };
-  if (role === 'commenter') {
-    for (const r of scopes.roots)
-      if (r !== 'comments') return { ok: false, reason: 'Commenters can only comment.' };
-    return { ok: true };
-  }
   if (scopes.roots.has('locks')) return { ok: false, reason: 'Only the owner can lock sheets.' };
+  if (scopes.roots.has('meta') && !roleAtLeast(role, 'editor'))
+    return { ok: false, reason: 'Only editors of the whole project can change it.' };
   const locked = new Set(lockedSheets);
-  for (const s of scopes.sheets)
+  for (const s of scopes.sheets) {
+    if (!accessAtLeast(levelOf(s), 'editor'))
+      return {
+        ok: false,
+        reason:
+          role === 'viewer'
+            ? 'Viewers cannot edit.'
+            : role === 'commenter'
+              ? 'Commenters can only comment.'
+              : 'You cannot edit this sheet.',
+      };
     if (locked.has(s)) return { ok: false, reason: 'This sheet is locked by the owner.' };
+  }
+  // Project symbols: editors of the project, or placing a part on a sheet you may edit.
+  if (scopes.roots.has('symbols') && !roleAtLeast(role, 'editor') && !scopes.sheets.size)
+    return { ok: false, reason: 'Only editors of the whole project can change its symbols.' };
+  for (const s of scopes.commentSheets)
+    if (!accessAtLeast(levelOf(s), 'commenter'))
+      return {
+        ok: false,
+        reason: role === 'viewer' ? 'Viewers cannot edit.' : 'You cannot comment on this sheet.',
+      };
   return { ok: true };
 }
 

@@ -274,9 +274,11 @@ export function SymbolEditor() {
     };
     if (scope === 'library') useUserLib.getState().saveSymbol(def);
     else if (inLibrary) useUserLib.getState().removeSymbol(id);
+    // The project's own symbols belong to editors of the whole project.
+    const projectOk = ed.project.canWrite(undefined, 'project');
     ed.commit(() => {
       // Library symbols are copied into the project when used: keep that copy up to date.
-      if (scope === 'project' || ed.project.symbols.has(id) || editing?.replaceId)
+      if (projectOk && (scope === 'project' || ed.project.symbols.has(id) || editing?.replaceId))
         ed.project.symbols.set(id, def);
       if (editing?.replaceId) ed.updateElement(editing.replaceId, { symbolId: id, opts: {} });
     });
@@ -306,7 +308,8 @@ export function SymbolEditor() {
       )
     )
       return;
-    ed.commit(() => ed.project.symbols.delete(existing.id));
+    if (ed.project.canWrite(undefined, 'project'))
+      ed.commit(() => ed.project.symbols.delete(existing.id));
     close();
   };
 

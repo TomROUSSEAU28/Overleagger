@@ -8,7 +8,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { ROLES, type Role } from '@overleagger/core';
+import { ROLES, type Role, type SheetLevel, type SheetRule } from '@overleagger/core';
 
 export interface UserRow {
   id: string;
@@ -154,6 +154,14 @@ CREATE TABLE IF NOT EXISTS project_teams (
   role TEXT NOT NULL,
   added_at INTEGER NOT NULL,
   PRIMARY KEY (project_id, team_id)
+);
+CREATE TABLE IF NOT EXISTS sheet_rules (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  sheet_id TEXT NOT NULL,
+  principal TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  level TEXT NOT NULL,
+  PRIMARY KEY (project_id, sheet_id, principal, principal_id)
 );
 `;
 
@@ -413,6 +421,62 @@ export class Store {
          WHERE project_teams.project_id = ? ORDER BY project_teams.added_at`,
       )
       .all(projectId) as unknown as { id: string; name: string; role: Role; size: number }[];
+  }
+
+  // Rights per sheet ------------------------------------------------------------
+
+  /** Set (or remove, with `null`) the rule of a person or a team on a sheet. */
+  setRule(projectId: string, r: Omit<SheetRule, 'level'> & { level: SheetLevel | null }) {
+    if (r.level === null)
+      this.db
+        .prepare(
+          'DELETE FROM sheet_rules WHERE project_id = ? AND sheet_id = ? AND principal = ? AND principal_id = ?',
+        )
+        .run(projectId, r.sheetId, r.principal, r.principalId);
+    else
+      this.db
+        .prepare(
+          `INSERT INTO sheet_rules (project_id, sheet_id, principal, principal_id, level)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(project_id, sheet_id, principal, principal_id)
+           DO UPDATE SET level = excluded.level`,
+        )
+        .run(projectId, r.sheetId, r.principal, r.principalId, r.level);
+  }
+
+  /** Every rule of a project (for its owner). */
+  rules(projectId: string): SheetRule[] {
+    return (
+      this.db
+        .prepare(
+          'SELECT sheet_id, principal, principal_id, level FROM sheet_rules WHERE project_id = ?',
+        )
+        .all(projectId) as {
+        sheet_id: string;
+        principal: 'user' | 'team';
+        principal_id: string;
+        level: SheetLevel;
+      }[]
+    ).map((r) => ({
+      sheetId: r.sheet_id,
+      principal: r.principal,
+      principalId: r.principal_id,
+      level: r.level,
+    }));
+  }
+
+  /** The rules that apply to a person: their own and those of their teams. */
+  rulesFor(projectId: string, userId: string): SheetRule[] {
+    const teams = new Set(
+      (
+        this.db.prepare('SELECT team_id FROM team_members WHERE user_id = ?').all(userId) as {
+          team_id: string;
+        }[]
+      ).map((t) => t.team_id),
+    );
+    return this.rules(projectId).filter((r) =>
+      r.principal === 'user' ? r.principalId === userId : teams.has(r.principalId),
+    );
   }
 
   // Friends -----------------------------------------------------------------

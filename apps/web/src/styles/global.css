@@ -2710,3 +2710,32 @@ body.resizing-panel {
     grid-template-columns: 1fr;
   }
 }
+
+/* Rights per sheet */
+.access-mark {
+  display: inline-flex;
+  color: var(--accent);
+  margin-left: 2px;
+}
+.access-btn {
+  color: var(--accent);
+}
+.sheet-access-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 2px 0 12px;
+}
+.sheet-access-info .field-label {
+  flex: 0 0 100%;
+}
+.sheet-access-pick {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.sheet-access select.rule-set {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}

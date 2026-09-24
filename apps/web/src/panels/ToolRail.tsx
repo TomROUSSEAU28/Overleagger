@@ -70,7 +70,7 @@ export function ToolRail() {
   const tool = useUI((s) => s.tool);
   const keymap = useKeymap((s) => s.keymap);
   const canEdit = useCanEdit();
-  const canComment = ed.project.canWrite(undefined, 'comments');
+  const canComment = ed.project.canWrite(ed.sheetId, 'comments');
   // Read-only: keep select, pan and (if allowed) comment.
   const groups = canEdit ? GROUPS : [GROUPS[0]!.filter((t) => t.tool !== 'comment' || canComment)];
   return (

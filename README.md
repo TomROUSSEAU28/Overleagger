@@ -109,6 +109,10 @@ see _Self-hosting_) to share projects:
 - **Invite links** with a role: **owner** (people, links, sheet locks), **editor**, **commenter**
   (comments only), **viewer** (look, present, export). The server checks every change against
   the role, not only the interface.
+- **Rights per sheet**: the owner can say, for a person or a team, _Can view_, _Can comment_ or
+  _Can edit_ on one sheet (Share → Access per sheet, or the 👤 button in the Sheets tab). A rule
+  can raise or lower the project role (a viewer may edit sheet 2 only) and applies to the
+  sub-sheets too. The server enforces it.
 - **Real time**: live edits, **cursors with names**, others' selections, avatars in the top bar
   — click one to **follow their view**; “X is presenting — Join” follows their slides.
 - **Comments** (tool `C`): threads pinned on the drawing (drag a bubble to move it), replies,

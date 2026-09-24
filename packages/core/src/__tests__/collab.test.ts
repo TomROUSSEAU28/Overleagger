@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   Project,
   addComponent,
+  createBlock,
+  effectiveLevel,
   makeContext,
+  updateAllowedFor,
+  writesSomewhere,
+  type SheetRule,
   replaceContent,
   roleAtLeast,
   touchedScopes,
@@ -85,5 +90,93 @@ describe('collaboration rules', () => {
     expect(p.getMeta().name).toBe('v1');
     expect(p.getElements(p.rootSheetId)).toEqual([]);
     expect(p.getComments()).toHaveLength(1);
+  });
+});
+
+describe('rights per sheet', () => {
+  // Sheet tree: root ─ power ─ driver
+  //                  └ control
+  const parents: Record<string, string | undefined> = {
+    root: undefined,
+    power: 'root',
+    driver: 'power',
+    control: 'root',
+  };
+  const parentOf = (s: string) => parents[s];
+  const rule = (
+    sheetId: string,
+    level: SheetRule['level'],
+    principal: SheetRule['principal'] = 'user',
+  ): SheetRule => ({ sheetId, principal, principalId: principal === 'user' ? 'u' : 't', level });
+
+  it('uses the project role without rules, and the owner always has every right', () => {
+    expect(effectiveLevel('driver', 'viewer', [], parentOf)).toBe('viewer');
+    expect(effectiveLevel('driver', 'owner', [rule('power', 'viewer')], parentOf)).toBe('owner');
+  });
+
+  it('applies the nearest rule, down the sub-sheets, raising or lowering the role', () => {
+    const rules = [rule('power', 'editor')];
+    expect(effectiveLevel('power', 'viewer', rules, parentOf)).toBe('editor');
+    expect(effectiveLevel('driver', 'viewer', rules, parentOf)).toBe('editor');
+    expect(effectiveLevel('control', 'viewer', rules, parentOf)).toBe('viewer');
+    const lower = [rule('control', 'viewer')];
+    expect(effectiveLevel('control', 'editor', lower, parentOf)).toBe('viewer');
+    // A sub-sheet rule beats the parent's.
+    const both = [rule('power', 'editor'), rule('driver', 'commenter')];
+    expect(effectiveLevel('driver', 'viewer', both, parentOf)).toBe('commenter');
+  });
+
+  it("prefers the person's own rule, else the best team rule", () => {
+    const teams = [rule('power', 'viewer', 'team'), rule('power', 'editor', 'team')];
+    expect(effectiveLevel('power', 'commenter', teams, parentOf)).toBe('editor');
+    const mine = [...teams, rule('power', 'commenter')];
+    expect(effectiveLevel('power', 'commenter', mine, parentOf)).toBe('commenter');
+  });
+
+  it('says who can write somewhere', () => {
+    expect(writesSomewhere('viewer', [])).toBe(false);
+    expect(writesSomewhere('viewer', [rule('power', 'editor')])).toBe(true);
+    expect(writesSomewhere('viewer', [rule('power', 'commenter')])).toBe(false);
+    expect(writesSomewhere('viewer', [rule('power', 'commenter')], 'commenter')).toBe(true);
+  });
+
+  it('checks each changed sheet and comment against the access of the person', () => {
+    const p = Project.create('t');
+    const root = p.rootSheetId;
+    const child = createBlock(p, root, { x: 0, y: 0, w: 80, h: 60 }, 'Sub').childSheetId;
+    const editRoot = touchedScopes(
+      p.doc,
+      remoteUpdate(p, (q) => addComponent(q, root, 'resistor', 0, 0, makeContext(q))),
+    );
+    const editChild = touchedScopes(
+      p.doc,
+      remoteUpdate(p, (q) => addComponent(q, child, 'resistor', 0, 0, makeContext(q))),
+    );
+    const commentChild = touchedScopes(
+      p.doc,
+      remoteUpdate(p, (q) => q.addComment({ sheetId: child, x: 0, y: 0 }, alice, 'hi')),
+    );
+    expect([...commentChild.commentSheets]).toEqual([child]);
+    expect(editChild.parents.get(child)).toBe(root);
+    const rules = [
+      { sheetId: child, principal: 'user' as const, principalId: 'a', level: 'editor' as const },
+    ];
+    const levelOf = (s: string) =>
+      effectiveLevel(s, 'viewer', rules, (x) => p.getSheet(x)?.parentSheetId);
+    // A viewer who may edit only the sub-sheet.
+    expect(updateAllowedFor('viewer', levelOf, editChild, []).ok).toBe(true);
+    expect(updateAllowedFor('viewer', levelOf, editRoot, []).ok).toBe(false);
+    expect(updateAllowedFor('viewer', levelOf, commentChild, []).ok).toBe(true);
+    // An editor kept to viewing the sub-sheet.
+    const lowered = (s: string) =>
+      effectiveLevel(
+        s,
+        'editor',
+        [{ ...rules[0]!, level: 'viewer' }],
+        (x) => p.getSheet(x)?.parentSheetId,
+      );
+    expect(updateAllowedFor('editor', lowered, editRoot, []).ok).toBe(true);
+    expect(updateAllowedFor('editor', lowered, editChild, []).ok).toBe(false);
+    expect(updateAllowedFor('editor', lowered, commentChild, []).ok).toBe(false);
   });
 });

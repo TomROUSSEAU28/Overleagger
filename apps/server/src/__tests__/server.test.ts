@@ -1,5 +1,5 @@
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { Project, addComponent, makeContext, type Person } from '@overleagger/core';
+import { Project, addComponent, createBlock, makeContext, type Person } from '@overleagger/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { createApp, type App } from '../app';
@@ -74,6 +74,12 @@ async function connect(projectId: string, token: string) {
     document: doc,
     token,
     onClose: ({ event }) => {
+      // Rights changed: join again, like the web app does.
+      if (event.reason === 'Reset Connection') {
+        const p = provider as unknown as { sendToken(): Promise<void>; startSync(): void };
+        void p.sendToken().then(() => p.startSync());
+        return;
+      }
       // The refusal reason travels with the close event.
       if (event.reason) closed = event.reason;
     },
@@ -355,5 +361,83 @@ describe('friends and teams', () => {
     // Only the creator manages the team.
     expect((await api('DELETE', `/api/teams/${teamId}`, pal.token)).status).toBe(403);
     expect((await api('DELETE', `/api/teams/${teamId}`, owner.token)).status).toBe(200);
+  });
+});
+
+describe('rights per sheet', () => {
+  it('lets a viewer edit one sheet, keeps an editor to viewing another', async () => {
+    const owner = await signup('Rita');
+    const vito = await signup('Vito');
+    const eve = await signup('Eve');
+    const { data } = await api<{ id: string }>('POST', '/api/projects', owner.token, {
+      name: 'Rules',
+    });
+    const id = data.id;
+    const link = async (role: string) =>
+      (
+        await api<{ invite: { token: string } }>(
+          'POST',
+          `/api/projects/${id}/invites`,
+          owner.token,
+          { role },
+        )
+      ).data.invite.token;
+    await api('POST', `/api/invites/${await link('viewer')}/accept`, vito.token);
+    await api('POST', `/api/invites/${await link('editor')}/accept`, eve.token);
+
+    // The owner draws a block: its sub-sheet is the "controller".
+    const o = await connect(id, owner.token);
+    const root = o.project.rootSheetId;
+    const ctrl = createBlock(
+      o.project,
+      root,
+      { x: 0, y: 0, w: 80, h: 60 },
+      'Controller',
+    ).childSheetId;
+    await until(() => o.provider.unsyncedChanges === 0);
+
+    // Only the owner sets rules; "hidden" is not available yet.
+    const setRule = (tok: string, principalId: string, level: string | null) =>
+      api('PUT', `/api/projects/${id}/rules`, tok, {
+        sheetId: ctrl,
+        principal: 'user',
+        principalId,
+        level,
+      });
+    expect((await setRule(eve.token, vito.user.id, 'editor')).status).toBe(403);
+    expect((await setRule(owner.token, vito.user.id, 'hidden')).status).toBe(400);
+    expect((await setRule(owner.token, vito.user.id, 'editor')).status).toBe(200);
+    expect((await setRule(owner.token, eve.user.id, 'viewer')).status).toBe(200);
+    const info = await api<{ rules: { principalId: string }[] }>(
+      'GET',
+      `/api/projects/${id}`,
+      vito.token,
+    );
+    expect(info.data.rules.map((r) => r.principalId)).toEqual([vito.user.id]);
+
+    const v = await connect(id, vito.token);
+    const e = await connect(id, eve.token);
+    // Vito (viewer) may edit the controller…
+    addComponent(v.project, ctrl, 'resistor', 0, 0, makeContext(v.project));
+    await until(() => o.project.getElements(ctrl).length === 1);
+    // …but not the main sheet.
+    addComponent(v.project, root, 'capacitor', 0, 0, makeContext(v.project));
+    await until(() => v.closed() === 'Viewers cannot edit.');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(o.project.getElements(root).filter((x) => x.type === 'component')).toHaveLength(0);
+
+    // Eve (editor) edits the main sheet, not the controller.
+    addComponent(e.project, root, 'inductor', 100, 0, makeContext(e.project));
+    await until(() => o.project.getElements(root).some((x) => x.type === 'component'));
+    addComponent(e.project, ctrl, 'capacitor', 40, 0, makeContext(e.project));
+    await until(() => e.closed() === 'You cannot edit this sheet.');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(o.project.getElements(ctrl)).toHaveLength(1);
+
+    // Removing the rule gives Eve her editor rights back everywhere.
+    expect((await setRule(owner.token, eve.user.id, null)).status).toBe(200);
+    expect(
+      (await api<{ rules: unknown[] }>('GET', `/api/projects/${id}`, eve.token)).data.rules,
+    ).toEqual([]);
   });
 });

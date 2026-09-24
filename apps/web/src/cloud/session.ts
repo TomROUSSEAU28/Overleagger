@@ -4,7 +4,20 @@
  * (who is here, where their cursor is, what they look at, who is presenting).
  */
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { Project, type Id, type Person, type Pt, type Role } from '@overleagger/core';
+import {
+  Project,
+  accessAtLeast,
+  effectiveLevel,
+  roleAtLeast,
+  writesSomewhere,
+  type Access,
+  type Id,
+  type Person,
+  type Pt,
+  type Role,
+  type SheetRule,
+  type WriteScope,
+} from '@overleagger/core';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
@@ -35,6 +48,15 @@ export interface SessionState {
   following: string | null;
   members: Members;
   teams: ProjectTeam[];
+  /** Rights per sheet: all of them for the owner, the ones that apply to me otherwise. */
+  rules: SheetRule[];
+}
+
+interface ProjectInfo {
+  role: Role;
+  members: Members;
+  teams?: ProjectTeam[];
+  rules?: SheetRule[];
 }
 
 // (Storage name kept from the first version of the app, so cached projects stay available.)
@@ -49,7 +71,8 @@ export class CloudSession {
   readonly state: UseBoundStore<StoreApi<SessionState>>;
   private me: Person;
 
-  private constructor(id: string, role: Role, members: Members, teams: ProjectTeam[]) {
+  private constructor(id: string, info: ProjectInfo) {
+    const { role, members } = info;
     this.id = id;
     this.project = new Project(this.doc);
     const { server, token, user } = useCloud.getState();
@@ -65,7 +88,8 @@ export class CloudSession {
       peers: [],
       following: null,
       members,
-      teams,
+      teams: info.teams ?? [],
+      rules: info.rules ?? [],
     }));
     this.cache = new IndexeddbPersistence(DB(id), this.doc);
     this.provider = new HocuspocusProvider({
@@ -85,7 +109,12 @@ export class CloudSession {
       onSynced: ({ state }) => this.state.setState({ synced: state }),
       onUnsyncedChanges: ({ number }) => this.state.setState({ unsynced: number }),
       onClose: ({ event }) => {
-        // A refused change (the server explains why) or rights that changed: refresh the role.
+        if (event.reason === 'Reset Connection') {
+          // Rights changed (the owner edited people or rules): reload them and join again.
+          void this.refreshRole().then(() => this.rejoin());
+          return;
+        }
+        // A refused change: the server explains why (the banner offers to reload).
         if (event.reason) this.state.setState({ refused: event.reason });
         void this.refreshRole();
       },
@@ -97,12 +126,9 @@ export class CloudSession {
 
   /** Open a cloud project: fetch the role, then show the cached copy or wait for the server. */
   static async open(id: string): Promise<CloudSession> {
-    let info: { role: Role; members: Members; teams?: ProjectTeam[] };
+    let info: ProjectInfo;
     try {
-      info = await api<{ role: Role; members: Members; teams: ProjectTeam[] }>(
-        'GET',
-        `/api/projects/${id}`,
-      );
+      info = await api<ProjectInfo>('GET', `/api/projects/${id}`);
       localStorage.setItem(`sb.role.${id}`, info.role);
     } catch (e) {
       // Offline: open the cached copy with the last known role.
@@ -110,7 +136,7 @@ export class CloudSession {
       if (!(e instanceof ApiError && e.status === 0) || !role) throw e;
       info = { role, members: [] };
     }
-    const s = new CloudSession(id, info.role, info.members, info.teams ?? []);
+    const s = new CloudSession(id, info);
     await s.cache.whenSynced;
     if (!s.project.rootSheetId) {
       await new Promise<void>((resolve, reject) => {
@@ -148,24 +174,47 @@ export class CloudSession {
     return this.me;
   }
 
+  /** My access to a sheet: project role, adjusted by the owner's rules for that sheet. */
+  levelOf(sheetId: Id): Access {
+    const { role, rules } = this.state.getState();
+    return effectiveLevel(sheetId, role, rules, (s) => this.project.getSheet(s)?.parentSheetId);
+  }
+
   /** Rights of the local user (mirrors what the server enforces). */
-  canWrite(sheetId: Id | undefined, scope: 'doc' | 'comments' | 'locks'): boolean {
-    const role = this.role;
+  canWrite(sheetId: Id | undefined, scope: WriteScope): boolean {
+    const { role, rules } = this.state.getState();
     if (role === 'owner') return true;
-    if (role === 'viewer') return false;
-    if (scope === 'comments') return true;
-    if (role === 'commenter') return false;
     if (scope === 'locks') return false;
-    return !(sheetId && this.project.locks.has(sheetId));
+    if (scope === 'project') return roleAtLeast(role, 'editor');
+    if (scope === 'comments')
+      return sheetId
+        ? accessAtLeast(this.levelOf(sheetId), 'commenter')
+        : writesSomewhere(role, rules, 'commenter');
+    if (!sheetId) return writesSomewhere(role, rules, 'editor');
+    return accessAtLeast(this.levelOf(sheetId), 'editor') && !this.project.locks.has(sheetId);
+  }
+
+  /** Join the document again after the server closed it (new rights). */
+  private rejoin() {
+    const p = this.provider as unknown as { sendToken(): Promise<void>; startSync(): void };
+    void p.sendToken().then(() => p.startSync());
+  }
+
+  /** Throw away the local copy (it holds a change the server refused) and load it again. */
+  async reload() {
+    await this.cache.clearData().catch(() => undefined);
+    window.location.reload();
   }
 
   async refreshRole() {
     try {
-      const info = await api<{ role: Role; members: Members; teams: ProjectTeam[] }>(
-        'GET',
-        `/api/projects/${this.id}`,
-      );
-      this.state.setState({ role: info.role, members: info.members, teams: info.teams ?? [] });
+      const info = await api<ProjectInfo>('GET', `/api/projects/${this.id}`);
+      this.state.setState({
+        role: info.role,
+        members: info.members,
+        teams: info.teams ?? [],
+        rules: info.rules ?? [],
+      });
     } catch {
       // offline: keep the last known role
     }

@@ -38,7 +38,7 @@ const READ_ONLY_ACTIONS = new Set<ActionId>([
 export function runAction(ed: EditorController, id: ActionId): boolean {
   // Read-only (viewer, commenter or locked sheet): only look, navigate, comment and export.
   if (!ed.canEdit() && !READ_ONLY_ACTIONS.has(id)) {
-    if (id !== 'tool.comment' || !ed.project.canWrite(undefined, 'comments')) return false;
+    if (id !== 'tool.comment' || !ed.project.canWrite(ed.sheetId, 'comments')) return false;
   }
   const ui = useUI.getState();
   const tools = activeTools.current;

@@ -1,5 +1,5 @@
 import { sheetTree, type SheetNode } from '@overleagger/core';
-import { FileText, Lock, LockOpen } from 'lucide-react';
+import { Eye, FileText, Lock, LockOpen, MessageSquare, Pencil, UserCog } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSession } from '../cloud/hooks';
 import { useEditor, useSheets } from '../editor/context';
@@ -21,6 +21,12 @@ function Node({
 }) {
   const ed = useEditor();
   const lock = ed.project.getLock(node.sheet.id);
+  const role = useSession((s) => s.role);
+  const rules = useSession((s) => s.rules);
+  const id = node.sheet.id;
+  // Owner: sheets with special access. Others: sheets where they have other rights than usual.
+  const special = role === 'owner' ? rules.filter((r) => r.sheetId === id) : [];
+  const level = ed.session && role !== 'owner' ? ed.session.levelOf(id) : role;
   return (
     <li>
       <div className="sheet-row">
@@ -35,7 +41,32 @@ function Node({
           <span>{node.sheet.name || 'Untitled'}</span>
           {node.children.length > 0 && <span className="count">{node.children.length}</span>}
           {lock && !lockable && <Lock size={12} className="lock-mark" />}
+          {level !== role && (
+            <span
+              className="access-mark"
+              title={`You ${level === 'editor' ? 'can edit' : level === 'commenter' ? 'can comment on' : 'can only view'} this sheet`}
+            >
+              {level === 'editor' ? (
+                <Pencil size={11} />
+              ) : level === 'commenter' ? (
+                <MessageSquare size={11} />
+              ) : (
+                <Eye size={11} />
+              )}
+            </span>
+          )}
         </button>
+        {special.length > 0 && (
+          <button
+            type="button"
+            className="icon-btn access-btn"
+            title={`Special access for ${special.length} ${special.length === 1 ? 'person or team' : 'people or teams'}: click to change`}
+            onClick={() => useUI.getState().set({ shareOpen: { sheetId: id } })}
+            data-testid={`access-${node.sheet.name}`}
+          >
+            <UserCog size={13} />
+          </button>
+        )}
         {lockable && (
           <button
             type="button"

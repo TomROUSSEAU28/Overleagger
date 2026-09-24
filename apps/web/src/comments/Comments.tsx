@@ -37,7 +37,7 @@ export function CommentPins({ zoom }: { zoom: number }) {
   const drag = useUI((s) => s.commentDrag);
   const k = 1 / zoom;
   const isOwner = (ed.session?.role ?? 'owner') === 'owner';
-  const canWrite = ed.project.canWrite(undefined, 'comments');
+  const canWrite = ed.project.canWrite(sheetId, 'comments');
   const here = threads.filter(
     (t) => t.sheetId === sheetId && (showResolved || !t.resolved || t.id === open),
   );
@@ -129,7 +129,7 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
   const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
   // Only the threads of the sheet on screen (the popup does not follow you to another sheet).
   const thread = openId ? threads.find((t) => t.id === openId && t.sheetId === sheetId) : undefined;
-  const canWrite = ed.project.canWrite(undefined, 'comments');
+  const canWrite = ed.project.canWrite(sheetId, 'comments');
   const isOwner = (ed.session?.role ?? 'owner') === 'owner';
   const textRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setText(''), [openId, draft]);

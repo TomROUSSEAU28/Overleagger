@@ -10,11 +10,14 @@
  */
 import { Hocuspocus } from '@hocuspocus/server';
 import {
+  effectiveLevel,
   replaceContent,
   touchedScopes,
-  updateAllowed,
+  updateAllowedFor,
+  writesSomewhere,
   type Person,
   type Role,
+  type SheetRule,
 } from '@overleagger/core';
 import * as Y from 'yjs';
 import { hashToken, randomToken } from './auth';
@@ -24,6 +27,8 @@ import type { Store } from './db';
 export interface CollabContext {
   user: Person;
   role: Role;
+  /** Rights per sheet that apply to this person (theirs and their teams'). */
+  rules: SheetRule[];
 }
 
 /** WebSocket close code for a refused change (the client shows the reason). */
@@ -41,8 +46,10 @@ export function createCollab(store: Store, config: Config) {
       if (!user) throw new Error('Not signed in');
       const role = store.role(documentName, user.id);
       if (!role) throw new Error('No access to this project');
-      connectionConfig.readOnly = role === 'viewer';
-      return { user: { id: user.id, name: user.name, color: user.color }, role };
+      const rules = store.rulesFor(documentName, user.id);
+      // Read-only unless the person may at least comment somewhere.
+      connectionConfig.readOnly = !writesSomewhere(role, rules, 'commenter');
+      return { user: { id: user.id, name: user.name, color: user.color }, role, rules };
     },
 
     async onLoadDocument({ document, documentName }) {
@@ -54,11 +61,19 @@ export function createCollab(store: Store, config: Config) {
     async beforeSync({ type, payload, document, context }) {
       // 1 = SyncStep2, 2 = Update: messages that carry changes.
       if (type !== 1 && type !== 2) return;
-      const role = context.role;
-      if (role === 'owner' || role === 'viewer') return; // viewers are read-only already
+      const { role, rules } = context;
+      if (role === 'owner') return;
       const locks = document.getMap('locks');
-      if (role === 'editor' && locks.size === 0) return;
-      const verdict = updateAllowed(role, touchedScopes(document, payload), locks.keys());
+      // Fast path: an editor of the whole project, no lock, no rule lowering anything.
+      if (role === 'editor' && locks.size === 0 && rules.every((r) => r.level === 'editor')) return;
+      const scopes = touchedScopes(document, payload);
+      const sheets = document.getMap<Y.Map<unknown>>('sheets');
+      const parentOf = (s: string) =>
+        scopes.parents.has(s)
+          ? scopes.parents.get(s)
+          : (sheets.get(s)?.get('parentSheetId') as string | undefined);
+      const levelOf = (s: string) => effectiveLevel(s, role, rules, parentOf);
+      const verdict = updateAllowedFor(role, levelOf, scopes, locks.keys());
       if (!verdict.ok)
         throw Object.assign(new Error(verdict.reason), {
           code: FORBIDDEN_CHANGE,
@@ -125,7 +140,11 @@ export function createCollab(store: Store, config: Config) {
     await saveVersion(projectId, by.id, 'Before restoring a version');
     const source = new Y.Doc();
     Y.applyUpdate(source, old);
-    const conn = await hocuspocus.openDirectConnection(projectId, { user: by, role: 'owner' });
+    const conn = await hocuspocus.openDirectConnection(projectId, {
+      user: by,
+      role: 'owner',
+      rules: [],
+    });
     await conn.transact((doc) => replaceContent(doc, source));
     await conn.disconnect();
     source.destroy();

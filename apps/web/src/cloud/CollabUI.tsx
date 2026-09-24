@@ -1,8 +1,12 @@
 import {
+  LEVEL_LABELS,
   Project,
   ROLE_LABELS,
   ROLES,
+  effectiveLevel,
   elementBBox,
+  flattenSheetTree,
+  sheetTree,
   rectUnion,
   roleAtLeast,
   type PortElement,
@@ -32,7 +36,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSocial } from './social';
 import * as Y from 'yjs';
 import { SheetRenderer } from '../canvas/render/SheetRenderer';
-import { useEditor } from '../editor/context';
+import { useEditor, useSheets } from '../editor/context';
 import { Field, Modal } from '../panels/common';
 import { navigate } from '../router';
 import { useUI } from '../store/ui';
@@ -53,6 +57,7 @@ export function CollabBar() {
   const following = useSession((s) => s.following);
   const user = useCloud((s) => s.user);
   const [dialog, setDialog] = useState<'share' | 'history' | null>(null);
+  const shareOpen = useUI((s) => s.shareOpen);
   // One avatar per person (someone may have several tabs open).
   const people = useMemo(() => {
     const m = new Map<string, (typeof peers)[number]>();
@@ -136,13 +141,18 @@ export function CollabBar() {
         <button
           type="button"
           className="btn"
-          onClick={() => setDialog('share')}
+          onClick={() => useUI.getState().set({ shareOpen: {} })}
           data-testid="open-share"
         >
           <Share2 size={15} /> Share
         </button>
       )}
-      {dialog === 'share' && <ShareDialog onClose={() => setDialog(null)} />}
+      {shareOpen && (
+        <ShareDialog
+          focusSheet={shareOpen.sheetId}
+          onClose={() => useUI.getState().set({ shareOpen: null })}
+        />
+      )}
       {dialog === 'history' && <HistoryDialog onClose={() => setDialog(null)} />}
     </div>
   );
@@ -165,11 +175,19 @@ export function AccessBanner() {
     return () => ed.project.locks.unobserve(h);
   }, [ed]);
   const lock = ed.project.getLock(sheetId);
+  const rules = useSession((s) => s.rules);
+  // Access to this very sheet (the owner may have set rules per sheet).
+  const level = ed.session ? ed.session.levelOf(sheetId) : role;
+  const perSheet = role !== 'owner' && rules.length > 0;
   let msg: React.ReactNode = null;
-  if (role === 'viewer')
-    msg = 'View only: you can look, present and export, but not change this project.';
-  else if (role === 'commenter')
-    msg = 'Comment only: add comments with the comment tool (C); the drawing is read-only for you.';
+  if (level === 'viewer')
+    msg = perSheet
+      ? 'View only on this sheet: the owner decided so. Other sheets may be different.'
+      : 'View only: you can look, present and export, but not change this project.';
+  else if (level === 'commenter')
+    msg = perSheet
+      ? 'Comment only on this sheet (tool C): the owner decided so.'
+      : 'Comment only: add comments with the comment tool (C); the drawing is read-only for you.';
   else if (lock)
     msg = (
       <>
@@ -197,9 +215,11 @@ export function AccessBanner() {
           <button
             type="button"
             className="link accent"
-            onClick={() => ed.session?.state.setState({ refused: null })}
+            title="Load the project again from the server (your refused change is dropped)"
+            onClick={() => void ed.session?.reload()}
+            data-testid="reload-project"
           >
-            OK
+            Reload
           </button>
         </span>
       )}
@@ -211,6 +231,118 @@ export function AccessBanner() {
 // Share dialog
 // ---------------------------------------------------------------------------
 
+/**
+ * The owner's "access per sheet": for one sheet (and its sub-sheets), what each person or team
+ * may do there. "Default" keeps what they have above (their role, or a rule on a parent sheet).
+ */
+function SheetAccess({
+  focusSheet,
+  onError,
+}: {
+  focusSheet?: string;
+  onError: (msg: string) => void;
+}) {
+  const ed = useEditor();
+  const session = ed.session!;
+  const members = useSession((s) => s.members);
+  const teams = useSession((s) => s.teams);
+  const rules = useSession((s) => s.rules);
+  useSheets(); // re-render when sheets change
+  const current = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
+  const [sheetId, setSheetId] = useState(focusSheet ?? current);
+  const tree = sheetTree(ed.project);
+  const ordered = tree ? flattenSheetTree(tree) : [];
+  const depth = (id: string) => {
+    let d = 0;
+    for (
+      let s = ed.project.getSheet(id);
+      s?.parentSheetId;
+      s = ed.project.getSheet(s.parentSheetId)
+    )
+      d++;
+    return d;
+  };
+  const parentOf = (s: string) => ed.project.getSheet(s)?.parentSheetId;
+  const people = [
+    ...members
+      .filter((m) => m.role !== 'owner')
+      .map((m) => ({ principal: 'user' as const, id: m.id, name: m.name, role: m.role })),
+    ...teams.map((t) => ({
+      principal: 'team' as const,
+      id: t.id,
+      name: `${t.name} (team)`,
+      role: t.role,
+    })),
+  ];
+  const set = async (principal: 'user' | 'team', principalId: string, level: string) => {
+    try {
+      await api('PUT', `/api/projects/${session.id}/rules`, {
+        sheetId,
+        principal,
+        principalId,
+        level: level || null,
+      });
+      await session.refreshRole();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <>
+      <h3 className="share-h">Access per sheet</h3>
+      <p className="muted small">
+        Choose a sheet, then what each person may do there. It applies to its sub-sheets too.
+      </p>
+      <select
+        className="sheet-access-pick"
+        value={sheetId}
+        onChange={(e) => setSheetId(e.target.value)}
+        data-testid="access-sheet"
+      >
+        {ordered.map((n) => (
+          <option key={n.sheet.id} value={n.sheet.id}>
+            {'\u00a0\u00a0'.repeat(depth(n.sheet.id))}
+            {n.sheet.name || 'Untitled'}
+          </option>
+        ))}
+      </select>
+      <ul className="members sheet-access" data-testid="sheet-access">
+        {people.map((p) => {
+          const mine = rules.filter((r) => r.principal === p.principal && r.principalId === p.id);
+          const here = mine.find((r) => r.sheetId === sheetId);
+          // What they would have here without a rule on this very sheet.
+          const inherited = effectiveLevel(
+            sheetId,
+            p.role,
+            mine.filter((r) => r.sheetId !== sheetId),
+            parentOf,
+          );
+          return (
+            <li key={`${p.principal}-${p.id}`}>
+              <span className="member-name">{p.name}</span>
+              <select
+                value={here?.level ?? ''}
+                onChange={(e) => void set(p.principal, p.id, e.target.value)}
+                className={here ? 'rule-set' : ''}
+                data-testid="sheet-level"
+              >
+                <option value="">
+                  Default ({inherited === 'hidden' ? 'Hidden' : ROLE_LABELS[inherited]})
+                </option>
+                {(['editor', 'commenter', 'viewer'] as const).map((l) => (
+                  <option key={l} value={l}>
+                    {LEVEL_LABELS[l]}
+                  </option>
+                ))}
+              </select>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 interface InviteInfo {
   token: string;
   role: Role;
@@ -220,7 +352,7 @@ interface InviteInfo {
   uses: number;
 }
 
-function ShareDialog({ onClose }: { onClose: () => void }) {
+function ShareDialog({ onClose, focusSheet }: { onClose: () => void; focusSheet?: string }) {
   const ed = useEditor();
   const session = ed.session;
   const close = onClose;
@@ -256,10 +388,10 @@ function ShareDialog({ onClose }: { onClose: () => void }) {
       </Modal>
     );
   }
-  return <CloudShare onClose={close} />;
+  return <CloudShare onClose={close} focusSheet={focusSheet} />;
 }
 
-function CloudShare({ onClose }: { onClose: () => void }) {
+function CloudShare({ onClose, focusSheet }: { onClose: () => void; focusSheet?: string }) {
   const ed = useEditor();
   const session = ed.session!;
   const role = useSession((s) => s.role);
@@ -484,6 +616,9 @@ function CloudShare({ onClose }: { onClose: () => void }) {
             </li>
           ))}
         </ul>
+      )}
+      {isOwner && (members.length > 1 || teams.length > 0) && (
+        <SheetAccess focusSheet={focusSheet} onError={setError} />
       )}
       {isOwner ? (
         <>

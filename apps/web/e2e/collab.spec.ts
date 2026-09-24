@@ -157,3 +157,97 @@ test('friends and teams: add a friend by username, share a project with a team',
   await card.locator('a.card-title').click();
   await expect(dan.getByTestId('canvas')).toBeVisible();
 });
+
+test('rights per sheet: a viewer who may edit one sheet only', async ({ browser }) => {
+  const emma = await person(browser, 'Emma');
+  const fred = await person(browser, 'Fred');
+  // Friends, through the Friends & teams page.
+  await fred.getByTestId('dash-people').click();
+  const handle = (await fred.getByTestId('my-handle').textContent())!.trim();
+  await emma.getByTestId('dash-people').click();
+  await emma.getByTestId('friend-who').fill(handle);
+  await emma.getByTestId('friend-add').click();
+  await fred.reload();
+  await fred.getByTestId('friend-accept').click();
+
+  // Emma: the example on the server, Fred as a viewer…
+  await emma.goto('/app/');
+  await emma.getByTestId('new-project').click();
+  await emma.getByTestId('start-example').click();
+  await emma.getByTestId('new-project-where').selectOption('cloud');
+  await emma.getByTestId('create-project').click();
+  await expect(emma.getByTestId('canvas')).toBeVisible();
+  await emma.getByTestId('open-share').click();
+  const fredOption = await emma
+    .getByTestId('share-pick')
+    .locator('option', { hasText: 'Fred' })
+    .textContent();
+  await emma.getByTestId('share-pick').selectOption({ label: fredOption! });
+  await emma.locator('.share-add select').nth(1).selectOption('viewer');
+  await emma.getByTestId('share-add').click();
+  // …who may edit the controller sheet.
+  const ctrlSheet = await emma
+    .getByTestId('access-sheet')
+    .locator('option', { hasText: 'Voltage controller' })
+    .getAttribute('value');
+  await emma.getByTestId('access-sheet').selectOption(ctrlSheet!);
+  await emma.getByTestId('sheet-level').first().selectOption('editor');
+  await expect(emma.getByTestId('sheet-level').first()).toHaveValue('editor');
+  const url = emma.url();
+  await emma.keyboard.press('Escape');
+
+  // Fred: view only on the power stage…
+  await fred.goto(url);
+  await expect(fred.getByTestId('canvas')).toBeVisible();
+  await expect(fred.getByTestId('access-banner')).toContainText('View only on this sheet');
+  const canEdit = () =>
+    fred.evaluate(() =>
+      (
+        window as unknown as { __overleagger: { ed: { canEdit(): boolean } } }
+      ).__overleagger.ed.canEdit(),
+    );
+  expect(await canEdit()).toBe(false);
+  // …but he edits the controller.
+  await fred.getByTestId('tab-sheets').click();
+  await fred.getByTestId('sheet-Voltage controller').click();
+  await expect(fred.getByTestId('access-banner')).toHaveCount(0);
+  expect(await canEdit()).toBe(true);
+  await fred.evaluate(() => {
+    const { ed } = (
+      window as unknown as {
+        __overleagger: { ed: { commit(f: () => void): void; addElement(e: object): void } };
+      }
+    ).__overleagger;
+    ed.commit(() =>
+      ed.addElement({
+        type: 'text',
+        x: 0,
+        y: 400,
+        text: 'Fred was here',
+        size: 16,
+        align: 'start',
+      }),
+    );
+  });
+  // Emma sees it (live), on the controller sheet.
+  await expect
+    .poll(() =>
+      emma.evaluate(() => {
+        const p = (
+          window as unknown as {
+            __overleagger: {
+              ed: {
+                project: {
+                  listSheets(): { id: string; name: string }[];
+                  getElements(id: string): { text?: string }[];
+                };
+              };
+            };
+          }
+        ).__overleagger.ed.project;
+        const s = p.listSheets().find((x) => x.name === 'Voltage controller')!;
+        return p.getElements(s.id).some((e) => e.text === 'Fred was here');
+      }),
+    )
+    .toBe(true);
+});

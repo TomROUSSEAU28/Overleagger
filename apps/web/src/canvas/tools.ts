@@ -144,7 +144,7 @@ export class ToolController {
 
     const editable = this.ed.canEdit();
     if (ui.tool === 'comment') {
-      if (this.ed.project.canWrite(undefined, 'comments'))
+      if (this.ed.project.canWrite(this.ed.sheetId, 'comments'))
         ui.set({ commentDraft: p.world, openThread: null });
       return;
     }

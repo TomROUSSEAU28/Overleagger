@@ -15,6 +15,7 @@ const localSession = create<SessionState>(() => ({
   following: null,
   members: [],
   teams: [],
+  rules: [],
 }));
 
 /** Read the collaboration state (works for local projects too). */
@@ -27,6 +28,7 @@ export function useSession<T>(sel: (s: SessionState) => T): T {
 export function useCanEdit(): boolean {
   const ed = useEditor();
   useSession((s) => s.role);
+  useSession((s) => s.rules);
   const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
   const [, bump] = useState(0);
   useEffect(() => {

@@ -1,8 +1,9 @@
 # Collaboration plan: contacts, teams, per-sheet rights
 
-> **Status**: the simple version is done — @usernames, friends (request / accept), teams, and
-> sharing a project with a friend or a whole team from the Share button. Per-sheet rights
-> (sections 1, 5) are left for later, on purpose: collaboration stays simple.
+> **Status**: steps 1–3 are done — @usernames, friends (request / accept), teams, sharing a
+> project with a friend or a whole team, and **per-sheet rights** (Can view / Can comment /
+> Can edit for a person or a team, raising or lowering the project role, inherited by
+> sub-sheets, enforced by the server). Next: step 4, **hidden** sheets (split documents).
 
 Goal: after creating an account, working together is easy. You add friends, create a team,
 add people to a project, and the owner decides who may **see**, **comment** or **edit**, down

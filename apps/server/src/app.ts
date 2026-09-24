@@ -5,7 +5,7 @@
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
-import { Project, ROLES, roleAtLeast, type Role } from '@overleagger/core';
+import { Project, ROLES, roleAtLeast, type Role, type SheetLevel } from '@overleagger/core';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
 import { colorFor, hashPassword, hashToken, randomToken, verifyPassword } from './auth';
@@ -329,7 +329,38 @@ export async function createApp(config: Config) {
       role,
       members: store.members(id),
       teams: store.projectTeams(id),
+      // The owner sees every rule; the others, the ones that apply to them.
+      rules: role === 'owner' ? store.rules(id) : store.rulesFor(id, requireUser(req).id),
     };
+  });
+
+  /** Rights of a person or a team on one sheet (and its sub-sheets); `level: null` removes it. */
+  app.put('/api/projects/:id/rules', async (req) => {
+    const { id } = req.params as { id: string };
+    const { user } = requireRole(req, id, 'owner');
+    const b = (req.body ?? {}) as {
+      sheetId?: string;
+      principal?: 'user' | 'team';
+      principalId?: string;
+      level?: SheetLevel | null;
+    };
+    if (!b.sheetId || !b.principalId || (b.principal !== 'user' && b.principal !== 'team'))
+      throw bad('Which sheet, and for whom?');
+    if (b.level !== null && !['editor', 'commenter', 'viewer'].includes(b.level ?? ''))
+      throw bad('Unknown access level.');
+    if (b.principal === 'user') {
+      if (b.principalId === user.id) throw bad('The owner always has every right.');
+      if (!store.role(id, b.principalId)) throw bad('This person has no access to the project.');
+    } else if (!store.projectTeams(id).some((t) => t.id === b.principalId))
+      throw bad('This team has no access to the project.');
+    store.setRule(id, {
+      sheetId: b.sheetId,
+      principal: b.principal,
+      principalId: b.principalId,
+      level: b.level ?? null,
+    });
+    collab.refreshAccess(id);
+    return { rules: store.rules(id) };
   });
 
   app.patch('/api/projects/:id', async (req) => {

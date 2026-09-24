@@ -14,11 +14,15 @@ import type {
   SheetLock,
 } from './types';
 
+/** What a change is about: drawing content, comments, sheet locks, or the project itself. */
+export type WriteScope = 'doc' | 'comments' | 'locks' | 'project';
+
 /**
  * What the local user may change (set by the collaboration layer). `sheetId` is the sheet being
- * edited when known; `scope` is 'comments' for comment threads, 'locks' for sheet locks.
+ * changed; without it, the question is "may they change this kind of thing somewhere?".
+ * 'project' is the project name, standard and symbols.
  */
-export type WriteGuard = (sheetId: Id | undefined, scope: 'doc' | 'comments' | 'locks') => boolean;
+export type WriteGuard = (sheetId: Id | undefined, scope: WriteScope) => boolean;
 
 /** Transaction origin for edits made by the local user (tracked by the undo manager). */
 export const LOCAL_ORIGIN = 'overleagger:local';
@@ -105,7 +109,7 @@ export class Project {
   }
 
   /** True when the local user may make this kind of change. */
-  canWrite(sheetId?: Id, scope: 'doc' | 'comments' | 'locks' = 'doc'): boolean {
+  canWrite(sheetId?: Id, scope: WriteScope = 'doc'): boolean {
     return this.writeGuard ? this.writeGuard(sheetId, scope) : true;
   }
 
@@ -135,6 +139,7 @@ export class Project {
   }
 
   setMeta(patch: Partial<ProjectMeta>): void {
+    if (!this.canWrite(undefined, 'project')) return;
     this.transact(() => {
       for (const [k, v] of Object.entries(patch)) this.meta.set(k, v);
     });
@@ -304,10 +309,14 @@ export class Project {
   // Comments (writable by commenters too)
   // -------------------------------------------------------------------------
 
-  private commentTransact(fn: () => void) {
-    if (!this.canWrite(undefined, 'comments')) return false;
+  private commentTransact(sheetId: Id | undefined, fn: () => void) {
+    if (!this.canWrite(sheetId, 'comments')) return false;
     this.doc.transact(fn, LOCAL_ORIGIN);
     return true;
+  }
+
+  private threadSheet(threadId: Id): Id | undefined {
+    return this.comments.get(threadId)?.get('sheetId') as Id | undefined;
   }
 
   getComments(): CommentThread[] {
@@ -325,7 +334,7 @@ export class Project {
     text: string,
   ): Id | undefined {
     const id = newId();
-    const ok = this.commentTransact(() => {
+    const ok = this.commentTransact(at.sheetId, () => {
       const m = new Y.Map<unknown>();
       m.set('id', id);
       m.set('sheetId', at.sheetId);
@@ -345,13 +354,15 @@ export class Project {
     const msgs = this.comments.get(threadId)?.get('messages') as
       Y.Array<CommentMessage> | undefined;
     if (!msgs) return;
-    this.commentTransact(() => msgs.push([{ id: newId(), author, text, at: Date.now() }]));
+    this.commentTransact(this.threadSheet(threadId), () =>
+      msgs.push([{ id: newId(), author, text, at: Date.now() }]),
+    );
   }
 
   updateComment(threadId: Id, patch: Partial<Pick<CommentThread, 'resolved' | 'x' | 'y'>>): void {
     const m = this.comments.get(threadId);
     if (!m) return;
-    this.commentTransact(() => {
+    this.commentTransact(this.threadSheet(threadId), () => {
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined || v === false) m.delete(k);
         else m.set(k, v);
@@ -361,7 +372,7 @@ export class Project {
 
   /** Put back a thread exactly as it was (undo of a deletion). */
   restoreComment(thread: CommentThread): void {
-    this.commentTransact(() => {
+    this.commentTransact(thread.sheetId, () => {
       const m = new Y.Map<unknown>();
       for (const [k, v] of Object.entries(thread)) {
         if (k === 'messages' || v === undefined || v === false) continue;
@@ -376,7 +387,7 @@ export class Project {
 
   deleteComment(threadId: Id): void {
     if (!this.comments.has(threadId)) return;
-    this.commentTransact(() => this.comments.delete(threadId));
+    this.commentTransact(this.threadSheet(threadId), () => this.comments.delete(threadId));
   }
 
   // -------------------------------------------------------------------------
