@@ -45,9 +45,21 @@ certificates and caches the static files close to visitors.
   cd circuit-notebook
   ```
 
-- [ ] In `docker-compose.yml`:
-  - `PUBLIC_URL: https://circuitnotebook.com`, `TRUST_PROXY: 'true'`;
-  - bind the port to the machine only: `'127.0.0.1:8787:8787'`.
+- [ ] Server settings go in `docker-compose.override.yml` (not in git, so `git pull` never
+      conflicts with them; Docker Compose merges it automatically):
+
+  ```bash
+  cat > docker-compose.override.yml <<'EOF'
+  services:
+    circuit-notebook:
+      ports: !override
+        - '127.0.0.1:8787:8787' # reachable from the machine only (the tunnel)
+      environment:
+        PUBLIC_URL: https://circuitnotebook.com
+        TRUST_PROXY: 'true'
+  EOF
+  ```
+
 - [ ] `docker compose up -d --build`, then `curl localhost:8787/api/health`.
 
 ## 3. Cloudflare in front
