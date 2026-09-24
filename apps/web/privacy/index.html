@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy policy — Circuit Notebook</title>
+    <meta
+      name="description"
+      content="What Circuit Notebook stores about you, why, for how long, who helps run the site, and how to see or delete your data."
+    />
+    <meta name="theme-color" content="#f7f3e8" />
+    <link rel="icon" type="image/svg+xml" href="/brand/logo.svg" />
+    <link rel="canonical" href="https://circuitnotebook.com/privacy/" />
+    <script type="module" src="/src/landing/landing.ts"></script>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="../" aria-label="Circuit Notebook, home">
+        <img src="/brand/logo.svg" alt="" width="30" height="30" />
+        <span>Circuit Notebook</span>
+      </a>
+      <nav aria-label="Sections">
+        <a href="../">Home</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+      <a class="btn primary" href="../app/">Open the app</a>
+    </header>
+
+    <main>
+      <article class="legal" data-testid="privacy">
+        <p class="kicker">Last updated: 24 September 2026</p>
+        <h1>Privacy policy</h1>
+
+        <div class="legal-summary">
+          <h2>In short</h2>
+          <ul>
+            <li>
+              <b>Without an account, your drawings never leave your browser.</b> They are saved on
+              your computer only.
+            </li>
+            <li>
+              With an account, the server keeps your e-mail, your name, your password (scrambled so
+              nobody can read it) and the projects you choose to put online.
+            </li>
+            <li>No ads, no analytics, no tracking cookies. Your data is never sold.</li>
+            <li>
+              You can see, download or delete your data at any time: write to
+              <a href="mailto:contact@circuitnotebook.com">contact@circuitnotebook.com</a>.
+            </li>
+          </ul>
+        </div>
+
+        <section>
+          <h2>1. Who runs Circuit Notebook</h2>
+          <p>
+            Circuit Notebook is made and run by one person, Tom Rousseau, a student developer in
+            France, as an individual (not a company). Under the European data protection law (GDPR)
+            I am the <i>data controller</i>: the person responsible for your data.
+          </p>
+          <p>
+            Contact for anything in this page:
+            <a href="mailto:contact@circuitnotebook.com">contact@circuitnotebook.com</a>, or the
+            <a href="../#contact">contact form</a>.
+          </p>
+        </section>
+
+        <section>
+          <h2>2. Using the app without an account</h2>
+          <p>
+            You can use the whole editor without signing up. Your projects, your own symbols and
+            templates, your settings and keyboard shortcuts are saved <b>in your browser</b>
+            (its storage called IndexedDB and localStorage). They are not sent to my server.
+          </p>
+          <p>
+            The flip side: if you clear your browser data or change computer, they are gone. Keep a
+            copy of important projects (<i>Export → Download .olg file</i>).
+          </p>
+        </section>
+
+        <section>
+          <h2>3. What the server keeps when you have an account</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>What</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  Your e-mail address, your name, your username (if you choose one), the colour of
+                  your cursor, the date you signed up.
+                </td>
+                <td>To create your account, sign you in and show who is who in shared projects.</td>
+              </tr>
+              <tr>
+                <td>
+                  Your password, <b>never in clear</b>: only a scrambled version (a <i>hash</i>,
+                  made with scrypt) from which the password cannot be read back.
+                </td>
+                <td>To check your password when you sign in.</td>
+              </tr>
+              <tr>
+                <td>
+                  A sign-in key, kept in your browser. The server keeps only a scrambled copy. It
+                  expires after 30 days or when you sign out.
+                </td>
+                <td>So you stay signed in.</td>
+              </tr>
+              <tr>
+                <td>
+                  The projects you put on the server: drawings, names, thumbnails, comments, version
+                  history (with who saved each version), who may open them (members, teams, invite
+                  links, rights per sheet).
+                </td>
+                <td>To keep them for you, sync them between devices and share them.</td>
+              </tr>
+              <tr>
+                <td>
+                  Your friends and teams, and your personal library of symbols if you sync it.
+                </td>
+                <td>To share projects with them in one click.</td>
+              </tr>
+              <tr>
+                <td>
+                  If you sign in with GitHub (when this button is offered): your GitHub account
+                  number, your GitHub name and your verified e-mail address. Nothing else: no access
+                  to your code.
+                </td>
+                <td>To sign you in without a password.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>Legal basis: providing the service you asked for (GDPR, article 6.1.b).</p>
+          <p>
+            <b>Who sees what.</b> People you share a project with see your name, username, colour,
+            e-mail address, your cursor and your comments in that project. Your friends and team
+            mates see your name, username and colour. Someone can send you a friend request only if
+            they already know your exact e-mail or username.
+          </p>
+          <p>
+            As the administrator I see the list of accounts (name, e-mail, date, number and size of
+            projects), to run the beta and its limits. I do not look inside your projects, unless
+            you ask me to help with one.
+          </p>
+        </section>
+
+        <section>
+          <h2>4. The contact form</h2>
+          <p>
+            When you write to me with the form of the homepage, I receive your name (optional), your
+            e-mail address and your message. They are saved on the server and e-mailed to me, so I
+            can answer you (legal basis: your request, and my legitimate interest in answering it,
+            GDPR article 6.1.f). I delete these messages once the conversation is over, and at the
+            latest one year later.
+          </p>
+          <p>
+            To stop spam, the server remembers your IP address for one hour (in memory, not in its
+            database) to count the messages sent from it.
+          </p>
+        </section>
+
+        <section>
+          <h2>5. What I do not do</h2>
+          <ul>
+            <li>No advertising, no audience statistics, no tracking pixels, no social buttons.</li>
+            <li>
+              No selling or renting of your data, and no use of your projects for anything other
+              than giving them back to you.
+            </li>
+            <li>
+              The fonts and images come from my own server: opening the site does not tell Google,
+              Facebook or anyone else that you came.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>6. Cookies and browser storage</h2>
+          <p>
+            Circuit Notebook sets no cookie of its own. It uses your browser's storage only for what
+            the app needs to work: your sign-in key, the server address, your settings and
+            shortcuts, your local projects and a copy of the online projects you opened (so they
+            still work offline). Cloudflare, which protects the site (see below), may set a
+            technical cookie to tell people from robots (<code>__cf_bm</code>, 30 minutes).
+          </p>
+          <p>
+            All of these are strictly necessary for the site to work, which is why there is no
+            cookie banner.
+          </p>
+        </section>
+
+        <section>
+          <h2>7. The services that help run the site</h2>
+          <p>
+            A few companies handle data for me, only for the task below, under contracts that follow
+            the GDPR.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>What for</th>
+                <th>Where</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Hetzner Online GmbH</td>
+                <td>The server that runs the site, the database, and its backups.</td>
+                <td>European Union (Germany)</td>
+              </tr>
+              <tr>
+                <td>Cloudflare, Inc.</td>
+                <td>
+                  Stands in front of the server: secure connection (HTTPS), protection against
+                  attacks, domain name, forwarding of e-mails sent to contact@. It sees the
+                  technical data of each visit (IP address, browser, page asked).
+                </td>
+                <td>Worldwide, incl. the United States*</td>
+              </tr>
+              <tr>
+                <td>Brevo (Sendinblue SAS)</td>
+                <td>Sends me the messages of the contact form by e-mail.</td>
+                <td>European Union (France)</td>
+              </tr>
+              <tr>
+                <td>Google LLC (Gmail)</td>
+                <td>The mailbox where I read and answer e-mails sent to contact@.</td>
+                <td>Worldwide, incl. the United States*</td>
+              </tr>
+              <tr>
+                <td>GitHub, Inc.</td>
+                <td>Only if you choose "Continue with GitHub".</td>
+                <td>United States*</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="muted small">
+            * Transfers outside the EU rely on the EU–US Data Privacy Framework and on the European
+            Commission's standard contractual clauses.
+          </p>
+          <p>
+            <b>Ko-fi.</b> The "Support" button opens Ko-fi, a separate site with its own privacy
+            policy. If you give, Ko-fi and its payment provider handle the payment; I only see the
+            name and message you choose to leave there.
+          </p>
+        </section>
+
+        <section>
+          <h2>8. How long data is kept</h2>
+          <ul>
+            <li><b>Account:</b> as long as it exists. Ask me and it is deleted.</li>
+            <li><b>Sign-in keys:</b> 30 days at most.</li>
+            <li>
+              <b>Projects on the server:</b> until their owner deletes them. The automatic versions
+              of the history are thinned out as new ones come (20 at most); versions you named stay
+              until the project is deleted.
+            </li>
+            <li><b>Contact messages:</b> one year at most.</li>
+            <li>
+              <b>Backups:</b> to protect your work against accidents, the database is copied every
+              night (the last 7 days are kept on the server, and 7 days more by Hetzner, on other
+              machines), and before each update of the site (the 5 latest). Something you delete
+              therefore disappears from the backups as these copies are replaced.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>9. Your rights</h2>
+          <p>You can at any time:</p>
+          <ul>
+            <li><b>see</b> the data I have about you, and get a copy of it;</li>
+            <li><b>correct</b> it (your name, username and colour can be changed in the app);</li>
+            <li>
+              <b>delete</b> it: your projects from the app, your whole account by writing to me;
+            </li>
+            <li>
+              <b>take it with you</b>: projects can be exported from the app as files; I send the
+              rest on request;
+            </li>
+            <li><b>object</b> to a use of your data, or ask me to pause it.</li>
+          </ul>
+          <p>
+            Write to <a href="mailto:contact@circuitnotebook.com">contact@circuitnotebook.com</a>
+            from the e-mail address of your account (so I know it is you). I answer within one
+            month.
+          </p>
+          <p>
+            If you think I do not respect your data, you can complain to the French data protection
+            authority, the CNIL (<a
+              href="https://www.cnil.fr/en/contact-cnil"
+              target="_blank"
+              rel="noopener"
+              >cnil.fr</a
+            >), or the authority of your country.
+          </p>
+        </section>
+
+        <section>
+          <h2>10. Security</h2>
+          <p>
+            Every connection is encrypted (HTTPS). Passwords and sign-in keys are stored only in
+            scrambled form. The server is not directly reachable from the internet: it is only
+            reached through Cloudflare. The database is backed up every night. No system is perfect:
+            if a problem ever puts your data at risk, I will tell you and the CNIL, as the law asks.
+          </p>
+        </section>
+
+        <section>
+          <h2>11. Young users</h2>
+          <p>
+            Circuit Notebook is made for students and engineers. If you are under 15, ask a parent
+            before creating an account.
+          </p>
+        </section>
+
+        <section>
+          <h2>12. Changes</h2>
+          <p>
+            If this policy changes, the date at the top changes too. Important changes will be
+            announced on the homepage, or by e-mail to account holders.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <div class="brand">
+        <img src="/brand/logo.svg" alt="" width="22" height="22" />
+        <span>Circuit Notebook</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="../app/">Open the app</a>
+        <a href="../#contact">Contact</a>
+        <a href="./">Privacy</a>
+      </nav>
+      <p class="muted small"><span data-year></span></p>
+    </footer>
+  </body>
+</html>

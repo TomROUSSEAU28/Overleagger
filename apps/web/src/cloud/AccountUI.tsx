@@ -184,6 +184,14 @@ export function SignInDialog({
             data-testid="auth-password"
           />
         </Field>
+        {mode === 'up' && (
+          <p className="muted small">
+            Your e-mail is only used to sign you in and to share projects.{' '}
+            <a href={`${cloud.server}/privacy/`} target="_blank" rel="noopener">
+              Privacy policy
+            </a>
+          </p>
+        )}
         {error && <p className="warning small">{error}</p>}
         <div className="modal-foot">
           {canSignUp && (

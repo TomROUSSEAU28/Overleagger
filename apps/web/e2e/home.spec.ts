@@ -66,3 +66,15 @@ test('homepage: open beta, support link, and the contact form reaches the admin'
   const { messages } = (await list.json()) as { messages: { body: string; name: string }[] };
   expect(messages.find((m) => m.body.includes(String(stamp)))?.name).toBe('Léa');
 });
+
+test('the privacy policy is one click away from the homepage', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('footer').getByRole('link', { name: 'Privacy' }).click();
+  await expect(page).toHaveURL(/\/privacy\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privacy policy');
+  await expect(page.getByTestId('privacy')).toContainText('contact@circuitnotebook.com');
+  // Styled like the homepage, and the way back works.
+  await expect(page.locator('.legal-summary')).toBeVisible();
+  await page.locator('header').getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page.locator('.beta-pill')).toBeVisible();
+});

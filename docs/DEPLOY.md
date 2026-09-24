@@ -198,9 +198,14 @@ Open projects reconnect by themselves; unsynced edits stay in the browsers and s
 
 ## 6. Before announcing it
 
-- [ ] **Legal (France / EU)**: _mentions légales_ (who publishes the site, the host's address)
-      and a **privacy policy** (GDPR: which data — email, name, projects —, why, how long, how to
-      delete an account). No tracking cookies → no cookie banner needed.
+- [x] **Privacy policy** (GDPR): `apps/web/privacy/index.html`, served at `/privacy/`, linked
+      from the footer, the contact form and the sign-up dialog. Keep it true: if you add a
+      service (analytics, another e-mail provider…) or change how long data is kept, update it
+      and its date. Promise made there: contact messages are deleted after one year at most
+      (Administration → Messages), and account deletions asked by e-mail are done within a month.
+- [ ] **Mentions légales** (France): who publishes the site and the host's name and address
+      (Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Germany). No tracking cookies
+      → no cookie banner needed.
 - [x] Homepage: absolute `og:image` / `twitter:image`, `<link rel="canonical">`, `robots.txt` and
       `sitemap.xml` point to `https://circuitnotebook.com/`.
 - [ ] Cloudflare _Rules → Redirect rules_: `www.circuitnotebook.com/*` →
