@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/*.local.mjs
+**/test-results
+**/playwright-report
+data
+.git

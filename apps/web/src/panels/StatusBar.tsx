@@ -3,6 +3,7 @@ import { useEditor } from '../editor/context';
 import { useUI, type ToolId } from '../store/ui';
 
 const HINTS: Record<ToolId, string> = {
+  comment: 'Click where you want to leave a comment · click a bubble to read and reply',
   select:
     'Click to select · drag to move · drag a pin end to start a wire · double-click a block to open it',
   pan: 'Drag to pan the view',

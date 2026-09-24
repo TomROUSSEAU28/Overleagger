@@ -1,3 +1,4 @@
+import { roleAtLeast } from '@overleagger/core';
 import { useEffect, useState } from 'react';
 import { Canvas } from '../canvas/Canvas';
 import { HelpOverlay, ShortcutsDialog } from '../panels/Shortcuts';
@@ -8,13 +9,17 @@ import { QuickAdd } from '../panels/QuickAdd';
 import { SheetsPanel } from '../panels/SheetsPanel';
 import { SaveTemplateDialog } from '../panels/SaveTemplateDialog';
 import { TemplatesPanel } from '../panels/TemplatesPanel';
+import { AccessBanner } from '../cloud/CollabUI';
+import { CommentsPanel } from '../comments/Comments';
 import { Presentation } from '../present/Presentation';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
 import { ToolRail } from '../panels/ToolRail';
 import { TopBar } from '../panels/TopBar';
 import { useShortcuts } from '../shortcuts/useShortcuts';
-import { openProject, updateEntry, type OpenProject } from '../storage/projects';
+import { api, useCloud } from '../cloud/cloud';
+import { CloudSession } from '../cloud/session';
+import { openProject, updateEntry } from '../storage/projects';
 import { useUI } from '../store/ui';
 import { THEMES } from '../theme';
 import { EditorContext, useEditor } from './context';
@@ -32,6 +37,7 @@ function EditorLayout() {
   return (
     <div className="editor" data-theme={theme}>
       <TopBar />
+      <AccessBanner />
       <div className="editor-main">
         <ToolRail />
         {left && (
@@ -59,6 +65,16 @@ function EditorLayout() {
               <button
                 type="button"
                 role="tab"
+                aria-selected={tab === 'comments'}
+                className={tab === 'comments' ? 'active' : ''}
+                onClick={() => useUI.getState().set({ leftTab: 'comments' })}
+                data-testid="tab-comments"
+              >
+                Comments
+              </button>
+              <button
+                type="button"
+                role="tab"
                 aria-selected={tab === 'sheets'}
                 className={tab === 'sheets' ? 'active' : ''}
                 onClick={() => useUI.getState().set({ leftTab: 'sheets' })}
@@ -71,6 +87,8 @@ function EditorLayout() {
               <LibraryPanel />
             ) : tab === 'templates' ? (
               <TemplatesPanel />
+            ) : tab === 'comments' ? (
+              <CommentsPanel />
             ) : (
               <SheetsPanel />
             )}
@@ -97,77 +115,106 @@ function EditorLayout() {
   );
 }
 
-/** Keep the dashboard entry (name, date, thumbnail) in sync with the document. */
-function useIndexSync(open: OpenProject | null, ed: EditorController | null) {
+/** Where the edited project lives. */
+export type ProjectSource = { kind: 'local'; id: string } | { kind: 'cloud'; id: string };
+
+interface Opened {
+  ed: EditorController;
+  close: () => void;
+  source: ProjectSource;
+}
+
+/**
+ * Keep the project list in sync with the document: name, date and thumbnail in the local index,
+ * or the thumbnail on the server for cloud projects (editors and owners).
+ */
+function useIndexSync(opened: Opened | null) {
   useEffect(() => {
-    if (!open || !ed) return;
+    if (!opened) return;
+    const { ed, source } = opened;
+    const project = ed.project;
     let t1: ReturnType<typeof setTimeout> | undefined;
     let t2: ReturnType<typeof setTimeout> | undefined;
     const onChange = () => {
-      clearTimeout(t1);
-      t1 = setTimeout(
-        () =>
-          void updateEntry(open.id, { name: open.project.getMeta().name, updatedAt: Date.now() }),
-        600,
-      );
+      if (source.kind === 'local') {
+        clearTimeout(t1);
+        t1 = setTimeout(
+          () =>
+            void updateEntry(source.id, { name: project.getMeta().name, updatedAt: Date.now() }),
+          600,
+        );
+      }
       clearTimeout(t2);
-      t2 = setTimeout(async () => {
-        const { renderSheetSvg } = await import('../export/render');
-        const r = await renderSheetSvg(open.project, ed.ctx, open.project.rootSheetId, {
-          theme: THEMES.paper,
-          background: 'paper',
-          latexRefs: true,
-          margin: 16,
-        });
-        await updateEntry(open.id, { thumbnail: r.svg });
-      }, 2500);
+      t2 = setTimeout(
+        async () => {
+          if (source.kind === 'cloud' && !roleAtLeast(ed.session?.role, 'editor')) return;
+          const { renderSheetSvg } = await import('../export/render');
+          const r = await renderSheetSvg(project, ed.ctx, project.rootSheetId, {
+            theme: THEMES.paper,
+            background: 'paper',
+            latexRefs: true,
+            margin: 16,
+          });
+          if (source.kind === 'local') await updateEntry(source.id, { thumbnail: r.svg });
+          else
+            await api('PATCH', `/api/projects/${source.id}`, { thumbnail: r.svg }).catch(
+              () => undefined,
+            );
+        },
+        source.kind === 'local' ? 2500 : 6000,
+      );
     };
-    const off = open.project.subscribe(onChange);
+    const off = project.subscribe(onChange);
     return () => {
       off();
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [open, ed]);
+  }, [opened]);
 }
 
-export function EditorPage({ projectId }: { projectId: string }) {
-  const [state, setState] = useState<
-    { open: OpenProject; ed: EditorController } | { error: string } | null
-  >(null);
+async function openSource(source: ProjectSource): Promise<Opened> {
+  if (source.kind === 'local') {
+    const open = await openProject(source.id);
+    const ed = new EditorController(open.project);
+    return { ed, source, close: () => (ed.destroy(), open.close()) };
+  }
+  await useCloud.getState().init();
+  if (!useCloud.getState().user) throw new Error('Please sign in to open this shared project.');
+  const session = await CloudSession.open(source.id);
+  const ed = new EditorController(session.project, session);
+  return { ed, source, close: () => (ed.destroy(), session.close()) };
+}
+
+export function EditorPage({ source }: { source: ProjectSource }) {
+  const [state, setState] = useState<Opened | { error: string } | null>(null);
+  const key = `${source.kind}:${source.id}`;
 
   useEffect(() => {
     let alive = true;
-    let opened: { open: OpenProject; ed: EditorController } | null = null;
+    let opened: Opened | null = null;
     useUI.getState().resetEditor();
-    openProject(projectId)
-      .then((open) => {
-        const ed = new EditorController(open.project);
-        if (!alive) {
-          ed.destroy();
-          open.close();
-          return;
-        }
-        opened = { open, ed };
-        useUI.getState().set({ sheetId: open.project.rootSheetId });
+    openSource(source)
+      .then((o) => {
+        if (!alive) return o.close();
+        opened = o;
+        useUI.getState().set({ sheetId: o.ed.project.rootSheetId });
         // Handle for debugging from the console and for end-to-end tests.
-        (window as unknown as { __overleagger?: unknown }).__overleagger = { ed, ui: useUI };
-        setState(opened);
+        (window as unknown as { __overleagger?: unknown }).__overleagger = { ed: o.ed, ui: useUI };
+        setState(o);
       })
       .catch(
         (e: unknown) => alive && setState({ error: e instanceof Error ? e.message : String(e) }),
       );
     return () => {
       alive = false;
-      if (opened) {
-        opened.ed.destroy();
-        opened.open.close();
-      }
+      opened?.close();
     };
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  const ok = state && 'open' in state ? state : null;
-  useIndexSync(ok?.open ?? null, ok?.ed ?? null);
+  const ok = state && 'ed' in state ? state : null;
+  useIndexSync(ok);
 
   if (!state) return <div className="loading">Opening project…</div>;
   if ('error' in state)

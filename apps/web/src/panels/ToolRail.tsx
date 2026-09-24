@@ -6,6 +6,7 @@ import {
   Image,
   Link,
   LogIn,
+  MessageSquarePlus,
   MousePointer2,
   MoveRight,
   MoveUpRight,
@@ -18,6 +19,7 @@ import {
   Type,
 } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
+import { useCanEdit } from '../cloud/hooks';
 import { useEditor } from '../editor/context';
 import { formatCombo, type ActionId } from '../shortcuts/keymap';
 import { useKeymap } from '../shortcuts/useKeymap';
@@ -35,6 +37,12 @@ const GROUPS: ToolDef[][] = [
   [
     { tool: 'select', action: 'tool.select', label: 'Select', icon: <MousePointer2 size={18} /> },
     { tool: 'pan', action: 'tool.pan', label: 'Pan', icon: <Hand size={18} /> },
+    {
+      tool: 'comment',
+      action: 'tool.comment',
+      label: 'Comment',
+      icon: <MessageSquarePlus size={18} />,
+    },
   ],
   [
     { tool: 'wire', action: 'tool.wire', label: 'Wire', icon: <Spline size={18} /> },
@@ -61,9 +69,13 @@ export function ToolRail() {
   const ed = useEditor();
   const tool = useUI((s) => s.tool);
   const keymap = useKeymap((s) => s.keymap);
+  const canEdit = useCanEdit();
+  const canComment = ed.project.canWrite(undefined, 'comments');
+  // Read-only: keep select, pan and (if allowed) comment.
+  const groups = canEdit ? GROUPS : [GROUPS[0]!.filter((t) => t.tool !== 'comment' || canComment)];
   return (
     <nav className="tool-rail" aria-label="Tools">
-      {GROUPS.map((group, gi) => (
+      {groups.map((group, gi) => (
         <Fragment key={gi}>
           {gi > 0 && <span className="rail-sep" />}
           {group.map((t) => {

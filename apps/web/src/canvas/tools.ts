@@ -135,7 +135,16 @@ export class ToolController {
       return;
     }
 
-    if (ui.tool === 'select' && p.handle && this.ed.selection().length === 1) {
+    const editable = this.ed.canEdit();
+    if (ui.tool === 'comment') {
+      if (this.ed.project.canWrite(undefined, 'comments'))
+        ui.set({ commentDraft: p.world, openThread: null });
+      return;
+    }
+    // Read-only (viewer, commenter, locked sheet): select, pan and follow links only.
+    if (!editable && ui.tool !== 'select') return;
+
+    if (editable && ui.tool === 'select' && p.handle && this.ed.selection().length === 1) {
       const id = this.ed.selection()[0]!;
       const el = this.ed.project.getElement(this.ed.sheetId, id);
       if (el && !el.locked) {
@@ -201,7 +210,8 @@ export class ToolController {
     const ed = this.ed;
     const elements = ed.elements();
     // Grabbing a pin starts a wire.
-    const pin = pinAt(elements, ed.ctx, p.world.x, p.world.y, 6 / this.zoom());
+    const editable = ed.canEdit();
+    const pin = editable ? pinAt(elements, ed.ctx, p.world.x, p.world.y, 6 / this.zoom()) : null;
     if (pin && !p.shift) {
       this.wireFromSelect = true;
       this.ui.set({ tool: 'wire', selection: [] });
@@ -226,7 +236,7 @@ export class ToolController {
         el?.type === 'wire' && this.dragIds.length === 1
           ? { wireId: el.id, index: nearestSegment(el, p.world.x, p.world.y) }
           : null;
-      this.mode = 'maybe-drag';
+      this.mode = editable ? 'maybe-drag' : 'idle';
       return;
     }
     if (!p.shift) ed.select([]);

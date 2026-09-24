@@ -42,6 +42,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheetElements, useSheets } from '../editor/context';
+import { useCanEdit } from '../cloud/hooks';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 import { Field, IconButton } from './common';
@@ -70,9 +71,13 @@ export function PropertiesPanel() {
   if (sel.length === 0) body = <SheetProps />;
   else if (sel.length === 1) body = <SingleProps el={sel[0]!} elements={elements} />;
   else body = <MultiProps sel={sel} elements={elements} />;
+  const canEdit = useCanEdit();
   return (
     <div className="props" data-testid="properties">
-      {body}
+      {/* Read-only: everything is shown but disabled. */}
+      <fieldset className="plain" disabled={!canEdit}>
+        {body}
+      </fieldset>
     </div>
   );
 }

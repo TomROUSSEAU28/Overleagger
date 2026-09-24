@@ -13,7 +13,30 @@ export function isEditable(t: EventTarget | null): boolean {
 }
 
 /** Execute an editor action (keyboard shortcut, menu or toolbar). */
+const READ_ONLY_ACTIONS = new Set<ActionId>([
+  'tool.select',
+  'tool.pan',
+  'edit.selectAll',
+  'edit.cancel',
+  'nav.enter',
+  'nav.up',
+  'view.fit',
+  'view.zoomIn',
+  'view.zoomOut',
+  'view.zoomReset',
+  'view.grid',
+  'view.leftPanel',
+  'view.rightPanel',
+  'view.present',
+  'file.export',
+  'help.shortcuts',
+]);
+
 export function runAction(ed: EditorController, id: ActionId): boolean {
+  // Read-only (viewer, commenter or locked sheet): only look, navigate, comment and export.
+  if (!ed.canEdit() && !READ_ONLY_ACTIONS.has(id)) {
+    if (id !== 'tool.comment' || !ed.project.canWrite(undefined, 'comments')) return false;
+  }
   const ui = useUI.getState();
   const tools = activeTools.current;
   switch (id) {
@@ -70,6 +93,9 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
       return true;
     case 'tool.frame':
       ed.setTool('frame');
+      return true;
+    case 'tool.comment':
+      ed.setTool('comment');
       return true;
     case 'edit.toBlock':
       ed.selectionToBlock();

@@ -21,6 +21,7 @@ export type ActionId =
   | 'tool.button'
   | 'tool.waveform'
   | 'tool.frame'
+  | 'tool.comment'
   | 'edit.toBlock'
   | 'edit.quickAdd'
   | 'edit.rotate'
@@ -85,6 +86,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'tool.button', label: 'Link button', category: 'Tools', keys: ['k'] },
   { id: 'tool.waveform', label: 'Waveform / oscillogram', category: 'Tools', keys: ['o'] },
   { id: 'tool.frame', label: 'Frame', category: 'Tools', keys: ['shift+f'] },
+  { id: 'tool.comment', label: 'Comment', category: 'Tools', keys: ['c'] },
   {
     id: 'edit.toBlock',
     label: 'Move selection into a new block',

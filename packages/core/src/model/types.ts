@@ -326,3 +326,42 @@ export interface Rect {
   w: number;
   h: number;
 }
+
+// ---------------------------------------------------------------------------
+// Collaboration
+// ---------------------------------------------------------------------------
+
+/** Project roles, from most to least powerful. */
+export type Role = 'owner' | 'editor' | 'commenter' | 'viewer';
+
+export interface Person {
+  id: string;
+  name: string;
+  /** Colour of the person's cursor and avatar. */
+  color: string;
+}
+
+export interface CommentMessage {
+  id: Id;
+  author: Person;
+  text: string;
+  at: number;
+}
+
+/** A comment thread pinned on a sheet (optionally on an element). */
+export interface CommentThread {
+  id: Id;
+  sheetId: Id;
+  x: number;
+  y: number;
+  elementId?: Id;
+  resolved?: boolean;
+  createdAt: number;
+  messages: CommentMessage[];
+}
+
+/** A locked sheet can only be edited by the project owner. */
+export interface SheetLock {
+  by: Person;
+  at: number;
+}

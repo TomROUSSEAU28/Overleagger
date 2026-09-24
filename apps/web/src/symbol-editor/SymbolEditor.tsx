@@ -324,7 +324,12 @@ export function SymbolEditor() {
   ];
 
   return (
-    <Modal title={existing ? `Edit symbol — ${existing.name}` : 'New symbol'} onClose={close} wide>
+    <Modal
+      title={existing ? `Edit symbol — ${existing.name}` : 'New symbol'}
+      onClose={close}
+      wide
+      escapeCloses={false}
+    >
       <div className="symed">
         <div className="symed-tools">
           {tools.map((t) => (

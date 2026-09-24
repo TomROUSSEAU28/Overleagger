@@ -11,6 +11,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@hocuspocus/provider": "^4.7.0",
     "@overleagger/core": "workspace:*",
     "@overleagger/symbols": "workspace:*",
     "fflate": "^0.8.3",

@@ -23,6 +23,7 @@ import {
   distributeUnits,
   followPins,
   moveToNewBlock,
+  ReadOnlyError,
   newId,
   type AlignMode,
   type ClipData,
@@ -37,6 +38,7 @@ import type { StaticSymbolDef } from '@overleagger/symbols';
 import type * as Y from 'yjs';
 import { motionEnabled, popIn, ripple, vanish } from '../canvas/juice';
 import { useUI, type ToolId, type Viewport } from '../store/ui';
+import type { CloudSession } from '../cloud/session';
 import { useUserLib, type UserTemplate } from '../storage/userLibrary';
 
 export const MIN_ZOOM = 0.1;
@@ -53,8 +55,12 @@ export class EditorController {
   canvasSize = { w: 1200, h: 800 };
   private clipboard: ClipData | null = null;
 
-  constructor(project: Project) {
+  /** Collaboration session (cloud projects only). */
+  readonly session: CloudSession | null;
+
+  constructor(project: Project, session: CloudSession | null = null) {
     this.project = project;
+    this.session = session;
     this.undo = createUndoManager(project);
     const base = makeContext(project);
     // Symbols of the personal library are usable in every project (they are copied into the
@@ -85,12 +91,22 @@ export class EditorController {
     return this.project.getElements(this.sheetId);
   }
 
+  /** May the local user edit this sheet (role, locks)? Always true for local projects. */
+  canEdit(sheetId: Id = this.sheetId): boolean {
+    return this.project.canWrite(sheetId);
+  }
+
   /** Run edits as one undo step. */
   commit<T>(fn: () => T): T {
     this.undo.stopCapturing();
-    const out = this.project.transact(fn);
-    this.undo.stopCapturing();
-    return out;
+    try {
+      return this.project.transact(fn);
+    } catch (e) {
+      if (e instanceof ReadOnlyError) return undefined as T;
+      throw e;
+    } finally {
+      this.undo.stopCapturing();
+    }
   }
 
   // -------------------------------------------------------------------------

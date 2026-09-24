@@ -17,10 +17,21 @@ export default defineConfig({
     acceptDownloads: true,
     launchOptions: executablePath ? { executablePath } : {},
   },
-  webServer: {
-    command: 'pnpm build && pnpm preview --port 4173 --strictPort',
-    url: 'http://localhost:4173/',
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm build && pnpm preview --port 4173 --strictPort',
+      url: 'http://localhost:4173/',
+      reuseExistingServer: true,
+      timeout: 120_000,
+    },
+    {
+      // Collaboration server with a throw-away database (the web app connects to it
+      // cross-origin, like GitHub Pages + a self-hosted server).
+      command: 'pnpm --filter @overleagger/server exec tsx src/main.ts',
+      url: 'http://localhost:8788/api/health',
+      reuseExistingServer: true,
+      timeout: 60_000,
+      env: { PORT: '8788', DB_FILE: ':memory:', HOST: '127.0.0.1' },
+    },
+  ],
 });

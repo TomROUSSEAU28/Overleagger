@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { ThemeName } from '../theme';
 
 export type ToolId =
+  | 'comment'
   | 'select'
   | 'pan'
   | 'wire'
@@ -129,9 +130,16 @@ export interface UIState extends Settings {
   cursor: Pt | null;
   modal: Modal;
   inlineEdit: InlineEdit | null;
-  leftTab: 'library' | 'sheets' | 'templates';
+  leftTab: 'library' | 'sheets' | 'templates' | 'comments';
+  /** New comment being written at this point (world px). */
+  commentDraft: Pt | null;
+  /** Comment thread shown in its popup. */
+  openThread: string | null;
+  showResolved: boolean;
   /** Presentation mode (full screen slides). */
   presenting: boolean;
+  /** Following someone else's presentation (their user id). */
+  presentFollow: string | null;
   spaceDown: boolean;
 
   set: (patch: Partial<UIState>) => void;
@@ -192,6 +200,9 @@ const transient = {
   modal: null as Modal,
   inlineEdit: null,
   presenting: false,
+  presentFollow: null,
+  commentDraft: null,
+  openThread: null,
 };
 
 export const useUI = create<UIState>((set, get) => ({
@@ -202,6 +213,7 @@ export const useUI = create<UIState>((set, get) => ({
   prefs: { shapeKind: 'rect', sketch: false, arrow: true, penSize: 3, highlighter: false },
   leftTab: 'library',
   spaceDown: false,
+  showResolved: false,
 
   set: (patch) => set(patch),
   setTool: (tool) =>

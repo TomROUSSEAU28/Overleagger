@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { formatCombo } from '../shortcuts/keymap';
 
 export function IconButton({
@@ -41,12 +41,28 @@ export function Modal({
   onClose,
   children,
   wide,
+  escapeCloses = true,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  /** Dialogs that use Escape themselves (symbol editor) turn this off. */
+  escapeCloses?: boolean;
 }) {
+  // Escape closes the dialog (captured first so the editor shortcuts do not see it).
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!escapeCloses) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      close.current();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [escapeCloses]);
   return (
     <div
       className="modal-backdrop"

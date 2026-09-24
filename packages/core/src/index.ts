@@ -11,3 +11,4 @@ export * from './hierarchy';
 export * from './clipboard';
 export * from './refdes';
 export * from './slides';
+export * from './collab';

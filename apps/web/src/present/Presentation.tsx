@@ -80,7 +80,7 @@ export function Presentation() {
 
   const close = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-    useUI.getState().set({ presenting: false });
+    useUI.getState().set({ presenting: false, presentFollow: null });
   }, []);
 
   // Full screen while presenting; leaving full screen (Esc) ends the presentation.
@@ -92,7 +92,8 @@ export function Presentation() {
       () => undefined,
     );
     const onChange = () => {
-      if (wasFull && !document.fullscreenElement) useUI.getState().set({ presenting: false });
+      if (wasFull && !document.fullscreenElement)
+        useUI.getState().set({ presenting: false, presentFollow: null });
     };
     const onResize = () => setScreen({ w: window.innerWidth, h: window.innerHeight });
     document.addEventListener('fullscreenchange', onChange);
@@ -162,6 +163,11 @@ export function Presentation() {
     [slides, screen, sheetId, animateTo],
   );
 
+  const indexRef = useRef(index);
+  indexRef.current = index;
+  const goRef = useRef(go);
+  goRef.current = go;
+
   const next = useCallback(() => index < slides.length - 1 && go(index + 1), [index, slides, go]);
   const prev = useCallback(() => index > 0 && go(index - 1), [index, go]);
   const up = useCallback(() => {
@@ -171,6 +177,32 @@ export function Presentation() {
     const i = slides.findIndex((s) => s.sheetId === parent);
     if (i >= 0) go(i);
   }, [ed, sheetId, slides, go]);
+
+  // Collaboration: tell the others which slide I show, or follow the presenter's slides.
+  const follow = useUI((s) => s.presentFollow);
+  useEffect(() => {
+    const session = ed.session;
+    if (!session || follow) return;
+    session.setPresence({ presenting: { index } });
+  }, [ed, index, follow]);
+  useEffect(() => () => ed.session?.setPresence({ presenting: null }), [ed]);
+  useEffect(() => {
+    const session = ed.session;
+    if (!session || !follow) return;
+    const sync = () => {
+      const p = session.state.getState().peers.find((x) => x.user.id === follow);
+      if (!p?.presenting) {
+        // The presenter stopped.
+        useUI.getState().set({ presenting: false, presentFollow: null });
+        return;
+      }
+      if (p.presenting.index !== indexRef.current) goRef.current(p.presenting.index);
+    };
+    sync();
+    return session.state.subscribe((a, b) => {
+      if (a.peers !== b.peers) sync();
+    });
+  }, [ed, follow]);
 
   // Re-fit on resize.
   useEffect(() => {

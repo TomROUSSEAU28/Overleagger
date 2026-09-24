@@ -1,4 +1,7 @@
 import { useEffect } from 'react';
+import { AuthPage, InvitePage } from './cloud/AccountUI';
+import { useCloud } from './cloud/cloud';
+import { startLibrarySync } from './cloud/librarySync';
 import { Dashboard } from './dashboard/Dashboard';
 import { EditorPage } from './editor/EditorPage';
 import { Gallery } from './gallery/Gallery';
@@ -18,10 +21,18 @@ export function App() {
   }, [animations]);
   useEffect(() => {
     void useUserLib.getState().load();
+    void useCloud.getState().init();
+    startLibrarySync();
   }, []);
   switch (route.page) {
     case 'editor':
-      return <EditorPage key={route.projectId} projectId={route.projectId} />;
+      return <EditorPage source={{ kind: 'local', id: route.projectId }} />;
+    case 'cloud':
+      return <EditorPage source={{ kind: 'cloud', id: route.projectId }} />;
+    case 'invite':
+      return <InvitePage token={route.token} />;
+    case 'auth':
+      return <AuthPage token={route.token} />;
     case 'gallery':
       return <Gallery />;
     default:

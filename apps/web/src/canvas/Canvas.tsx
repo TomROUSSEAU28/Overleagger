@@ -28,6 +28,9 @@ import {
   type PointerEvent as RPointerEvent,
 } from 'react';
 import { useEditor, useMeta, useSheetElements, useSymbolsVersion } from '../editor/context';
+import { CommentPins, CommentPopover } from '../comments/Comments';
+import { RemoteOverlay } from '../cloud/Presence';
+import { useFollow, usePresencePublisher } from '../cloud/presenceHooks';
 import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { THEMES, resolveColor, type Theme } from '../theme';
@@ -71,6 +74,8 @@ export function Canvas() {
   const resize = useUI((s) => s.resize);
   const erasing = useUI((s) => s.erasing);
   const animations = useUI((s) => s.animations);
+  usePresencePublisher();
+  const followTarget = useFollow();
   const storedVp = useUI((s) => s.viewports[sheetId]);
   const meta = useMeta();
   const symbolsVersion = useSymbolsVersion();
@@ -401,8 +406,25 @@ export function Canvas() {
             style={{ '--fx-ink': theme.ink, '--fx-sel': theme.select } as CSSProperties}
           />
           <Overlay elements={effective} o={o} zoom={vp.zoom} />
+          <RemoteOverlay elements={effective} o={o} zoom={vp.zoom} />
+          <CommentPins zoom={vp.zoom} />
         </g>
       </svg>
+      <CommentPopover vp={vp} />
+      {followTarget && (
+        <div
+          className="follow-frame"
+          style={{ ['--c' as string]: followTarget.user.color }}
+          data-testid="follow-frame"
+        >
+          <span>
+            Following {followTarget.user.name}
+            <button type="button" onClick={() => ed.session?.state.setState({ following: null })}>
+              Stop
+            </button>
+          </span>
+        </div>
+      )}
       <ToolOptions />
       <InlineEditor vp={vp} />
       <input

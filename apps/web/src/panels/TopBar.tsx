@@ -13,6 +13,7 @@ import {
   Sparkles,
   Undo2,
 } from 'lucide-react';
+import { CollabBar } from '../cloud/CollabUI';
 import { useEditor, useMeta, useSheets, useUndoState } from '../editor/context';
 import { useUI } from '../store/ui';
 import { IconButton } from './common';
@@ -65,6 +66,7 @@ export function TopBar() {
       />
       <Breadcrumbs />
       <div className="spacer" />
+      <CollabBar />
       <div className="segmented" role="group" aria-label="Drawing standard">
         {(['IEC', 'ANSI'] as const).map((s) => (
           <button

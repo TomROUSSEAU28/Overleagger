@@ -1,7 +1,24 @@
 import * as Y from 'yjs';
 import type { Standard } from '@overleagger/symbols';
 import { newId } from '../ids';
-import type { Element, Id, NewElement, ProjectMeta, ProjectSymbol, SheetInfo } from './types';
+import type {
+  CommentMessage,
+  CommentThread,
+  Element,
+  Id,
+  NewElement,
+  Person,
+  ProjectMeta,
+  ProjectSymbol,
+  SheetInfo,
+  SheetLock,
+} from './types';
+
+/**
+ * What the local user may change (set by the collaboration layer). `sheetId` is the sheet being
+ * edited when known; `scope` is 'comments' for comment threads, 'locks' for sheet locks.
+ */
+export type WriteGuard = (sheetId: Id | undefined, scope: 'doc' | 'comments' | 'locks') => boolean;
 
 /** Transaction origin for edits made by the local user (tracked by the undo manager). */
 export const LOCAL_ORIGIN = 'overleagger:local';
@@ -18,6 +35,9 @@ type YSheet = Y.Map<unknown>;
  *   meta:    Y.Map   { name, standard, rootSheetId, formatVersion, createdAt }
  *   sheets:  Y.Map<sheetId, Y.Map { id, name, parentSheetId?, blockId?, elements: Y.Map<id, Y.Map> }>
  *   symbols: Y.Map<symbolId, StaticSymbolDef>   (project custom symbols)
+ *   comments: Y.Map<threadId, Y.Map { id, sheetId, x, y, elementId?, resolved?, createdAt,
+ *                                     messages: Y.Array<CommentMessage> }>
+ *   locks:   Y.Map<sheetId, SheetLock>          (sheets only the owner may edit)
  *
  * Each element is its own Y.Map so concurrent edits of different fields merge cleanly.
  * Reads return plain immutable snapshots that are cached until the element changes, so UI
@@ -28,6 +48,10 @@ export class Project {
   readonly meta: Y.Map<unknown>;
   readonly sheets: Y.Map<YSheet>;
   readonly symbols: Y.Map<ProjectSymbol>;
+  readonly comments: Y.Map<Y.Map<unknown>>;
+  readonly locks: Y.Map<SheetLock>;
+  /** Collaboration permissions; `null` = everything allowed (local projects). */
+  writeGuard: WriteGuard | null = null;
 
   private cache = new WeakMap<YElement, Element>();
   private listCache = new Map<Id, { version: number; list: Element[] }>();
@@ -39,6 +63,8 @@ export class Project {
     this.meta = doc.getMap('meta');
     this.sheets = doc.getMap('sheets') as Y.Map<YSheet>;
     this.symbols = doc.getMap('symbols') as Y.Map<ProjectSymbol>;
+    this.comments = doc.getMap('comments') as Y.Map<Y.Map<unknown>>;
+    this.locks = doc.getMap('locks') as Y.Map<SheetLock>;
     doc.on('afterTransaction', (tr: Y.Transaction) => {
       if (tr.changed.size === 0) return;
       for (const type of tr.changed.keys()) {
@@ -78,7 +104,14 @@ export class Project {
     return () => this.listeners.delete(fn);
   }
 
+  /** True when the local user may make this kind of change. */
+  canWrite(sheetId?: Id, scope: 'doc' | 'comments' | 'locks' = 'doc'): boolean {
+    return this.writeGuard ? this.writeGuard(sheetId, scope) : true;
+  }
+
+  /** Run edits in one Yjs transaction (skipped entirely when the user may not edit). */
   transact<T>(fn: () => T, origin: unknown = LOCAL_ORIGIN): T {
+    if (!this.canWrite()) return undefined as T;
     let out!: T;
     this.doc.transact(() => {
       out = fn();
@@ -153,7 +186,7 @@ export class Project {
 
   updateSheet(id: Id, patch: Partial<Omit<SheetInfo, 'id'>>): void {
     const s = this.sheets.get(id);
-    if (!s) return;
+    if (!s || !this.canWrite(id)) return;
     this.transact(() => {
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined) s.delete(k);
@@ -218,6 +251,7 @@ export class Project {
   addElement(sheetId: Id, el: NewElement): Element {
     const map = this.elementsMap(sheetId);
     if (!map) throw new Error(`Unknown sheet ${sheetId}`);
+    if (!this.canWrite(sheetId)) throw new ReadOnlyError();
     const id = el.id ?? newId();
     const full = { ...el, id, z: el.z ?? this.maxZ(sheetId) + 1 } as Element;
     this.transact(() => {
@@ -231,7 +265,7 @@ export class Project {
   /** Shallow-merge `patch` into an element. `undefined` values delete the field. */
   updateElement(sheetId: Id, id: Id, patch: Partial<Element>): void {
     const m = this.elementsMap(sheetId)?.get(id);
-    if (!m) return;
+    if (!m || !this.canWrite(sheetId)) return;
     this.transact(() => {
       for (const [k, v] of Object.entries(patch)) {
         if (k === 'id' || k === 'type') continue;
@@ -250,7 +284,7 @@ export class Project {
 
   removeElement(sheetId: Id, id: Id): void {
     const map = this.elementsMap(sheetId);
-    if (!map?.has(id)) return;
+    if (!map?.has(id) || !this.canWrite(sheetId)) return;
     this.transact(() => map.delete(id));
   }
 
@@ -260,6 +294,86 @@ export class Project {
 
   getProjectSymbols(): ProjectSymbol[] {
     return [...this.symbols.values()];
+  }
+
+  // -------------------------------------------------------------------------
+  // Comments (writable by commenters too)
+  // -------------------------------------------------------------------------
+
+  private commentTransact(fn: () => void) {
+    if (!this.canWrite(undefined, 'comments')) return false;
+    this.doc.transact(fn, LOCAL_ORIGIN);
+    return true;
+  }
+
+  getComments(): CommentThread[] {
+    const out: CommentThread[] = [];
+    for (const m of this.comments.values()) {
+      const t = m.toJSON() as CommentThread;
+      out.push({ ...t, messages: t.messages ?? [] });
+    }
+    return out.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  addComment(
+    at: { sheetId: Id; x: number; y: number; elementId?: Id },
+    author: Person,
+    text: string,
+  ): Id | undefined {
+    const id = newId();
+    const ok = this.commentTransact(() => {
+      const m = new Y.Map<unknown>();
+      m.set('id', id);
+      m.set('sheetId', at.sheetId);
+      m.set('x', at.x);
+      m.set('y', at.y);
+      if (at.elementId) m.set('elementId', at.elementId);
+      m.set('createdAt', Date.now());
+      const msgs = new Y.Array<CommentMessage>();
+      msgs.push([{ id: newId(), author, text, at: Date.now() }]);
+      m.set('messages', msgs);
+      this.comments.set(id, m);
+    });
+    return ok ? id : undefined;
+  }
+
+  replyComment(threadId: Id, author: Person, text: string): void {
+    const msgs = this.comments.get(threadId)?.get('messages') as
+      Y.Array<CommentMessage> | undefined;
+    if (!msgs) return;
+    this.commentTransact(() => msgs.push([{ id: newId(), author, text, at: Date.now() }]));
+  }
+
+  updateComment(threadId: Id, patch: Partial<Pick<CommentThread, 'resolved' | 'x' | 'y'>>): void {
+    const m = this.comments.get(threadId);
+    if (!m) return;
+    this.commentTransact(() => {
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined || v === false) m.delete(k);
+        else m.set(k, v);
+      }
+    });
+  }
+
+  deleteComment(threadId: Id): void {
+    if (!this.comments.has(threadId)) return;
+    this.commentTransact(() => this.comments.delete(threadId));
+  }
+
+  // -------------------------------------------------------------------------
+  // Sheet locks (owner only)
+  // -------------------------------------------------------------------------
+
+  getLock(sheetId: Id): SheetLock | undefined {
+    return this.locks.get(sheetId);
+  }
+
+  setLock(sheetId: Id, by: Person | null): void {
+    if (!this.canWrite(sheetId, 'locks')) return;
+    this.doc.transact(() => {
+      if (by) this.locks.set(sheetId, { by, at: Date.now() });
+      else this.locks.delete(sheetId);
+    }, LOCAL_ORIGIN);
   }
 
   // -------------------------------------------------------------------------
@@ -287,6 +401,14 @@ export class Project {
     const doc = new Y.Doc();
     Y.applyUpdate(doc, update);
     return new Project(doc);
+  }
+}
+
+/** Thrown when adding content the local user may not add (read-only or locked sheet). */
+export class ReadOnlyError extends Error {
+  constructor() {
+    super('This sheet is read-only for you.');
+    this.name = 'ReadOnlyError';
   }
 }
 

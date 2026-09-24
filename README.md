@@ -10,7 +10,7 @@ draw.io or CircuitPaint, but made for engineers: symbols that follow the **IEC (
 **ANSI (US)** standards, wires that snap to a grid with **automatic junction dots**, **blocks you
 can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
-![Status](<https://img.shields.io/badge/status-phase%203%20(presentation%20%26%20smart%20PDF)-2f5d9e>)
+![Status](<https://img.shields.io/badge/status-phase%204%20(collaboration)-2f5d9e>)
 
 ## Features
 
@@ -85,6 +85,27 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 - **Laser pointer** (`L`), **pen** (`P`, nothing is saved, `C` clears), **blank screen** (`B`),
   `←/→`, `Space`, `Home/End`, `Esc` to leave.
 
+### Collaboration (phase 4)
+
+Everything above works offline in the browser. Connect to a **SchemaBoard server** (your own,
+see _Self-hosting_) to share projects:
+
+- **Accounts**: email + password, or GitHub sign-in when the server enables it. Your personal
+  library (symbols and templates) follows your account.
+- **Shared projects**: create a project on the server, or upload one from this browser
+  (_Share_ button or ☁ on the project card). They open instantly and keep working offline; the
+  changes sync when you are back online.
+- **Invite links** with a role: **owner** (people, links, sheet locks), **editor**, **commenter**
+  (comments only), **viewer** (look, present, export). The server checks every change against
+  the role, not only the interface.
+- **Real time**: live edits, **cursors with names**, others' selections, avatars in the top bar
+  — click one to **follow their view**; “X is presenting — Join” follows their slides.
+- **Comments** (tool `C`): threads pinned on the drawing, replies, resolve, a list of all threads
+  in the _Comments_ tab. They also work in local projects, as notes to yourself.
+- **Sheet locks**: the owner locks a sheet (Sheets tab) so only they can change it.
+- **Version history**: a version is kept automatically every few minutes; name one with _Save_;
+  preview and **restore** (the current state is saved first, so nothing is lost).
+
 ### Files and export
 
 - Projects saved automatically in the browser (IndexedDB), `.olg` project files to back up/share.
@@ -121,6 +142,32 @@ The build is a static site (`base: './'`), so it can be hosted on any static hos
 `.github/workflows/pages.yml` publishes it on **GitHub Pages** on every push to `main`
 (one-time setup: repository _Settings → Pages → Source: GitHub Actions_).
 
+To work on the collaboration server: `pnpm --filter @overleagger/server dev` (port 8787), then
+_Connect to a server_ → `http://localhost:8787` in the app.
+
+## Self-hosting (collaboration server)
+
+One container holds the web app and the server (Node 22, Fastify, Hocuspocus/Yjs, SQLite):
+
+```bash
+docker compose up -d        # → http://localhost:8787
+```
+
+Data (accounts, projects, versions) lives in the `schemaboard-data` volume — back it up by
+copying `/data/schemaboard.sqlite`. Settings (environment variables, see `docker-compose.yml`):
+
+| Variable                                    | Default                    | Meaning                                                     |
+| ------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `PUBLIC_URL`                                | `http://localhost:8787`    | Public address (invite links, GitHub sign-in)               |
+| `ALLOW_SIGNUP`                              | `true`                     | `false`: new accounts only through an invite link           |
+| `CORS_ORIGINS`                              | `*`                        | Web app origins allowed to call the API (e.g. GitHub Pages) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | —                          | Enables “Continue with GitHub”                              |
+| `DB_FILE`                                   | `/data/schemaboard.sqlite` | SQLite file                                                 |
+| `SESSION_DAYS` / `AUTO_VERSION_MINUTES`     | `30` / `10`                | Sign-in lifetime / time between automatic versions          |
+
+Put it behind HTTPS (Caddy, nginx, Traefik…) for real use: WebSockets go through `/collab`. The
+GitHub Pages version of the app can use any server: _Connect to a server_ on the dashboard.
+
 ## Architecture
 
 ```
@@ -128,10 +175,13 @@ packages/symbols   Symbol library: primitives in grid units, IEC/ANSI variants, 
 packages/core      Document model (Yjs), geometry, connectivity (junctions, nets), hierarchy,
                    move/rotate/mirror, groups, clipboard, reference designators
 apps/web           React + Vite editor: SVG canvas, tools, panels, shortcuts, LaTeX, export
+apps/server        Collaboration server: Fastify API, Hocuspocus sync, SQLite, auth, history
 ```
 
-- The document is a **Yjs** CRDT (`meta`, `sheets`, `symbols`). Each element is a `Y.Map`, so the
-  future real-time collaboration server only has to sync the document — no rewrite.
+- The document is a **Yjs** CRDT (`meta`, `sheets`, `symbols`, `comments`, `locks`). Each element
+  is a `Y.Map`, so concurrent edits of different fields merge cleanly. The server applies each
+  incoming update to a copy of the document to see which parts it touches, and refuses it when
+  the sender's role does not allow it (`packages/core/src/collab.ts`).
 - Junction dots are **computed, never stored**: at every wire end or pin, a wire end counts 1
   branch, a wire passing through counts 2, a pin counts 1; three or more branches → a dot.
 - Symbols are plain data (`line`, `poly`, `circle`, `arc`, `rect`, `path`, `text`) built by small
@@ -142,8 +192,7 @@ apps/web           React + Vite editor: SVG canvas, tools, panels, shortcuts, La
 - ~~Phase 1 — Core editor~~ ✔
 - ~~Phase 2 — Whiteboard~~ ✔
 - ~~Phase 3 — Presentation & smart PDF, CircuiTikZ export~~ ✔
-- **Phase 4 — Collaboration**: self-hosted server (Hocuspocus + SQLite, Docker), invitations,
-  roles (owner / editor / commenter / viewer), live cursors, comments, version history.
+- ~~Phase 4 — Collaboration~~ ✔
 - **Phase 5 — Extras**: SPICE netlist, BOM.
 
 ## Licences
