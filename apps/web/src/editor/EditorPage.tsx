@@ -181,7 +181,14 @@ async function openSource(source: ProjectSource): Promise<Opened> {
   if (source.kind === 'local') {
     const open = await openProject(source.id);
     const ed = new EditorController(open.project);
-    return { ed, source, close: () => (ed.destroy(), open.close()) };
+    return {
+      ed,
+      source,
+      close: () => {
+        ed.destroy();
+        void open.close();
+      },
+    };
   }
   await useCloud.getState().init();
   if (!useCloud.getState().user) throw new Error('Please sign in to open this shared project.');

@@ -2720,6 +2720,10 @@ body.resizing-panel {
 .access-btn {
   color: var(--accent);
 }
+.sheet-node.hidden-sheet > span:not(.access-mark) {
+  opacity: 0.55;
+  font-style: italic;
+}
 .sheet-access-info {
   display: flex;
   flex-wrap: wrap;

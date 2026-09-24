@@ -18,6 +18,7 @@ import {
   Check,
   Cloud,
   CloudOff,
+  EyeOff,
   Copy,
   History,
   Link2,
@@ -34,7 +35,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSocial } from './social';
-import * as Y from 'yjs';
 import { SheetRenderer } from '../canvas/render/SheetRenderer';
 import { useEditor, useSheets } from '../editor/context';
 import { Field, Modal } from '../panels/common';
@@ -176,11 +176,22 @@ export function AccessBanner() {
   }, [ed]);
   const lock = ed.project.getLock(sheetId);
   const rules = useSession((s) => s.rules);
+  useSession((s) => s.denied);
   // Access to this very sheet (the owner may have set rules per sheet).
-  const level = ed.session ? ed.session.levelOf(sheetId) : role;
+  const level = ed.session
+    ? ed.session.isHidden(sheetId)
+      ? 'hidden'
+      : ed.session.levelOf(sheetId)
+    : role;
   const perSheet = role !== 'owner' && rules.length > 0;
   let msg: React.ReactNode = null;
-  if (level === 'viewer')
+  if (level === 'hidden')
+    msg = (
+      <>
+        <EyeOff size={13} /> This sheet is hidden from you by the owner of the project.
+      </>
+    );
+  else if (level === 'viewer')
     msg = perSheet
       ? 'View only on this sheet: the owner decided so. Other sheets may be different.'
       : 'View only: you can look, present and export, but not change this project.';
@@ -291,7 +302,8 @@ function SheetAccess({
     <>
       <h3 className="share-h">Access per sheet</h3>
       <p className="muted small">
-        Choose a sheet, then what each person may do there. It applies to its sub-sheets too.
+        Choose a sheet, then what each person may do there. It applies to its sub-sheets too. A
+        hidden sheet is never sent to them: they only see its block, with a padlock.
       </p>
       <select
         className="sheet-access-pick"
@@ -329,7 +341,7 @@ function SheetAccess({
                 <option value="">
                   Default ({inherited === 'hidden' ? 'Hidden' : ROLE_LABELS[inherited]})
                 </option>
-                {(['editor', 'commenter', 'viewer'] as const).map((l) => (
+                {(['editor', 'commenter', 'viewer', 'hidden'] as const).map((l) => (
                   <option key={l} value={l}>
                     {LEVEL_LABELS[l]}
                   </option>
@@ -735,9 +747,7 @@ function VersionPreview({ id, versionId }: { id: string; versionId: string }) {
     let alive = true;
     void api<{ state: string }>('GET', `/api/projects/${id}/versions/${versionId}`).then((r) => {
       if (!alive) return;
-      const doc = new Y.Doc();
-      Y.applyUpdate(doc, base64ToBytes(r.state));
-      setProject(new Project(doc));
+      setProject(Project.fromUpdate(base64ToBytes(r.state)));
     });
     return () => {
       alive = false;

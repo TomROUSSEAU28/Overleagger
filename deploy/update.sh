@@ -16,6 +16,16 @@ if [ "$before" = "$after" ] && [ "${1:-}" != "--force" ]; then
 fi
 git log --oneline "$before..$after" | sed 's/^/   /' || true
 
+echo "→ Saving a copy of the data (backups/, the 5 latest are kept)"
+mkdir -p backups
+stamp=$(date +%Y%m%d-%H%M%S)
+if docker compose cp circuit-notebook:/data "backups/data-$stamp" >/dev/null 2>&1; then
+  echo "   backups/data-$stamp"
+  ls -1dt backups/data-* | tail -n +6 | xargs -r rm -rf
+else
+  echo "   (no data yet)"
+fi
+
 echo "→ Building and restarting"
 docker compose up -d --build
 

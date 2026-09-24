@@ -103,15 +103,23 @@ function rootName(doc: Y.Doc, type: Y.AbstractType<unknown>): string {
   return '?';
 }
 
+/** Root maps of the root document of a project, and of a sheet document. */
+export const ROOT_DOC_MAPS = ['meta', 'sheets', 'symbols', 'locks'];
+export const SHEET_DOC_MAPS = ['elements', 'comments'];
+
 /**
  * Apply `update` to a copy of `doc` and report what it changes. The original document is not
  * modified. Cost: one copy of the document, so only call it when restrictions apply.
  */
-export function touchedScopes(doc: Y.Doc, update: Uint8Array): TouchedScopes {
+export function touchedScopes(
+  doc: Y.Doc,
+  update: Uint8Array,
+  maps: string[] = ROOT_DOC_MAPS,
+): TouchedScopes {
   const copy = new Y.Doc();
   Y.applyUpdate(copy, Y.encodeStateAsUpdate(doc));
   // Make sure the root types exist so nested items resolve to them by name.
-  for (const name of ['meta', 'sheets', 'symbols', 'comments', 'locks']) copy.getMap(name);
+  for (const name of maps) copy.getMap(name);
   const out: TouchedScopes = {
     roots: new Set(),
     sheets: new Set(),
@@ -166,6 +174,65 @@ export function updateAllowed(
   return updateAllowedFor(role, () => role, scopes, lockedSheets);
 }
 
+/** Name of a document of a project on the sync server: its root, or one of its sheets. */
+export function docName(projectId: string, sheetId?: Id): string {
+  return `${projectId}/${sheetId ?? 'root'}`;
+}
+
+/** `docName` the other way round (`undefined` for a name of the first versions of the app). */
+export function parseDocName(name: string): { projectId: string; sheetId?: Id } | undefined {
+  const i = name.indexOf('/');
+  if (i <= 0 || i === name.length - 1) return undefined;
+  const projectId = name.slice(0, i);
+  const rest = name.slice(i + 1);
+  return rest === 'root' ? { projectId } : { projectId, sheetId: rest };
+}
+
+/**
+ * May a person apply `update` to one document of a project (`sheetId` for a sheet document,
+ * none for the root)? `doc` is the current document, `parentOf` reads the sheet tree, `locked`
+ * lists the locked sheets.
+ */
+export function docUpdateAllowed(
+  doc: Y.Doc,
+  sheetId: Id | undefined,
+  update: Uint8Array,
+  access: {
+    role: Role;
+    rules: readonly SheetRule[];
+    parentOf: (sheetId: Id) => Id | undefined;
+    locked: Iterable<Id>;
+  },
+): Verdict {
+  const { role, rules } = access;
+  if (role === 'owner') return { ok: true };
+  const lockedSheets = [...access.locked];
+  if (!sheetId) {
+    const scopes = touchedScopes(doc, update);
+    const parentOf = (s: Id) =>
+      scopes.parents.has(s) ? scopes.parents.get(s) : access.parentOf(s);
+    return updateAllowedFor(
+      role,
+      (s) => effectiveLevel(s, role, rules, parentOf),
+      scopes,
+      lockedSheets,
+      writesSomewhere(role, rules, 'editor'),
+    );
+  }
+  const level = effectiveLevel(sheetId, role, rules, access.parentOf);
+  const locked = lockedSheets.includes(sheetId);
+  // Editors of this sheet may change anything in it: no need to look at the update.
+  if (accessAtLeast(level, 'editor') && !locked) return { ok: true };
+  const { roots } = touchedScopes(doc, update, SHEET_DOC_MAPS);
+  const scopes: TouchedScopes = {
+    roots: new Set(),
+    sheets: new Set(roots.has('elements') ? [sheetId] : []),
+    commentSheets: new Set(roots.has('comments') ? [sheetId] : []),
+    parents: new Map(),
+  };
+  return updateAllowedFor(role, () => level, scopes, lockedSheets);
+}
+
 /**
  * May a person send an update touching `scopes`, given their project `role` and their access
  * to each sheet (`levelOf`, from `effectiveLevel`)? Each changed sheet needs "Can edit", each
@@ -177,6 +244,8 @@ export function updateAllowedFor(
   levelOf: (sheetId: Id) => Access,
   scopes: TouchedScopes,
   lockedSheets: Iterable<Id>,
+  /** May add project symbols (they edit some sheet, where they place the part). */
+  mayAddSymbols = false,
 ): Verdict {
   if (role === 'owner') return { ok: true };
   if (scopes.roots.has('locks')) return { ok: false, reason: 'Only the owner can lock sheets.' };
@@ -197,7 +266,12 @@ export function updateAllowedFor(
     if (locked.has(s)) return { ok: false, reason: 'This sheet is locked by the owner.' };
   }
   // Project symbols: editors of the project, or placing a part on a sheet you may edit.
-  if (scopes.roots.has('symbols') && !roleAtLeast(role, 'editor') && !scopes.sheets.size)
+  if (
+    scopes.roots.has('symbols') &&
+    !roleAtLeast(role, 'editor') &&
+    !scopes.sheets.size &&
+    !mayAddSymbols
+  )
     return { ok: false, reason: 'Only editors of the whole project can change its symbols.' };
   for (const s of scopes.commentSheets)
     if (!accessAtLeast(levelOf(s), 'commenter'))

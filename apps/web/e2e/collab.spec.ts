@@ -158,7 +158,7 @@ test('friends and teams: add a friend by username, share a project with a team',
   await expect(dan.getByTestId('canvas')).toBeVisible();
 });
 
-test('rights per sheet: a viewer who may edit one sheet only', async ({ browser }) => {
+test('rights per sheet: edit one sheet only, then a hidden sheet', async ({ browser }) => {
   const emma = await person(browser, 'Emma');
   const fred = await person(browser, 'Fred');
   // Friends, through the Friends & teams page.
@@ -250,4 +250,56 @@ test('rights per sheet: a viewer who may edit one sheet only', async ({ browser 
       }),
     )
     .toBe(true);
+
+  // Emma now hides the controller from Fred: he is taken out of it, and its content leaves
+  // his browser; the block stays, with a padlock.
+  const fredSees = () =>
+    fred.evaluate(() => {
+      const p = (
+        window as unknown as {
+          __overleagger: {
+            ed: {
+              project: {
+                listSheets(): { id: string; name: string }[];
+                getElements(id: string): unknown[];
+              };
+            };
+          };
+        }
+      ).__overleagger.ed.project;
+      const s = p.listSheets().find((x) => x.name === 'Voltage controller')!;
+      return p.getElements(s.id).length;
+    });
+  expect(await fredSees()).toBeGreaterThan(0);
+  await emma.getByTestId('open-share').click();
+  await emma.getByTestId('access-sheet').selectOption(ctrlSheet!);
+  await emma.getByTestId('sheet-level').first().selectOption('hidden');
+  await expect(emma.getByTestId('sheet-level').first()).toHaveValue('hidden');
+  await emma.keyboard.press('Escape');
+  await expect.poll(fredSees).toBe(0);
+  await expect(fred.getByTestId('sheet-Voltage controller')).toHaveClass(/hidden-sheet/);
+  await expect(fred.locator('[data-restricted]')).toHaveCount(1);
+  await fred.getByTestId('sheet-Voltage controller').click();
+  await expect(fred.getByTestId('toast')).toContainText('hidden from you');
+  // The PDF of Fred leaves the sheet out: one page less than Emma's.
+  const pages = (page: typeof fred) =>
+    page.evaluate(async () => {
+      const { ed } = (
+        window as unknown as {
+          __overleagger: {
+            ed: { project: { listSheets(): { id: string }[]; canRead(id: string): boolean } };
+          };
+        }
+      ).__overleagger;
+      return ed.project.listSheets().filter((x) => ed.project.canRead(x.id)).length;
+    });
+  expect(await pages(fred)).toBe((await pages(emma)) - 1);
+
+  // Back to "Can edit": the sheet comes back.
+  await emma.getByTestId('open-share').click();
+  await emma.getByTestId('access-sheet').selectOption(ctrlSheet!);
+  await emma.getByTestId('sheet-level').first().selectOption('editor');
+  await emma.keyboard.press('Escape');
+  await expect.poll(fredSees).toBeGreaterThan(0);
+  await expect(fred.locator('[data-restricted]')).toHaveCount(0);
 });

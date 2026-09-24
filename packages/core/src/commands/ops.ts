@@ -108,7 +108,10 @@ export function createBlock(
 // Deletion
 // ---------------------------------------------------------------------------
 
-/** Delete elements (and group members, and the sub-sheets of deleted blocks). */
+/**
+ * Delete elements (and group members, and the sub-sheets of deleted blocks). A block is kept
+ * when the user may not edit all its sub-sheets.
+ */
 export function deleteElements(project: Project, sheetId: Id, ids: Iterable<Id>): void {
   const all = project.getElements(sheetId);
   const doomed = expandSelection(all, ids);
@@ -116,8 +119,9 @@ export function deleteElements(project: Project, sheetId: Id, ids: Iterable<Id>)
     for (const id of doomed) {
       const el = all.find((e) => e.id === id);
       if (el?.type === 'block') {
-        for (const s of [el.childSheetId, ...descendantSheets(project, el.childSheetId)])
-          project.deleteSheetRaw(s);
+        const sheets = [el.childSheetId, ...descendantSheets(project, el.childSheetId)];
+        if (sheets.some((s) => project.hasSheet(s) && !project.canWrite(s))) continue;
+        for (const s of sheets) project.deleteSheetRaw(s);
       }
       project.removeElement(sheetId, id);
     }

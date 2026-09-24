@@ -29,6 +29,8 @@ export interface SheetContext {
   symbol(id: string): AnySymbol | undefined;
   /** Port elements of a (child) sheet. */
   ports(sheetId: Id): PortElement[];
+  /** False for a sheet hidden from the user (default: every sheet is visible). */
+  canRead?(sheetId: Id): boolean;
 }
 
 /**
@@ -41,8 +43,8 @@ export function makeContext(project: Project): SheetContext {
       return project.getMeta().standard;
     },
     symbol: (id) => getBuiltinSymbol(id) ?? project.symbols.get(id),
-    ports: (sheetId) =>
-      project.getElements(sheetId).filter((e): e is PortElement => e.type === 'port'),
+    ports: (sheetId) => project.sheetPorts(sheetId),
+    canRead: (sheetId) => project.canRead(sheetId),
   };
 }
 

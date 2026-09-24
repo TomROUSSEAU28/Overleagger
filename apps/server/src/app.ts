@@ -5,11 +5,18 @@
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
-import { Project, ROLES, roleAtLeast, type Role, type SheetLevel } from '@overleagger/core';
+import {
+  Project,
+  ROLES,
+  encodeBundle,
+  roleAtLeast,
+  type ProjectParts,
+  type Role,
+  type SheetLevel,
+} from '@overleagger/core';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
-import * as Y from 'yjs';
 import { colorFor, hashPassword, hashToken, randomToken, verifyPassword } from './auth';
-import { createCollab } from './collab';
+import { createCollab, visibleParts } from './collab';
 import type { Config } from './config';
 import { Store, type UserRow } from './db';
 
@@ -290,22 +297,23 @@ export async function createApp(config: Config) {
     const user = requireUser(req);
     const b = (req.body ?? {}) as { name?: string; state?: string };
     const id = randomToken(12);
-    let state: Uint8Array;
+    let parts: ProjectParts;
     let name = (b.name ?? '').trim();
     if (b.state) {
       // Upload of an existing (local) project.
-      const doc = new Y.Doc();
+      let p: Project;
       try {
-        Y.applyUpdate(doc, Buffer.from(b.state, 'base64'));
+        p = Project.fromUpdate(new Uint8Array(Buffer.from(b.state, 'base64')));
       } catch {
         throw bad('This is not a Circuit Notebook project.');
       }
-      const p = new Project(doc);
-      if (!p.rootSheetId) throw bad('This is not a Circuit Notebook project.');
+      if (!p.rootSheetId || !p.hasSheet(p.rootSheetId))
+        throw bad('This is not a Circuit Notebook project.');
       name = name || p.getMeta().name;
-      state = Y.encodeStateAsUpdate(doc);
+      parts = p.encodeParts();
+      p.destroy();
     } else {
-      state = Project.create(name || 'Untitled project').encodeState();
+      parts = Project.create(name || 'Untitled project').encodeParts();
     }
     const now = Date.now();
     store.createProject({
@@ -316,7 +324,7 @@ export async function createApp(config: Config) {
       updated_at: now,
       thumbnail: null,
     });
-    store.saveState(id, state);
+    store.saveParts(id, parts);
     return { id };
   });
 
@@ -346,7 +354,7 @@ export async function createApp(config: Config) {
     };
     if (!b.sheetId || !b.principalId || (b.principal !== 'user' && b.principal !== 'team'))
       throw bad('Which sheet, and for whom?');
-    if (b.level !== null && !['editor', 'commenter', 'viewer'].includes(b.level ?? ''))
+    if (b.level !== null && !['editor', 'commenter', 'viewer', 'hidden'].includes(b.level ?? ''))
       throw bad('Unknown access level.');
     if (b.principal === 'user') {
       if (b.principalId === user.id) throw bad('The owner always has every right.');
@@ -669,15 +677,22 @@ export async function createApp(config: Config) {
 
   app.get('/api/projects/:id/versions/:vid', async (req) => {
     const { id, vid } = req.params as { id: string; vid: string };
-    requireRole(req, id, 'viewer');
+    const { user, role } = requireRole(req, id, 'viewer');
     const state = store.versionState(id, vid);
     if (!state) throw new HttpError(404, 'Version not found.');
-    return { state: Buffer.from(state).toString('base64') };
+    // Without the sheets hidden from this person.
+    const p = Project.fromUpdate(new Uint8Array(state));
+    const parts = visibleParts(p.encodeParts(), role, store.rulesFor(id, user.id));
+    p.destroy();
+    return { state: Buffer.from(encodeBundle(parts)).toString('base64') };
   });
 
   app.post('/api/projects/:id/versions/:vid/restore', async (req) => {
     const { id, vid } = req.params as { id: string; vid: string };
-    const { user } = requireRole(req, id, 'editor');
+    const { user, role } = requireRole(req, id, 'editor');
+    // Restoring rewrites every sheet: not for someone whose rights differ from sheet to sheet.
+    if (role !== 'owner' && store.rulesFor(id, user.id).length)
+      throw new HttpError(403, 'Only the owner can restore a version of this project.');
     const ok = await collab.restoreVersion(id, vid, {
       id: user.id,
       name: user.name,

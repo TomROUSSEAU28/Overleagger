@@ -39,7 +39,8 @@ export function framesInReadingOrder(frames: FrameElement[]): FrameElement[] {
 /**
  * Slides of the whole project: for each sheet (hierarchy order), its frames in reading order,
  * or the whole drawing when the sheet has no frame. Empty sheets, sheets and frames hidden from
- * the presentation are skipped (a sheet whose frames are all hidden gives no slide).
+ * the presentation are skipped (a sheet whose frames are all hidden gives no slide), and so
+ * are the sheets the user may not see.
  */
 export function buildSlides(project: Project, ctx: SheetContext): Slide[] {
   const tree = sheetTree(project);
@@ -50,7 +51,7 @@ export function buildSlides(project: Project, ctx: SheetContext): Slide[] {
     const s = node.sheet;
     const depth = s.parentSheetId ? (depthOf.get(s.parentSheetId) ?? 0) + 1 : 0;
     depthOf.set(s.id, depth);
-    if (s.noPresent) continue;
+    if (s.noPresent || !project.canRead(s.id)) continue;
     const all = project.getElements(s.id);
     const els = visibleFor(all, 'present');
     const frames = els.filter((e): e is FrameElement => e.type === 'frame');

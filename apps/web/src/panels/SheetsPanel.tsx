@@ -1,5 +1,14 @@
 import { sheetTree, type SheetNode } from '@overleagger/core';
-import { Eye, FileText, Lock, LockOpen, MessageSquare, Pencil, UserCog } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  FileText,
+  Lock,
+  LockOpen,
+  MessageSquare,
+  Pencil,
+  UserCog,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSession } from '../cloud/hooks';
 import { useEditor, useSheets } from '../editor/context';
@@ -26,13 +35,19 @@ function Node({
   const id = node.sheet.id;
   // Owner: sheets with special access. Others: sheets where they have other rights than usual.
   const special = role === 'owner' ? rules.filter((r) => r.sheetId === id) : [];
-  const level = ed.session && role !== 'owner' ? ed.session.levelOf(id) : role;
+  useSession((s) => s.denied);
+  const level =
+    ed.session && role !== 'owner'
+      ? ed.session.isHidden(id)
+        ? 'hidden'
+        : ed.session.levelOf(id)
+      : role;
   return (
     <li>
       <div className="sheet-row">
         <button
           type="button"
-          className={`sheet-node${node.sheet.id === current ? ' active' : ''}`}
+          className={`sheet-node${node.sheet.id === current ? ' active' : ''}${level === 'hidden' ? ' hidden-sheet' : ''}`}
           style={{ paddingLeft: 8 + depth * 14 }}
           onClick={() => onOpen(node.sheet.id)}
           data-testid={`sheet-${node.sheet.name}`}
@@ -44,9 +59,15 @@ function Node({
           {level !== role && (
             <span
               className="access-mark"
-              title={`You ${level === 'editor' ? 'can edit' : level === 'commenter' ? 'can comment on' : 'can only view'} this sheet`}
+              title={
+                level === 'hidden'
+                  ? 'Hidden from you by the owner'
+                  : `You ${level === 'editor' ? 'can edit' : level === 'commenter' ? 'can comment on' : 'can only view'} this sheet`
+              }
             >
-              {level === 'editor' ? (
+              {level === 'hidden' ? (
+                <EyeOff size={11} />
+              ) : level === 'editor' ? (
                 <Pencil size={11} />
               ) : level === 'commenter' ? (
                 <MessageSquare size={11} />

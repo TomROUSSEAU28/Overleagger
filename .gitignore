@@ -11,3 +11,4 @@ test-results
 *.local.html
 # Server-specific settings (see docs/DEPLOY.md)
 docker-compose.override.yml
+backups/

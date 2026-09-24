@@ -241,10 +241,13 @@ export const BlockView = memo(function BlockView({
   el,
   ports,
   o,
+  hidden = false,
 }: {
   el: BlockElement;
   ports: PortElement[];
   o: RenderOptions;
+  /** The sub-sheet is hidden from the user: a padlock instead of the sub-sheet marker. */
+  hidden?: boolean;
 }) {
   const ink = inkOf(el, o);
   const l = blockLayout(el, ports);
@@ -252,7 +255,11 @@ export const BlockView = memo(function BlockView({
   const cx = l.x + l.w / 2;
   const titleY = el.tex ? l.y + Math.min(22, l.h / 3) : l.y + l.h / 2;
   return (
-    <g data-id={o.interactive ? el.id : undefined} className="el block">
+    <g
+      data-id={o.interactive ? el.id : undefined}
+      className={`el block${hidden ? ' restricted' : ''}`}
+      data-restricted={hidden || undefined}
+    >
       <rect
         x={l.x}
         y={l.y}
@@ -287,11 +294,23 @@ export const BlockView = memo(function BlockView({
           </g>
         );
       })}
-      {/* Sub-sheet marker: two stacked sheets in the corner. */}
-      <g stroke={ink.color} strokeWidth={0.9} fill={fill}>
-        <rect x={l.x + l.w - 15} y={l.y + l.h - 12} width={8} height={6} />
-        <rect x={l.x + l.w - 12} y={l.y + l.h - 9} width={8} height={6} />
-      </g>
+      {hidden ? (
+        <g stroke={ink.color} strokeWidth={0.9} fill={fill}>
+          <title>Restricted: the owner hides this sheet from you</title>
+          {/* Padlock in the corner. */}
+          <path
+            d={`M ${l.x + l.w - 14} ${l.y + l.h - 10} v -2.5 a 3 3 0 0 1 6 0 v 2.5`}
+            fill="none"
+          />
+          <rect x={l.x + l.w - 15.5} y={l.y + l.h - 10} width={9} height={6.5} rx={1} />
+        </g>
+      ) : (
+        /* Sub-sheet marker: two stacked sheets in the corner. */
+        <g stroke={ink.color} strokeWidth={0.9} fill={fill}>
+          <rect x={l.x + l.w - 15} y={l.y + l.h - 12} width={8} height={6} />
+          <rect x={l.x + l.w - 12} y={l.y + l.h - 9} width={8} height={6} />
+        </g>
+      )}
     </g>
   );
 });

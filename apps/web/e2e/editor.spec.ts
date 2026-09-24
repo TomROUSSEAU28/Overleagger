@@ -146,3 +146,74 @@ test('dashboard lists projects and the example opens with its sub-sheet', async 
   await page.goto('/app/');
   await expect(page.getByTestId('project-card').first()).toBeVisible();
 });
+
+test('a project saved by the first versions (one document) still opens', async ({ page }) => {
+  // Build it the old way: every sheet holds its elements, in one Yjs document.
+  const Y = await import('yjs');
+  const old = new Y.Doc();
+  old.transact(() => {
+    old.getMap('meta').set('name', 'Old notebook');
+    old.getMap('meta').set('standard', 'IEC');
+    old.getMap('meta').set('rootSheetId', 'r');
+    const sheet = new Y.Map<unknown>();
+    sheet.set('id', 'r');
+    sheet.set('name', 'Main');
+    const els = new Y.Map<unknown>();
+    const el = new Y.Map<unknown>();
+    const text = { id: 'e1', type: 'text', x: 0, y: 0, z: 1, text: 'Still here', size: 16 };
+    for (const [k, v] of Object.entries(text)) el.set(k, v);
+    els.set('e1', el);
+    sheet.set('elements', els);
+    old.getMap('sheets').set('r', sheet);
+  });
+  const update = [...Y.encodeStateAsUpdate(old)];
+  await page.goto('/app/');
+  // Where the first versions stored it (y-indexeddb + the project list).
+  await page.evaluate(async (bytes) => {
+    const open = (name: string, init: (db: IDBDatabase) => void) =>
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open(name);
+        req.onupgradeneeded = () => init(req.result);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    const put = (db: IDBDatabase, store: string, value: unknown, key?: IDBValidKey) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    const legacy = await open('overleagger-project-pold1', (db) => {
+      db.createObjectStore('updates', { autoIncrement: true });
+      db.createObjectStore('custom');
+    });
+    await put(legacy, 'updates', new Uint8Array(bytes));
+    legacy.close();
+    const index = await open('overleagger-index', (db) => db.createObjectStore('projects'));
+    const now = Date.now();
+    await put(
+      index,
+      'projects',
+      { id: 'pold1', name: 'Old notebook', createdAt: now, updatedAt: now },
+      'pold1',
+    );
+    index.close();
+  }, update);
+  await page.goto('/app/#/p/pold1');
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await expect.poll(() => elementTypes(page)).toEqual(['text']);
+  // Converted once: it opens again from the new storage, with the edits made since.
+  await page.evaluate(() => {
+    const { ed } = (
+      window as unknown as {
+        __overleagger: { ed: { commit(f: () => void): void; addElement(e: object): void } };
+      }
+    ).__overleagger;
+    ed.commit(() => ed.addElement({ type: 'text', x: 0, y: 60, text: 'New', size: 16 }));
+  });
+  await page.waitForTimeout(300);
+  await page.reload();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await expect.poll(() => elementTypes(page)).toEqual(['text', 'text']);
+});

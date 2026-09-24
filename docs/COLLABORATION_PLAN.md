@@ -1,9 +1,11 @@
 # Collaboration plan: contacts, teams, per-sheet rights
 
-> **Status**: steps 1–3 are done — @usernames, friends (request / accept), teams, sharing a
-> project with a friend or a whole team, and **per-sheet rights** (Can view / Can comment /
-> Can edit for a person or a team, raising or lowering the project role, inherited by
-> sub-sheets, enforced by the server). Next: step 4, **hidden** sheets (split documents).
+> **Status**: steps 1–4 are done — @usernames, friends (request / accept), teams, sharing a
+> project with a friend or a whole team, per-sheet rights (Can view / Can comment / Can edit /
+> **Hidden**, for a person or a team, raising or lowering the project role, inherited by
+> sub-sheets), all enforced by the server. A project is split into a root document and one
+> document per sheet (section 5); old projects are converted automatically. The name of a
+> hidden sheet and its pins stay visible (they are the block's title and pins). Next: step 5.
 
 Goal: after creating an account, working together is easy. You add friends, create a team,
 add people to a project, and the owner decides who may **see**, **comment** or **edit**, down

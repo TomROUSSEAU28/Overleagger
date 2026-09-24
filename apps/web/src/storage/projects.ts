@@ -3,6 +3,7 @@ import type { Standard } from '@overleagger/symbols';
 import { createStore, del, get, keys, set } from 'idb-keyval';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { DocStore } from './docStore';
 
 export interface ProjectEntry {
   id: string;
@@ -14,7 +15,8 @@ export interface ProjectEntry {
 }
 
 const index = createStore('overleagger-index', 'projects');
-const dbName = (id: string) => `overleagger-project-${id}`;
+/** Storage of a project in the first versions of the app (one Yjs document). */
+const legacyDbName = (id: string) => `overleagger-project-${id}`;
 
 export function newProjectId(): string {
   return `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -41,18 +43,19 @@ export async function updateEntry(id: string, patch: Partial<ProjectEntry>): Pro
 export interface OpenProject {
   id: string;
   project: Project;
-  persistence: IndexeddbPersistence;
-  close: () => void;
+  /** Stop saving (after the last changes are saved) and close the documents. */
+  close: () => Promise<void>;
 }
 
-/** Store a Yjs document under a new project id. */
-async function persistNew(doc: Y.Doc, name: string): Promise<string> {
+const space = (id: string) => `local:${id}`;
+
+/** Store a project under a new project id. */
+async function persistNew(project: Project, name: string): Promise<string> {
   const id = newProjectId();
-  const persistence = new IndexeddbPersistence(dbName(id), doc);
-  await persistence.whenSynced;
-  // Make sure the full state is written before closing.
-  await new Promise((r) => setTimeout(r, 50));
-  await persistence.destroy();
+  const store = new DocStore(space(id));
+  const off = store.bindProject(project, true);
+  off();
+  await store.close();
   const now = Date.now();
   await set(id, { id, name, createdAt: now, updatedAt: now } satisfies ProjectEntry, index);
   return id;
@@ -63,44 +66,69 @@ export async function createProject(
   standard: Standard,
   seed?: (p: Project) => void,
 ): Promise<string> {
-  const doc = new Y.Doc();
-  const p = Project.create(name, standard, doc);
+  const p = Project.create(name, standard);
   seed?.(p);
-  return persistNew(doc, name);
+  const id = await persistNew(p, name);
+  p.destroy();
+  return id;
 }
 
 export async function createProjectFromUpdate(update: Uint8Array, name?: string): Promise<string> {
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, update);
-  const p = new Project(doc);
+  const p = Project.fromUpdate(update);
   if (name) p.setMeta({ name });
-  return persistNew(doc, p.getMeta().name);
+  const id = await persistNew(p, p.getMeta().name);
+  p.destroy();
+  return id;
+}
+
+/** A project saved by the first versions of the app (one document, y-indexeddb). */
+async function loadSingleDoc(id: string): Promise<Project | undefined> {
+  const doc = new Y.Doc();
+  const persistence = new IndexeddbPersistence(legacyDbName(id), doc);
+  await persistence.whenSynced;
+  await persistence.destroy();
+  const p = doc.getMap('meta').has('rootSheetId') ? Project.fromSingleDoc(doc) : undefined;
+  doc.destroy();
+  return p;
 }
 
 export async function openProject(id: string): Promise<OpenProject> {
-  const doc = new Y.Doc();
-  const persistence = new IndexeddbPersistence(dbName(id), doc);
-  await persistence.whenSynced;
-  const project = new Project(doc);
+  const store = new DocStore(space(id));
+  const docs = await store.load();
+  let project: Project;
+  let initial = false;
+  if (docs.has('root')) {
+    const sheets = new Map(docs);
+    sheets.delete('root');
+    project = Project.fromParts({ root: docs.get('root')!, sheets });
+  } else {
+    // Converted once; the old copy stays in the browser until the project is deleted.
+    const old = await loadSingleDoc(id);
+    if (!old) throw new Error('This project could not be loaded (empty or damaged document).');
+    project = old;
+    initial = true;
+  }
   if (!project.rootSheetId || !project.hasSheet(project.rootSheetId)) {
-    await persistence.destroy();
+    project.destroy();
     throw new Error('This project could not be loaded (empty or damaged document).');
   }
+  const off = store.bindProject(project, initial);
   return {
     id,
     project,
-    persistence,
-    close: () => {
-      void persistence.destroy();
-      doc.destroy();
+    close: async () => {
+      off();
+      await store.close();
+      project.destroy();
     },
   };
 }
 
 export async function deleteProject(id: string): Promise<void> {
   await del(id, index);
+  await new DocStore(space(id)).clear();
   await new Promise<void>((resolve) => {
-    const req = indexedDB.deleteDatabase(dbName(id));
+    const req = indexedDB.deleteDatabase(legacyDbName(id));
     req.onsuccess = req.onerror = req.onblocked = () => resolve();
   });
 }
@@ -109,15 +137,14 @@ export async function duplicateProject(id: string): Promise<string> {
   const open = await openProject(id);
   const update = open.project.encodeState();
   const name = `${open.project.getMeta().name} (copy)`;
-  open.close();
+  await open.close();
   return createProjectFromUpdate(update, name);
 }
 
 export async function renameProject(id: string, name: string): Promise<void> {
   const open = await openProject(id);
   open.project.setMeta({ name });
-  await new Promise((r) => setTimeout(r, 50));
-  open.close();
+  await open.close();
   await updateEntry(id, { name, updatedAt: Date.now() });
 }
 
@@ -130,6 +157,6 @@ export async function exportProjectUpdate(
     update: open.project.encodeState(),
     json: open.project.toJSON(),
   };
-  open.close();
+  await open.close();
   return out;
 }

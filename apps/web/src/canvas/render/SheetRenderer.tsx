@@ -29,7 +29,14 @@ export function ElementView({ el, o }: { el: Element; o: RenderOptions }) {
     case 'wire':
       return <WireView el={el} o={o} />;
     case 'block':
-      return <BlockView el={el} ports={o.ctx.ports(el.childSheetId)} o={o} />;
+      return (
+        <BlockView
+          el={el}
+          ports={o.ctx.ports(el.childSheetId)}
+          o={o}
+          hidden={o.ctx.canRead?.(el.childSheetId) === false}
+        />
+      );
     case 'port':
       return <PortView el={el} o={o} />;
     case 'label':

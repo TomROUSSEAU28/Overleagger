@@ -1,14 +1,22 @@
 /**
  * SQLite storage (Node's built-in `node:sqlite`, no native module to compile).
  *
- * Tables: users, sessions, projects, members, invites, documents (Yjs state), versions,
+ * Tables: users, sessions, projects, members, invites, docs (Yjs state of each document of a
+ * project: its root and each sheet; `documents` held the single document of old projects), versions,
  * libraries (each user's personal symbols and templates), friends, teams, team_members and
  * project_teams (a team added to a project: all its members get the role).
  */
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { ROLES, type Role, type SheetLevel, type SheetRule } from '@overleagger/core';
+import {
+  Project,
+  ROLES,
+  type ProjectParts,
+  type Role,
+  type SheetLevel,
+  type SheetRule,
+} from '@overleagger/core';
 
 export interface UserRow {
   id: string;
@@ -113,6 +121,13 @@ CREATE TABLE IF NOT EXISTS documents (
   state BLOB NOT NULL,
   updated_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS docs (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  doc TEXT NOT NULL,
+  state BLOB NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, doc)
+);
 CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -176,8 +191,26 @@ export class Store {
     this.migrate();
   }
 
-  /** Older databases: add the handle column and give every account one. */
+  /**
+   * Older databases: add the handle column and give every account one; split the projects
+   * saved in one single document (first versions) into one document per sheet.
+   */
   private migrate() {
+    const single = this.db
+      .prepare(
+        'SELECT project_id, state FROM documents WHERE project_id NOT IN (SELECT DISTINCT project_id FROM docs)',
+      )
+      .all() as { project_id: string; state: Uint8Array }[];
+    for (const r of single) {
+      try {
+        const p = Project.fromUpdate(new Uint8Array(r.state));
+        this.saveParts(r.project_id, p.encodeParts());
+        p.destroy();
+        this.db.prepare('DELETE FROM documents WHERE project_id = ?').run(r.project_id);
+      } catch (e) {
+        console.error(`Could not convert project ${r.project_id}:`, e);
+      }
+    }
     const cols = this.db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
     if (!cols.some((c) => c.name === 'handle'))
       this.db.exec('ALTER TABLE users ADD COLUMN handle TEXT');
@@ -646,19 +679,34 @@ export class Store {
 
   // Documents & versions ------------------------------------------------------
 
-  loadState(projectId: string): Uint8Array | undefined {
-    const r = this.db.prepare('SELECT state FROM documents WHERE project_id = ?').get(projectId) as
-      { state: Uint8Array } | undefined;
-    return r?.state;
+  /** State of one document of a project: `root`, or a sheet id. */
+  loadDoc(projectId: string, doc: string): Uint8Array | undefined {
+    const r = this.db
+      .prepare('SELECT state FROM docs WHERE project_id = ? AND doc = ?')
+      .get(projectId, doc) as { state: Uint8Array } | undefined;
+    return r ? new Uint8Array(r.state) : undefined;
   }
 
-  saveState(projectId: string, state: Uint8Array) {
+  saveDoc(projectId: string, doc: string, state: Uint8Array) {
     this.db
       .prepare(
-        `INSERT INTO documents (project_id, state, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(project_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`,
+        `INSERT INTO docs (project_id, doc, state, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(project_id, doc) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`,
       )
-      .run(projectId, state, Date.now());
+      .run(projectId, doc, state, Date.now());
+  }
+
+  /** Every stored document of a project (sheets deleted since included). */
+  loadDocs(projectId: string): Map<string, Uint8Array> {
+    const rows = this.db
+      .prepare('SELECT doc, state FROM docs WHERE project_id = ?')
+      .all(projectId) as { doc: string; state: Uint8Array }[];
+    return new Map(rows.map((r) => [r.doc, new Uint8Array(r.state)]));
+  }
+
+  saveParts(projectId: string, parts: ProjectParts) {
+    this.saveDoc(projectId, 'root', parts.root);
+    for (const [id, state] of parts.sheets) this.saveDoc(projectId, id, state);
   }
 
   addVersion(v: Omit<VersionRow, 'size'> & { state: Uint8Array }) {

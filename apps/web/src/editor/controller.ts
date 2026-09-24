@@ -32,13 +32,15 @@ import {
   type Element,
   type Id,
   type Project,
+  type ProjectUndo,
   type Pt,
   type Rect,
   type SheetContext,
+  type UndoStep,
 } from '@overleagger/core';
 import type { StaticSymbolDef } from '@overleagger/symbols';
-import type * as Y from 'yjs';
 import { motionEnabled, popIn, ripple, vanish } from '../canvas/juice';
+import { toast } from '../store/toast';
 import { useUI, type ToolId, type Viewport } from '../store/ui';
 import type { CloudSession } from '../cloud/session';
 import { useUserLib, type UserTemplate } from '../storage/userLibrary';
@@ -52,7 +54,7 @@ export const MAX_ZOOM = 8;
  */
 export class EditorController {
   readonly project: Project;
-  readonly undo: Y.UndoManager;
+  readonly undo: ProjectUndo;
   readonly ctx: SheetContext;
   canvasSize = { w: 1200, h: 800 };
   private clipboard: ClipData | null = null;
@@ -65,8 +67,8 @@ export class EditorController {
     this.session = session;
     this.undo = createUndoManager(project);
     // Remember on which sheet each change was made, so undo / redo can show it there.
-    this.undo.on('stack-item-added', (e: { stackItem: { meta: Map<string, unknown> } }) => {
-      if (!e.stackItem.meta.has('sheet')) e.stackItem.meta.set('sheet', this.sheetId);
+    this.undo.onStep((step) => {
+      if (!step.meta.has('sheet')) step.meta.set('sheet', this.sheetId);
     });
     const base = makeContext(project);
     // Symbols of the personal library are usable in every project (they are copied into the
@@ -77,6 +79,7 @@ export class EditorController {
       },
       symbol: (id) => base.symbol(id) ?? useUserLib.getState().symbols.find((s) => s.id === id),
       ports: base.ports,
+      canRead: base.canRead,
     };
   }
 
@@ -472,20 +475,20 @@ export class EditorController {
   }
 
   doUndo() {
-    this.showSheetOf(this.undo.undoStack);
+    this.showSheetOf(this.undo.peek('undo'));
     this.undo.undo();
     this.cleanSelection();
   }
 
   doRedo() {
-    this.showSheetOf(this.undo.redoStack);
+    this.showSheetOf(this.undo.peek('redo'));
     this.undo.redo();
     this.cleanSelection();
   }
 
   /** Undoing a change made on another sheet goes there first, so the change is not invisible. */
-  private showSheetOf(stack: { meta: Map<string, unknown> }[]) {
-    const sheet = stack[stack.length - 1]?.meta.get('sheet');
+  private showSheetOf(step: UndoStep | undefined) {
+    const sheet = step?.meta.get('sheet');
     if (typeof sheet === 'string' && sheet !== this.sheetId && this.project.hasSheet(sheet))
       this.openSheet(sheet);
   }
@@ -518,6 +521,10 @@ export class EditorController {
 
   openSheet(sheetId: Id) {
     if (!this.project.hasSheet(sheetId)) return;
+    if (!this.project.canRead(sheetId)) {
+      toast('This sheet is hidden from you by the owner of the project.');
+      return;
+    }
     const changed = sheetId !== this.sheetId;
     this.ui.set({
       sheetId,

@@ -117,8 +117,12 @@ ranges** (<https://www.cloudflare.com/ips/>). Also set `TRUST_PROXY: 'true'`.
 ~/circuit-notebook/deploy/update.sh
 ```
 
-It fetches the latest code, rebuilds, restarts, removes the old images and checks
-`/api/health`. Nothing new on GitHub → it stops there (`--force` rebuilds anyway).
+It fetches the latest code, saves a copy of the data in `~/circuit-notebook/backups/` (the 5
+latest are kept), rebuilds, restarts, removes the old images and checks `/api/health`. Nothing
+new on GitHub → it stops there (`--force` rebuilds anyway).
+
+To go back to a copy: `docker compose stop`, then
+`docker compose cp backups/data-<date>/. circuit-notebook:/data`, then `docker compose start`.
 
 Open projects reconnect by themselves; unsynced edits stay in the browsers and sync afterwards.
 

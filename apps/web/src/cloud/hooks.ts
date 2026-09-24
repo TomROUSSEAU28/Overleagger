@@ -16,6 +16,7 @@ const localSession = create<SessionState>(() => ({
   members: [],
   teams: [],
   rules: [],
+  denied: [],
 }));
 
 /** Read the collaboration state (works for local projects too). */
@@ -24,11 +25,17 @@ export function useSession<T>(sel: (s: SessionState) => T): T {
   return (ed.session?.state ?? localSession)(sel);
 }
 
+/** Re-render when my rights change (role, rules per sheet, sheets hidden from me). */
+export function useAccess() {
+  useSession((s) => s.role);
+  useSession((s) => s.rules);
+  useSession((s) => s.denied);
+}
+
 /** May the local user edit the current sheet? Re-renders when the role or the locks change. */
 export function useCanEdit(): boolean {
   const ed = useEditor();
-  useSession((s) => s.role);
-  useSession((s) => s.rules);
+  useAccess();
   const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
   const [, bump] = useState(0);
   useEffect(() => {

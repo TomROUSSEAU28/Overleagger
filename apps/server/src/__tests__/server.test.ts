@@ -1,5 +1,12 @@
-import { HocuspocusProvider } from '@hocuspocus/provider';
-import { Project, addComponent, createBlock, makeContext, type Person } from '@overleagger/core';
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
+import {
+  Project,
+  addComponent,
+  createBlock,
+  docName,
+  makeContext,
+  type Person,
+} from '@overleagger/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { createApp, type App } from '../app';
@@ -7,7 +14,7 @@ import { loadConfig } from '../config';
 
 let srv: App;
 let base = '';
-const providers: HocuspocusProvider[] = [];
+const providers: { destroy(): void }[] = [];
 
 beforeAll(async () => {
   srv = await createApp({
@@ -65,28 +72,52 @@ async function until(fn: () => boolean, ms = 5000) {
   }
 }
 
+/**
+ * Open a project like the web app: its root document and one document per sheet, all on one
+ * WebSocket. `closed()` is the last refusal reason; `denied` the sheets the server refused.
+ */
 async function connect(projectId: string, token: string) {
-  const doc = new Y.Doc();
+  const socket = new HocuspocusProviderWebsocket({ url: `ws://${base}/collab` });
+  providers.push(socket);
   let closed: string | null = null;
-  const provider = new HocuspocusProvider({
-    url: `ws://${base}/collab`,
-    name: projectId,
-    document: doc,
-    token,
-    onClose: ({ event }) => {
-      // Rights changed: join again, like the web app does.
-      if (event.reason === 'Reset Connection') {
-        const p = provider as unknown as { sendToken(): Promise<void>; startSync(): void };
-        void p.sendToken().then(() => p.startSync());
-        return;
-      }
-      // The refusal reason travels with the close event.
-      if (event.reason) closed = event.reason;
+  const denied = new Set<string>();
+  const byName = new Map<string, HocuspocusProvider>();
+  const open = (doc: Y.Doc, sheetId?: string) => {
+    const provider = new HocuspocusProvider({
+      websocketProvider: socket,
+      name: docName(projectId, sheetId),
+      document: doc,
+      token,
+      onAuthenticationFailed: () => denied.add(sheetId ?? 'root'),
+      onClose: ({ event }) => {
+        // Rights changed: join again, like the web app does.
+        if (event.reason === 'Reset Connection') {
+          void provider.sendToken().then(() => provider.startSync());
+          return;
+        }
+        // The refusal reason travels with the close event.
+        if (event.reason) closed = event.reason;
+      },
+    });
+    provider.attach();
+    providers.push(provider);
+    byName.set(sheetId ?? 'root', provider);
+    return provider;
+  };
+  const rootDoc = new Y.Doc();
+  const project = new Project(rootDoc, {
+    sheetDoc: (id) => {
+      const d = new Y.Doc();
+      open(d, id);
+      return d;
     },
   });
-  providers.push(provider);
-  await until(() => provider.isSynced);
-  return { doc, project: new Project(doc), provider, closed: () => closed };
+  const provider = open(rootDoc);
+  await until(() => provider.isSynced && Boolean(project.rootSheetId));
+  const settled = () =>
+    [...byName].every(([k, p]) => denied.has(k) || (p.isSynced && p.unsyncedChanges === 0));
+  await until(settled);
+  return { project, provider, settled, denied, closed: () => closed };
 }
 
 const person = (id: string): Person => ({ id, name: id, color: '#000' });
@@ -189,7 +220,7 @@ describe('sharing and real-time sync', () => {
     const o = await connect(data.id, owner.token);
     const root = o.project.rootSheetId;
     addComponent(o.project, root, 'resistor', 0, 0, makeContext(o.project));
-    await until(() => o.provider.unsyncedChanges === 0);
+    await until(o.settled);
     const saved = await api<{ id: string }>(
       'POST',
       `/api/projects/${data.id}/versions`,
@@ -199,7 +230,7 @@ describe('sharing and real-time sync', () => {
       },
     );
     addComponent(o.project, root, 'capacitor', 40, 0, makeContext(o.project));
-    await until(() => o.provider.unsyncedChanges === 0);
+    await until(o.settled);
     expect(o.project.getElements(root)).toHaveLength(2);
     const r = await api(
       'POST',
@@ -394,9 +425,9 @@ describe('rights per sheet', () => {
       { x: 0, y: 0, w: 80, h: 60 },
       'Controller',
     ).childSheetId;
-    await until(() => o.provider.unsyncedChanges === 0);
+    await until(o.settled);
 
-    // Only the owner sets rules; "hidden" is not available yet.
+    // Only the owner sets rules.
     const setRule = (tok: string, principalId: string, level: string | null) =>
       api('PUT', `/api/projects/${id}/rules`, tok, {
         sheetId: ctrl,
@@ -405,7 +436,7 @@ describe('rights per sheet', () => {
         level,
       });
     expect((await setRule(eve.token, vito.user.id, 'editor')).status).toBe(403);
-    expect((await setRule(owner.token, vito.user.id, 'hidden')).status).toBe(400);
+    expect((await setRule(owner.token, vito.user.id, 'secret')).status).toBe(400);
     expect((await setRule(owner.token, vito.user.id, 'editor')).status).toBe(200);
     expect((await setRule(owner.token, eve.user.id, 'viewer')).status).toBe(200);
     const info = await api<{ rules: { principalId: string }[] }>(
@@ -420,10 +451,9 @@ describe('rights per sheet', () => {
     // Vito (viewer) may edit the controller…
     addComponent(v.project, ctrl, 'resistor', 0, 0, makeContext(v.project));
     await until(() => o.project.getElements(ctrl).length === 1);
-    // …but not the main sheet.
+    // …but not the main sheet (read-only there: the change is ignored).
     addComponent(v.project, root, 'capacitor', 0, 0, makeContext(v.project));
-    await until(() => v.closed() === 'Viewers cannot edit.');
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 300));
     expect(o.project.getElements(root).filter((x) => x.type === 'component')).toHaveLength(0);
 
     // Eve (editor) edits the main sheet, not the controller.
@@ -439,5 +469,108 @@ describe('rights per sheet', () => {
     expect(
       (await api<{ rules: unknown[] }>('GET', `/api/projects/${id}`, eve.token)).data.rules,
     ).toEqual([]);
+  });
+});
+
+describe('hidden sheets', () => {
+  it('never sends a hidden sheet, and follows rule changes', async () => {
+    const owner = await signup('Hana');
+    const ivo = await signup('Ivo');
+    const { data } = await api<{ id: string }>('POST', '/api/projects', owner.token, {
+      name: 'Secret',
+    });
+    const id = data.id;
+    const inv = await api<{ invite: { token: string } }>(
+      'POST',
+      `/api/projects/${id}/invites`,
+      owner.token,
+      { role: 'editor' },
+    );
+    await api('POST', `/api/invites/${inv.data.invite.token}/accept`, ivo.token);
+
+    const o = await connect(id, owner.token);
+    const root = o.project.rootSheetId;
+    const ctrl = createBlock(
+      o.project,
+      root,
+      { x: 0, y: 0, w: 80, h: 60 },
+      'Controller',
+    ).childSheetId;
+    addComponent(o.project, ctrl, 'mosfet', 0, 0, makeContext(o.project));
+    o.project.addComment({ sheetId: ctrl, x: 0, y: 0 }, person('Hana'), 'secret note');
+    await until(o.settled);
+    const hide = (level: string | null) =>
+      api('PUT', `/api/projects/${id}/rules`, owner.token, {
+        sheetId: ctrl,
+        principal: 'user',
+        principalId: ivo.user.id,
+        level,
+      });
+    expect((await hide('hidden')).status).toBe(200);
+
+    // Ivo sees the block and the sheet in the tree, never its content or comments.
+    const i = await connect(id, ivo.token);
+    expect(i.project.hasSheet(ctrl)).toBe(true);
+    expect(i.denied.has(ctrl)).toBe(true);
+    expect(i.project.getElements(ctrl)).toEqual([]);
+    expect(i.project.getComments()).toEqual([]);
+    expect(i.project.getElements(root)).toHaveLength(1); // the block
+
+    // Versions he downloads leave it out too.
+    const v = await api<{ id: string }>('POST', `/api/projects/${id}/versions`, owner.token, {
+      label: 'v1',
+    });
+    const got = await api<{ state: string }>(
+      'GET',
+      `/api/projects/${id}/versions/${v.data.id}`,
+      ivo.token,
+    );
+    const copy = Project.fromUpdate(new Uint8Array(Buffer.from(got.data.state, 'base64')));
+    expect(copy.hasSheet(ctrl)).toBe(true);
+    expect(copy.getElements(ctrl)).toEqual([]);
+    const full = await api<{ state: string }>(
+      'GET',
+      `/api/projects/${id}/versions/${v.data.id}`,
+      owner.token,
+    );
+    expect(
+      Project.fromUpdate(new Uint8Array(Buffer.from(full.data.state, 'base64'))).getElements(ctrl),
+    ).toHaveLength(1);
+    // Restoring would rewrite the hidden sheet: owner only.
+    expect(
+      (await api('POST', `/api/projects/${id}/versions/${v.data.id}/restore`, ivo.token)).status,
+    ).toBe(403);
+
+    // The owner lifts the rule: a new connection gets the sheet.
+    expect((await hide(null)).status).toBe(200);
+    const again = await connect(id, ivo.token);
+    await until(() => again.project.getElements(ctrl).length === 1);
+    expect(again.project.getComments().map((t) => t.messages[0]?.text)).toEqual(['secret note']);
+  });
+
+  it('converts projects saved in one single document', async () => {
+    const u = await signup('Otto');
+    // An upload in the old format (one Yjs document).
+    const old = new Y.Doc();
+    old.transact(() => {
+      old.getMap('meta').set('name', 'Old one');
+      old.getMap('meta').set('rootSheetId', 'r');
+      const sheet = new Y.Map<unknown>();
+      sheet.set('id', 'r');
+      sheet.set('name', 'Main');
+      const els = new Y.Map<unknown>();
+      const el = new Y.Map<unknown>();
+      for (const [k, v] of Object.entries({ id: 'e', type: 'text', x: 0, y: 0, z: 1, text: 'hi' }))
+        el.set(k, v);
+      els.set('e', el);
+      sheet.set('elements', els);
+      old.getMap('sheets').set('r', sheet);
+    });
+    const up = await api<{ id: string }>('POST', '/api/projects', u.token, {
+      state: Buffer.from(Y.encodeStateAsUpdate(old)).toString('base64'),
+    });
+    const o = await connect(up.data.id, u.token);
+    expect(o.project.getMeta().name).toBe('Old one');
+    await until(() => o.project.getElements('r').length === 1);
   });
 });

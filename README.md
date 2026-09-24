@@ -112,7 +112,9 @@ see _Self-hosting_) to share projects:
 - **Rights per sheet**: the owner can say, for a person or a team, _Can view_, _Can comment_ or
   _Can edit_ on one sheet (Share → Access per sheet, or the 👤 button in the Sheets tab). A rule
   can raise or lower the project role (a viewer may edit sheet 2 only) and applies to the
-  sub-sheets too. The server enforces it.
+  sub-sheets too. A sheet can also be **hidden**: it is never sent to that person, who only
+  sees its block with a padlock (and its pins). The server enforces all of it: each sheet is
+  its own document, sent only to the people who may see it.
 - **Real time**: live edits, **cursors with names**, others' selections, avatars in the top bar
   — click one to **follow their view**; “X is presenting — Join” follows their slides.
 - **Comments** (tool `C`): threads pinned on the drawing (drag a bubble to move it), replies,

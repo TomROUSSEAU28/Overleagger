@@ -61,7 +61,9 @@ export async function exportPdf(
 ): Promise<PdfResult> {
   const tree = sheetTree(project);
   if (!tree) throw new Error('Empty project');
-  const nodes = flattenSheetTree(tree).filter((n) => !n.sheet.noExport);
+  const nodes = flattenSheetTree(tree).filter(
+    (n) => !n.sheet.noExport && project.canRead(n.sheet.id),
+  );
   if (!nodes.length) throw new Error('Every sheet is hidden from the export.');
   const pageOf = new Map<Id, number>(nodes.map((n, i) => [n.sheet.id, i + 1]));
   const meta = project.getMeta();
