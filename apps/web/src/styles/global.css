@@ -312,6 +312,7 @@ button.kbd {
   background: transparent;
   font-size: 16px;
   width: 200px;
+  text-overflow: ellipsis;
 }
 .topbar .project-name:hover {
   border-color: var(--border);
@@ -342,6 +343,22 @@ button.kbd {
   border-radius: 4px;
   color: var(--muted);
   font-style: italic;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Too long: the parents shrink first, then the current sheet, with "…". */
+.breadcrumbs .crumb {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 3 auto;
+}
+.breadcrumbs .crumb:last-child {
+  flex-shrink: 1;
+}
+.breadcrumbs .sep {
+  flex-shrink: 0;
 }
 .breadcrumbs button:hover {
   background: var(--hover);
@@ -442,7 +459,7 @@ button.kbd {
   white-space: nowrap;
   border: none;
   background: none;
-  padding: 8px 0;
+  padding: 8px 3px;
   cursor: pointer;
   color: var(--muted);
   font-variant: small-caps;
@@ -1884,7 +1901,13 @@ fieldset.plain {
 }
 .comments-head {
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  row-gap: 6px;
   margin: 10px 0 6px;
+}
+.comments-head .check {
+  white-space: nowrap;
 }
 .thread-card {
   display: flex;
@@ -1945,6 +1968,11 @@ fieldset.plain {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.member-name > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .role-tag {
   font-size: 12px;

@@ -36,5 +36,23 @@ if (!reduce && 'IntersectionObserver' in window) {
   });
 }
 
+// Click a screenshot to see it in full size (Esc, or a click, closes it).
+let zoom: HTMLDialogElement | null = null;
+function showBig(img: HTMLImageElement) {
+  if (!zoom) {
+    zoom = document.createElement('dialog');
+    zoom.className = 'zoom';
+    zoom.append(document.createElement('img'));
+    zoom.addEventListener('click', () => zoom?.close());
+    document.body.append(zoom);
+  }
+  const big = zoom.querySelector('img')!;
+  big.src = img.currentSrc || img.src;
+  big.alt = img.alt;
+  zoom.showModal();
+}
+for (const img of document.querySelectorAll<HTMLImageElement>('.shot img'))
+  img.addEventListener('click', () => showBig(img));
+
 const year = document.querySelector('[data-year]');
 if (year) year.textContent = `© ${new Date().getFullYear()}`;

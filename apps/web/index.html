@@ -115,8 +115,8 @@
         <figure class="shot hero-shot">
           <img
             src="/landing/hero.webp"
-            width="2040"
-            height="1230"
+            width="2400"
+            height="1447"
             alt="The Circuit Notebook editor with a synchronous buck converter: MOSFETs with body diodes, LC filter, a hierarchical voltage-controller block and LaTeX labels."
             fetchpriority="high"
           />
@@ -124,7 +124,7 @@
             <svg viewBox="0 0 60 40" aria-hidden="true">
               <path d="M58 4C38 6 18 14 6 34M6 34l2-10M6 34l9-5" />
             </svg>
-            junction dots appear by themselves
+            EU or US symbols, one click
           </figcaption>
           <figcaption class="margin-note note-2">
             <svg viewBox="0 0 60 40" aria-hidden="true">
@@ -180,8 +180,8 @@
         <figure class="shot">
           <img
             src="/landing/hierarchy.webp"
-            width="2040"
-            height="1230"
+            width="1800"
+            height="1125"
             loading="lazy"
             alt="Inside the voltage-controller block: reference, summing junction, PI controller, PWM comparator and sheet ports."
           />
@@ -206,8 +206,8 @@
         <figure class="shot">
           <img
             src="/landing/whiteboard.webp"
-            width="2040"
-            height="1230"
+            width="1800"
+            height="1125"
             loading="lazy"
             alt="A perturb-and-observe MPPT flowchart with a power curve and a sticky note, on the whiteboard theme."
           />
@@ -219,10 +219,9 @@
           <p class="kicker">Collaboration</p>
           <h2>Work on it together, live</h2>
           <p>
-            Share a project with a link: see each other's cursors and selections, comment right on
-            the drawing, follow what someone is looking at, and go back to any earlier version.
-            Everyone gets the right access — edit, comment or view — and the server checks it for
-            every change.
+            Share a project with a friend, a whole team or a link: see each other's cursors and
+            selections, comment right on the drawing, follow what someone is looking at, and go back
+            to any earlier version.
           </p>
           <ul class="ticks">
             <li>Keeps working offline, syncs when you are back</li>
@@ -233,15 +232,56 @@
         <figure class="shot">
           <img
             src="/landing/collab.webp"
-            width="2040"
-            height="1230"
+            width="1800"
+            height="1074"
             loading="lazy"
             alt="Two people on the same project: a comment thread about the inductor and a teammate's cursor on the capacitor."
           />
         </figure>
       </section>
 
-      <section class="story reverse">
+      <section id="access" class="story reverse">
+        <div class="story-text">
+          <p class="kicker">Rights per sheet</p>
+          <h2>Decide who sees what, sheet by sheet</h2>
+          <p>
+            Add friends by their @username, gather them in teams, then give each person or team
+            <i>Can edit</i>, <i>Can comment</i> or <i>Can view</i> — on the whole project or on a
+            single sheet. A sheet can even be <b>hidden</b>: it never leaves the server for that
+            person, who only sees its block, with a padlock.
+          </p>
+          <ul class="ticks">
+            <li>A student edits the controller, the power stage stays read-only</li>
+            <li>Keep the solution sheet hidden until the lab is over</li>
+            <li>Share with a team: people who join it later get access too</li>
+          </ul>
+        </div>
+        <figure class="shot stack">
+          <img
+            src="/landing/access.webp"
+            width="1800"
+            height="1074"
+            loading="lazy"
+            alt="Tom's view of the project: the voltage-controller block shows a padlock and the sheet is marked hidden in the Sheets tab."
+          />
+          <img
+            class="inset"
+            src="/landing/access-dialog.webp"
+            width="760"
+            height="768"
+            loading="lazy"
+            alt="The Share window: Tom can edit the project, but the Voltage controller sheet is hidden from him."
+          />
+          <figcaption class="margin-note note-3">
+            <svg viewBox="0 0 60 40" aria-hidden="true">
+              <path d="M58 36C38 32 18 22 6 6M6 6l9 3M6 6l1 10" />
+            </svg>
+            Tom only gets the padlock
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="story">
         <div class="story-text">
           <p class="kicker">Presentation</p>
           <h2>Present straight from your drawing</h2>
@@ -253,15 +293,15 @@
         <figure class="shot dark">
           <img
             src="/landing/present.webp"
-            width="2040"
-            height="1230"
+            width="1800"
+            height="1125"
             loading="lazy"
             alt="Presentation mode on the blackboard theme with a laser pointer on the buck converter."
           />
         </figure>
       </section>
 
-      <section id="latex" class="story">
+      <section id="latex" class="story reverse">
         <div class="story-text">
           <p class="kicker">LaTeX</p>
           <h2>Straight into your thesis</h2>
@@ -362,9 +402,11 @@
           <details>
             <summary>Can I work on it with my team?</summary>
             <p>
-              Yes: share a project with a link and give each person a role — edit, comment or view.
-              You see each other's cursors, comment on the drawing and keep a history of versions.
-              Sharing goes through a Circuit Notebook server, which you can also run yourself.
+              Yes: add friends by @username or e-mail, make teams, and share a project with a
+              person, a team or a link. Each one can edit, comment or view — the whole project or
+              sheet by sheet, and a sheet can be hidden from someone. You see each other's cursors,
+              comment on the drawing and keep a history of versions. Sharing goes through a Circuit
+              Notebook server, which you can also run yourself.
             </p>
           </details>
           <details>
