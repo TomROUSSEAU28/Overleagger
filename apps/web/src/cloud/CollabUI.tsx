@@ -25,8 +25,11 @@ import {
   Share2,
   Trash,
   UploadCloud,
+  UserPlus,
+  Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useSocial } from './social';
 import * as Y from 'yjs';
 import { SheetRenderer } from '../canvas/render/SheetRenderer';
 import { useEditor } from '../editor/context';
@@ -261,8 +264,29 @@ function CloudShare({ onClose }: { onClose: () => void }) {
   const session = ed.session!;
   const role = useSession((s) => s.role);
   const members = useSession((s) => s.members);
+  const teams = useSession((s) => s.teams);
   const me = useCloud((s) => s.user);
   const isOwner = role === 'owner';
+  const social = useSocial();
+  const [pick, setPick] = useState('');
+  const [pickRole, setPickRole] = useState<Role>('editor');
+  useEffect(() => {
+    if (isOwner) void social.load().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner]);
+  // Friends and teams not on the project yet.
+  const friendChoices = social.friends.filter((f) => !members.some((m) => m.id === f.id));
+  const teamChoices = social.teams.filter((t) => !teams.some((x) => x.id === t.id));
+  const addPicked = () => {
+    const [kind, id] = pick.split(':');
+    if (!id) return;
+    void run(async () => {
+      if (kind === 'team')
+        await api('POST', `/api/projects/${session.id}/teams`, { teamId: id, role: pickRole });
+      else await api('POST', `/api/projects/${session.id}/members`, { userId: id, role: pickRole });
+      setPick('');
+    });
+  };
   const [invites, setInvites] = useState<InviteInfo[]>([]);
   const [newRole, setNewRole] = useState<Role>('editor');
   const [days, setDays] = useState(7);
@@ -298,6 +322,73 @@ function CloudShare({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Share" onClose={onClose}>
+      {isOwner && (
+        <>
+          <h3 className="share-h">Add people</h3>
+          {friendChoices.length || teamChoices.length ? (
+            <div className="share-add">
+              <select
+                value={pick}
+                onChange={(e) => setPick(e.target.value)}
+                data-testid="share-pick"
+              >
+                <option value="">Choose a friend or a team…</option>
+                {teamChoices.length > 0 && (
+                  <optgroup label="Your teams">
+                    {teamChoices.map((t) => (
+                      <option key={t.id} value={`team:${t.id}`}>
+                        {t.name} ({t.members.length})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {friendChoices.length > 0 && (
+                  <optgroup label="Your friends">
+                    {friendChoices.map((f) => (
+                      <option key={f.id} value={`user:${f.id}`}>
+                        {f.name} (@{f.handle})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <select
+                value={pickRole}
+                onChange={(e) => setPickRole(e.target.value as Role)}
+                aria-label="Role"
+              >
+                {ROLES.filter((r) => r !== 'owner').map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={!pick}
+                onClick={addPicked}
+                data-testid="share-add"
+              >
+                <UserPlus size={15} /> Add
+              </button>
+            </div>
+          ) : (
+            <p className="muted small">
+              {social.friends.length || social.teams.length
+                ? 'All your friends and teams are already here.'
+                : 'Add friends or create a team in '}
+              {!(social.friends.length || social.teams.length) && (
+                <a href="#/people" onClick={onClose}>
+                  Friends &amp; teams
+                </a>
+              )}
+              {!(social.friends.length || social.teams.length) &&
+                ' to add them here in one click — or send an invite link below.'}
+            </p>
+          )}
+        </>
+      )}
       <h3 className="share-h">People with access</h3>
       <ul className="members" data-testid="members">
         {members.map((m: Member) => (
@@ -344,6 +435,56 @@ function CloudShare({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
+      {teams.length > 0 && (
+        <ul className="members" data-testid="project-teams">
+          {teams.map((t) => (
+            <li key={t.id}>
+              <span className="team-avatar">
+                <Users size={14} />
+              </span>
+              <span className="member-name">
+                {t.name}
+                <span className="muted small">
+                  team · {t.size} {t.size === 1 ? 'person' : 'people'}
+                </span>
+              </span>
+              {isOwner ? (
+                <>
+                  <select
+                    value={t.role}
+                    onChange={(e) =>
+                      void run(() =>
+                        api('PATCH', `/api/projects/${session.id}/teams/${t.id}`, {
+                          role: e.target.value,
+                        }),
+                      )
+                    }
+                  >
+                    {ROLES.filter((r) => r !== 'owner').map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="icon-btn danger"
+                    title="Remove the team from this project"
+                    onClick={() =>
+                      confirm(`Remove the team “${t.name}” from this project?`) &&
+                      void run(() => api('DELETE', `/api/projects/${session.id}/teams/${t.id}`))
+                    }
+                  >
+                    <Trash size={14} />
+                  </button>
+                </>
+              ) : (
+                <span className="role-tag">{ROLE_LABELS[t.role]}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {isOwner ? (
         <>
           <h3 className="share-h">Invite links</h3>

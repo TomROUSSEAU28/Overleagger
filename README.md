@@ -103,6 +103,9 @@ see _Self-hosting_) to share projects:
 - **Shared projects**: create a project on the server, or upload one from this browser
   (_Share_ button or ☁ on the project card). They open instantly and keep working offline; the
   changes sync when you are back online.
+- **Friends & teams**: every account has a @username. Add friends by username or e-mail (they
+  accept), group them in teams, then add a friend or a whole team to a project from the Share
+  button — people who join the team later get access too.
 - **Invite links** with a role: **owner** (people, links, sheet locks), **editor**, **commenter**
   (comments only), **viewer** (look, present, export). The server checks every change against
   the role, not only the interface.

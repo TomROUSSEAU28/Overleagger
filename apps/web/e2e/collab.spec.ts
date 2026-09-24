@@ -102,3 +102,58 @@ test('two people edit, comment and follow each other in real time', async ({ bro
   await alice.getByTestId('save-version').click();
   await expect(alice.getByTestId('versions')).toContainText('Before review');
 });
+
+test('friends and teams: add a friend by username, share a project with a team', async ({
+  browser,
+}) => {
+  const chloe = await person(browser, 'Chloe');
+  const dan = await person(browser, 'Dan');
+
+  // Dan reads his username on the Friends & teams page and gives it to Chloe.
+  await dan.getByTestId('dash-people').click();
+  const handle = (await dan.getByTestId('my-handle').textContent())!.trim();
+  expect(handle).toMatch(/^@dan/);
+
+  await chloe.getByTestId('dash-people').click();
+  await chloe.getByTestId('friend-who').fill(handle);
+  await chloe.getByTestId('friend-add').click();
+  await expect(chloe.getByText('Waiting for an answer')).toBeVisible();
+
+  // Dan sees the request (badge) and accepts.
+  await dan.reload();
+  await expect(dan.getByTestId('friend-requests')).toContainText('Chloe');
+  await expect(dan.locator('.count-badge').first()).toHaveText('1');
+  await dan.getByTestId('friend-accept').click();
+  await expect(dan.getByTestId('friends')).toContainText('Chloe');
+
+  // Chloe makes a team with Dan.
+  await chloe.reload();
+  await expect(chloe.getByTestId('friends')).toContainText('Dan');
+  await chloe.getByTestId('team-name').fill('Lab group 4');
+  await chloe.getByTestId('team-create').click();
+  const dansOption = await chloe
+    .getByTestId('team-add-member')
+    .locator('option', { hasText: 'Dan' })
+    .textContent();
+  await chloe.getByTestId('team-add-member').selectOption({ label: dansOption! });
+  await expect(chloe.getByTestId('team')).toContainText('Dan');
+
+  // A project on the server, shared with the team from the Share button.
+  await chloe.goto('/app/');
+  await chloe.getByTestId('new-project').click();
+  await chloe.getByTestId('new-project-name').fill('Team converter');
+  await chloe.getByTestId('new-project-where').selectOption('cloud');
+  await chloe.getByTestId('create-project').click();
+  await expect(chloe.getByTestId('canvas')).toBeVisible();
+  await chloe.getByTestId('open-share').click();
+  await chloe.getByTestId('share-pick').selectOption({ label: 'Lab group 4 (2)' });
+  await chloe.getByTestId('share-add').click();
+  await expect(chloe.getByTestId('project-teams')).toContainText('Lab group 4');
+
+  // Dan finds it on his dashboard, marked with the team, and opens it.
+  await dan.goto('/app/');
+  const card = dan.getByTestId('cloud-card').filter({ hasText: 'Team converter' });
+  await expect(card).toContainText('Team Lab group 4');
+  await card.locator('a.card-title').click();
+  await expect(dan.getByTestId('canvas')).toBeVisible();
+});

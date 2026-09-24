@@ -8,7 +8,7 @@ import { Project, type Id, type Person, type Pt, type Role } from '@overleagger/
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import { ApiError, api, collabUrl, useCloud, type Member } from './cloud';
+import { ApiError, api, collabUrl, useCloud, type Member, type ProjectTeam } from './cloud';
 
 type Members = Member[];
 
@@ -34,6 +34,7 @@ export interface SessionState {
   /** Person whose view we follow (their user id). */
   following: string | null;
   members: Members;
+  teams: ProjectTeam[];
 }
 
 // (Storage name kept from the first version of the app, so cached projects stay available.)
@@ -48,7 +49,7 @@ export class CloudSession {
   readonly state: UseBoundStore<StoreApi<SessionState>>;
   private me: Person;
 
-  private constructor(id: string, role: Role, members: Members) {
+  private constructor(id: string, role: Role, members: Members, teams: ProjectTeam[]) {
     this.id = id;
     this.project = new Project(this.doc);
     const { server, token, user } = useCloud.getState();
@@ -64,6 +65,7 @@ export class CloudSession {
       peers: [],
       following: null,
       members,
+      teams,
     }));
     this.cache = new IndexeddbPersistence(DB(id), this.doc);
     this.provider = new HocuspocusProvider({
@@ -95,9 +97,12 @@ export class CloudSession {
 
   /** Open a cloud project: fetch the role, then show the cached copy or wait for the server. */
   static async open(id: string): Promise<CloudSession> {
-    let info: { role: Role; members: Members };
+    let info: { role: Role; members: Members; teams?: ProjectTeam[] };
     try {
-      info = await api<{ role: Role; members: Members }>('GET', `/api/projects/${id}`);
+      info = await api<{ role: Role; members: Members; teams: ProjectTeam[] }>(
+        'GET',
+        `/api/projects/${id}`,
+      );
       localStorage.setItem(`sb.role.${id}`, info.role);
     } catch (e) {
       // Offline: open the cached copy with the last known role.
@@ -105,7 +110,7 @@ export class CloudSession {
       if (!(e instanceof ApiError && e.status === 0) || !role) throw e;
       info = { role, members: [] };
     }
-    const s = new CloudSession(id, info.role, info.members);
+    const s = new CloudSession(id, info.role, info.members, info.teams ?? []);
     await s.cache.whenSynced;
     if (!s.project.rootSheetId) {
       await new Promise<void>((resolve, reject) => {
@@ -156,8 +161,11 @@ export class CloudSession {
 
   async refreshRole() {
     try {
-      const info = await api<{ role: Role; members: Members }>('GET', `/api/projects/${this.id}`);
-      this.state.setState({ role: info.role, members: info.members });
+      const info = await api<{ role: Role; members: Members; teams: ProjectTeam[] }>(
+        'GET',
+        `/api/projects/${this.id}`,
+      );
+      this.state.setState({ role: info.role, members: info.members, teams: info.teams ?? [] });
     } catch {
       // offline: keep the last known role
     }

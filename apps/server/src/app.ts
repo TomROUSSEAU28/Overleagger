@@ -13,7 +13,16 @@ import { createCollab } from './collab';
 import type { Config } from './config';
 import { Store, type UserRow } from './db';
 
-const publicUser = (u: UserRow) => ({ id: u.id, name: u.name, email: u.email, color: u.color });
+const publicUser = (u: UserRow) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  color: u.color,
+  handle: u.handle ?? '',
+});
+/** "@Tom.Martin " → "tom.martin" if it is a valid handle. */
+const HANDLE = /^[a-z0-9][a-z0-9._]{2,19}$/;
+const cleanHandle = (s: string) => s.trim().replace(/^@/, '').toLowerCase();
 
 class HttpError extends Error {
   constructor(
@@ -161,7 +170,15 @@ export async function createApp(config: Config) {
 
   app.patch('/api/auth/me', async (req) => {
     const user = requireUser(req);
-    const b = (req.body ?? {}) as { name?: string; color?: string };
+    const b = (req.body ?? {}) as { name?: string; color?: string; handle?: string };
+    if (b.handle !== undefined) {
+      const h = cleanHandle(b.handle);
+      if (!HANDLE.test(h))
+        throw bad('A username has 3 to 20 characters: letters, digits, dots or underscores.');
+      const taken = store.userByHandle(h);
+      if (taken && taken.id !== user.id) throw bad(`@${h} is already taken.`);
+      store.setHandle(user.id, h);
+    }
     store.updateUser(user.id, {
       ...(b.name?.trim() ? { name: b.name.trim().slice(0, 60) } : {}),
       ...(b.color && /^#[0-9a-f]{6}$/i.test(b.color) ? { color: b.color } : {}),
@@ -261,6 +278,7 @@ export async function createApp(config: Config) {
         name: p.name,
         role: p.role,
         owner: p.owner_name,
+        ...(p.team_name ? { team: p.team_name } : {}),
         updatedAt: p.updated_at,
         createdAt: p.created_at,
         thumbnail: p.thumbnail,
@@ -310,6 +328,7 @@ export async function createApp(config: Config) {
       project: { id, name: p.name, updatedAt: p.updated_at, ownerId: p.owner_id },
       role,
       members: store.members(id),
+      teams: store.projectTeams(id),
     };
   });
 
@@ -337,7 +356,7 @@ export async function createApp(config: Config) {
     const { user } = requireRole(req, id, 'owner');
     const role = (req.body as { role?: Role } | undefined)?.role;
     if (!role || !ROLES.includes(role)) throw bad('Unknown role.');
-    if (!store.role(id, userId)) throw new HttpError(404, 'Not a member.');
+    if (!store.directRole(id, userId)) throw new HttpError(404, 'Not a member.');
     if (userId === user.id) throw bad('Give the ownership to someone else first.');
     if (role === 'owner') {
       // Transfer: the previous owner stays as an editor.
@@ -357,10 +376,169 @@ export async function createApp(config: Config) {
     const leaving = userId === me.id;
     if (!leaving && myRole !== 'owner')
       throw new HttpError(403, 'Only the owner can remove people.');
+    if (leaving && !store.directRole(id, me.id))
+      throw bad('You have access through a team: leave the team, or ask the owner.');
     if (store.role(id, userId) === 'owner') throw bad('The owner cannot be removed.');
     store.removeMember(id, userId);
     collab.refreshAccess(id);
     return { ok: true };
+  });
+
+  /** Add a friend to the project directly (no link needed). */
+  app.post('/api/projects/:id/members', async (req) => {
+    const { id } = req.params as { id: string };
+    const { user } = requireRole(req, id, 'owner');
+    const b = (req.body ?? {}) as { userId?: string; role?: Role };
+    const role = b.role ?? 'editor';
+    if (!ROLES.includes(role) || role === 'owner') throw bad('Unknown role.');
+    if (!b.userId || !store.areFriends(user.id, b.userId))
+      throw bad('You can add your friends directly; send an invite link to anyone else.');
+    store.setMember(id, b.userId, role);
+    collab.refreshAccess(id);
+    return { members: store.members(id) };
+  });
+
+  /** Give one of your teams access: every member, now and later. */
+  app.post('/api/projects/:id/teams', async (req) => {
+    const { id } = req.params as { id: string };
+    const { user } = requireRole(req, id, 'owner');
+    const b = (req.body ?? {}) as { teamId?: string; role?: Role };
+    const role = b.role ?? 'editor';
+    if (!ROLES.includes(role) || role === 'owner') throw bad('Unknown role.');
+    if (!b.teamId || !store.isTeamMember(b.teamId, user.id))
+      throw bad('You can only add teams you belong to.');
+    store.setProjectTeam(id, b.teamId, role);
+    collab.refreshAccess(id);
+    return { teams: store.projectTeams(id) };
+  });
+
+  app.patch('/api/projects/:id/teams/:teamId', async (req) => {
+    const { id, teamId } = req.params as { id: string; teamId: string };
+    requireRole(req, id, 'owner');
+    const role = (req.body as { role?: Role } | undefined)?.role;
+    if (!role || !ROLES.includes(role) || role === 'owner') throw bad('Unknown role.');
+    store.setProjectTeam(id, teamId, role);
+    collab.refreshAccess(id);
+    return { teams: store.projectTeams(id) };
+  });
+
+  app.delete('/api/projects/:id/teams/:teamId', async (req) => {
+    const { id, teamId } = req.params as { id: string; teamId: string };
+    requireRole(req, id, 'owner');
+    store.removeProjectTeam(id, teamId);
+    collab.refreshAccess(id);
+    return { teams: store.projectTeams(id) };
+  });
+
+  // Friends ------------------------------------------------------------------
+
+  // A few dozen requests an hour is plenty for a person, and stops anyone from probing accounts.
+  const requests = new Map<string, number[]>();
+  const limitRequests = (userId: string) => {
+    const now = Date.now();
+    const recent = (requests.get(userId) ?? []).filter((t) => now - t < 3600_000);
+    if (recent.length >= 30) throw new HttpError(429, 'Too many requests, try again later.');
+    requests.set(userId, [...recent, now]);
+  };
+
+  app.get('/api/friends', async (req) => store.friendsOf(requireUser(req).id));
+
+  /** Send a request by exact email or @username; accepts it if they already asked you. */
+  app.post('/api/friends', async (req) => {
+    const me = requireUser(req);
+    limitRequests(me.id);
+    const who = ((req.body as { who?: string } | undefined)?.who ?? '').trim();
+    if (!who) throw bad('Type the e-mail address or the @username of your friend.');
+    const other =
+      who.includes('@') && !who.startsWith('@')
+        ? store.userByEmail(who.toLowerCase())
+        : store.userByHandle(cleanHandle(who));
+    if (!other) throw new HttpError(404, `Nobody found with “${who}”. Check the spelling.`);
+    if (other.id === me.id) throw bad('That is you!');
+    const f = store.friendship(me.id, other.id);
+    if (f?.status === 'accepted') throw bad(`${other.name} is already your friend.`);
+    if (f && f.user_id === other.id) store.acceptFriend(me.id, other.id);
+    else store.requestFriend(me.id, other.id);
+    return store.friendsOf(me.id);
+  });
+
+  app.post('/api/friends/:userId/accept', async (req) => {
+    const me = requireUser(req);
+    const { userId } = req.params as { userId: string };
+    store.acceptFriend(me.id, userId);
+    return store.friendsOf(me.id);
+  });
+
+  /** Decline a request, cancel yours, or remove a friend. */
+  app.delete('/api/friends/:userId', async (req) => {
+    const me = requireUser(req);
+    const { userId } = req.params as { userId: string };
+    store.removeFriend(me.id, userId);
+    return store.friendsOf(me.id);
+  });
+
+  // Teams --------------------------------------------------------------------
+
+  const refreshTeam = (teamId: string) => {
+    for (const p of store.teamProjects(teamId)) collab.refreshAccess(p);
+  };
+  const ownTeam = (req: FastifyRequest) => {
+    const me = requireUser(req);
+    const { id } = req.params as { id: string };
+    const team = store.team(id);
+    if (!team || !store.isTeamMember(id, me.id)) throw new HttpError(404, 'Team not found.');
+    return { me, team, isOwner: team.owner_id === me.id };
+  };
+
+  app.get('/api/teams', async (req) => ({ teams: store.teamsOf(requireUser(req).id) }));
+
+  app.post('/api/teams', async (req) => {
+    const me = requireUser(req);
+    const name = ((req.body as { name?: string } | undefined)?.name ?? '').trim().slice(0, 60);
+    if (!name) throw bad('Give the team a name.');
+    store.createTeam({ id: randomToken(9), name, owner_id: me.id, created_at: Date.now() });
+    return { teams: store.teamsOf(me.id) };
+  });
+
+  app.patch('/api/teams/:id', async (req) => {
+    const { me, team, isOwner } = ownTeam(req);
+    if (!isOwner) throw new HttpError(403, 'Only the creator of the team can rename it.');
+    const name = ((req.body as { name?: string } | undefined)?.name ?? '').trim().slice(0, 60);
+    if (name) store.renameTeam(team.id, name);
+    return { teams: store.teamsOf(me.id) };
+  });
+
+  app.delete('/api/teams/:id', async (req) => {
+    const { me, team, isOwner } = ownTeam(req);
+    if (!isOwner) throw new HttpError(403, 'Only the creator of the team can delete it.');
+    const projects = store.teamProjects(team.id);
+    store.deleteTeam(team.id);
+    for (const p of projects) collab.refreshAccess(p);
+    return { teams: store.teamsOf(me.id) };
+  });
+
+  /** The creator adds one of their friends. */
+  app.post('/api/teams/:id/members', async (req) => {
+    const { me, team, isOwner } = ownTeam(req);
+    if (!isOwner) throw new HttpError(403, 'Only the creator of the team can add people.');
+    const userId = (req.body as { userId?: string } | undefined)?.userId;
+    if (!userId || !store.areFriends(me.id, userId))
+      throw bad('Add your friends to a team (send them a friend request first).');
+    store.addTeamMember(team.id, userId);
+    refreshTeam(team.id);
+    return { teams: store.teamsOf(me.id) };
+  });
+
+  /** The creator removes someone, or a member leaves. */
+  app.delete('/api/teams/:id/members/:userId', async (req) => {
+    const { me, team, isOwner } = ownTeam(req);
+    const { userId } = req.params as { userId: string };
+    if (userId !== me.id && !isOwner)
+      throw new HttpError(403, 'Only the creator of the team can remove people.');
+    if (userId === team.owner_id) throw bad('The creator cannot leave: delete the team instead.');
+    store.removeTeamMember(team.id, userId);
+    refreshTeam(team.id);
+    return { teams: store.teamsOf(me.id) };
   });
 
   // Invite links -------------------------------------------------------------

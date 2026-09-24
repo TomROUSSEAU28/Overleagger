@@ -2507,3 +2507,206 @@ body.resizing-panel {
     margin-left: 0;
   }
 }
+
+/* ------------------------------------------------------------ friends & teams */
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 9px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  text-decoration: none;
+  margin-bottom: 6px;
+}
+.people-page .me-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.people-page .me-card p {
+  margin: 4px 0 0;
+}
+.handle-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.handle {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--accent);
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.people-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px 18px;
+}
+.people-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 400;
+}
+.people-h {
+  font-size: 13px;
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--muted);
+  margin: 18px 0 6px;
+}
+.people-add {
+  display: flex;
+  gap: 8px;
+}
+.people-add > input {
+  flex: 1;
+  min-width: 0;
+}
+.people-input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--muted);
+}
+.people-input:focus-within {
+  border-color: var(--accent);
+}
+.people-input input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 6px 0;
+  color: var(--ink);
+}
+.people-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.person-row:last-child {
+  border-bottom: none;
+}
+.person-name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.person-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.small-btn {
+  padding: 2px 9px;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+.team-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+.team-card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.team-members {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 8px;
+  padding: 0;
+}
+.team-members li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px 2px 2px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  font-size: 13px;
+}
+.team-members .icon-btn {
+  padding: 0;
+  width: 18px;
+  height: 18px;
+}
+.team-add {
+  width: 100%;
+}
+.share-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.share-add select:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.team-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex: none;
+}
+@media (max-width: 860px) {
+  .people-grid {
+    grid-template-columns: 1fr;
+  }
+}

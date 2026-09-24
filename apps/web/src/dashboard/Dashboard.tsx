@@ -11,6 +11,7 @@ import {
   Trash,
   Upload,
   UploadCloud,
+  Users,
   Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -18,6 +19,7 @@ import { Project, ROLE_LABELS } from '@overleagger/core';
 import { Logo } from '../brand/Logo';
 import { AccountMenu } from '../cloud/AccountUI';
 import { api, bytesToBase64, useCloud, type CloudProjectEntry } from '../cloud/cloud';
+import { useSocial } from '../cloud/social';
 import { seedBuckExample } from '../examples/buck';
 import { Field, Modal } from '../panels/common';
 import { ThemePicker } from '../panels/ThemePicker';
@@ -289,6 +291,7 @@ export function Dashboard() {
   const fileRef = useRef<HTMLInputElement>(null);
   const theme = useUI((s) => s.theme);
   const user = useCloud((s) => s.user);
+  const requests = useSocial((s) => s.incoming.length);
   const [cloudProjects, setCloudProjects] = useState<CloudProjectEntry[] | null>(null);
 
   useEffect(() => {
@@ -446,6 +449,12 @@ export function Dashboard() {
           <span className="logo">Circuit Notebook</span>
         </a>
         <div className="dash-top-right">
+          {user && (
+            <a className="btn" href="#/people" data-testid="dash-people">
+              <Users size={15} /> Friends &amp; teams
+              {requests > 0 && <span className="count-badge">{requests}</span>}
+            </a>
+          )}
           <AccountMenu />
           <ThemePicker />
         </div>
@@ -567,7 +576,7 @@ export function Dashboard() {
                 name={i.p.name}
                 thumbnail={i.p.thumbnail}
                 badge={i.p.role === 'owner' ? 'Shared' : ROLE_LABELS[i.p.role]}
-                meta={`${i.p.role === 'owner' ? 'Yours' : `By ${i.p.owner}`} · ${ago(i.p.updatedAt)}`}
+                meta={`${i.p.role === 'owner' ? 'Yours' : i.p.team ? `Team ${i.p.team}` : `By ${i.p.owner}`} · ${ago(i.p.updatedAt)}`}
                 menu={cloudMenu(i.p)}
                 testId="cloud-card"
               />

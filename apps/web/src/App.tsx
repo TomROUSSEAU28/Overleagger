@@ -7,6 +7,7 @@ import { Dashboard } from './dashboard/Dashboard';
 import { seedBuckExample } from './examples/buck';
 import { createProject } from './storage/projects';
 import { EditorPage } from './editor/EditorPage';
+import { PeoplePage } from './cloud/PeoplePage';
 import { Gallery } from './gallery/Gallery';
 import { parseHash, useHash } from './router';
 import { useUserLib } from './storage/userLibrary';
@@ -48,6 +49,8 @@ export function App() {
       return <AuthPage token={route.token} />;
     case 'gallery':
       return <Gallery />;
+    case 'people':
+      return <PeoplePage />;
     case 'example':
       return <ExamplePage />;
     default:

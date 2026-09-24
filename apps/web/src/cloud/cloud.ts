@@ -13,6 +13,8 @@ export interface CloudUser {
   name: string;
   email: string;
   color: string;
+  /** Public username (@tom), how friends find you. */
+  handle: string;
 }
 
 export interface ServerInfo {
@@ -27,7 +29,16 @@ export interface Member {
   name: string;
   email: string;
   color: string;
+  handle?: string;
   role: Role;
+}
+
+/** A team given access to a project (all its members get the role). */
+export interface ProjectTeam {
+  id: string;
+  name: string;
+  role: Role;
+  size: number;
 }
 
 export interface CloudProjectEntry {
@@ -35,6 +46,8 @@ export interface CloudProjectEntry {
   name: string;
   role: Role;
   owner: string;
+  /** Access through this team (not as a direct member). */
+  team?: string;
   updatedAt: number;
   createdAt: number;
   thumbnail: string | null;
@@ -81,7 +94,7 @@ interface CloudState {
   signUp: (email: string, name: string, password: string, invite?: string) => Promise<void>;
   acceptToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateMe: (patch: { name?: string; color?: string }) => Promise<void>;
+  updateMe: (patch: { name?: string; color?: string; handle?: string }) => Promise<void>;
 }
 
 const normalize = (url: string) => url.trim().replace(/\/+$/, '');

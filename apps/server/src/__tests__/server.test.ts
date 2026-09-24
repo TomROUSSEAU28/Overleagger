@@ -234,3 +234,126 @@ describe('sharing and real-time sync', () => {
     expect((await api('GET', '/api/library', u.token)).data).toMatchObject({ library: lib });
   });
 });
+
+describe('friends and teams', () => {
+  it('finds people by @username or e-mail, and needs both sides to agree', async () => {
+    const zoe = await signup('Zoe');
+    const yan = await signup('Yan');
+    const me = await api<{ user: { handle: string } }>('GET', '/api/auth/me', yan.token);
+    expect(me.data.user.handle).toBe('yan');
+
+    // Unknown person, yourself.
+    expect((await api('POST', '/api/friends', zoe.token, { who: '@nobody.here' })).status).toBe(
+      404,
+    );
+    expect((await api('POST', '/api/friends', zoe.token, { who: '@zoe' })).status).toBe(400);
+
+    // Request by handle: pending on both sides.
+    const sent = await api<{ outgoing: { id: string }[] }>('POST', '/api/friends', zoe.token, {
+      who: '@Yan',
+    });
+    expect(sent.data.outgoing.map((u) => u.id)).toEqual([yan.user.id]);
+    const inbox = await api<{ incoming: { id: string }[]; friends: unknown[] }>(
+      'GET',
+      '/api/friends',
+      yan.token,
+    );
+    expect(inbox.data.incoming.map((u) => u.id)).toEqual([zoe.user.id]);
+    expect(inbox.data.friends).toEqual([]);
+
+    // Accept → friends; the answer never shows e-mail addresses.
+    const ok = await api<{ friends: Record<string, unknown>[] }>(
+      'POST',
+      `/api/friends/${zoe.user.id}/accept`,
+      yan.token,
+    );
+    expect(ok.data.friends.map((u) => u.id)).toEqual([zoe.user.id]);
+    expect(ok.data.friends[0]).not.toHaveProperty('email');
+
+    // Asking back by e-mail when they already asked you accepts at once.
+    const xia = await signup('Xia');
+    await api('POST', '/api/friends', xia.token, { who: 'zoe@lab.test' });
+    const back = await api<{ friends: { id: string }[] }>('POST', '/api/friends', zoe.token, {
+      who: '@xia',
+    });
+    expect(back.data.friends.map((u) => u.id).sort()).toEqual([xia.user.id, yan.user.id].sort());
+
+    // Handle change: unique and valid.
+    expect((await api('PATCH', '/api/auth/me', xia.token, { handle: '@yan' })).status).toBe(400);
+    expect((await api('PATCH', '/api/auth/me', xia.token, { handle: 'x' })).status).toBe(400);
+    expect((await api('PATCH', '/api/auth/me', xia.token, { handle: 'xia.lab' })).status).toBe(200);
+  });
+
+  it('shares a project with a friend or a whole team, and follows team changes', async () => {
+    const owner = await signup('Olga');
+    const pal = await signup('Pablo');
+    const late = await signup('Lina');
+    const stranger = await signup('Sam');
+    for (const u of [pal, late]) {
+      await api('POST', '/api/friends', owner.token, { who: `@${u === pal ? 'pablo' : 'lina'}` });
+      await api('POST', `/api/friends/${owner.user.id}/accept`, u.token);
+    }
+    const { data: proj } = await api<{ id: string }>('POST', '/api/projects', owner.token, {
+      name: 'Team project',
+    });
+
+    // Only friends can be added directly.
+    expect(
+      (
+        await api('POST', `/api/projects/${proj.id}/members`, owner.token, {
+          userId: stranger.user.id,
+        })
+      ).status,
+    ).toBe(400);
+    const added = await api<{ members: { id: string; role: string }[] }>(
+      'POST',
+      `/api/projects/${proj.id}/members`,
+      owner.token,
+      { userId: pal.user.id, role: 'viewer' },
+    );
+    expect(added.data.members.find((m) => m.id === pal.user.id)?.role).toBe('viewer');
+
+    // A team with Pablo, given edit rights: the best role wins.
+    const t = await api<{ teams: { id: string }[] }>('POST', '/api/teams', owner.token, {
+      name: 'Lab group 4',
+    });
+    const teamId = t.data.teams[0]!.id;
+    await api('POST', `/api/teams/${teamId}/members`, owner.token, { userId: pal.user.id });
+    expect(
+      (await api('POST', `/api/teams/${teamId}/members`, owner.token, { userId: stranger.user.id }))
+        .status,
+    ).toBe(400);
+    await api('POST', `/api/projects/${proj.id}/teams`, owner.token, { teamId, role: 'editor' });
+    const palView = await api<{ role: string; teams: { name: string }[] }>(
+      'GET',
+      `/api/projects/${proj.id}`,
+      pal.token,
+    );
+    expect(palView.data.role).toBe('editor');
+    expect(palView.data.teams.map((x) => x.name)).toEqual(['Lab group 4']);
+
+    // Someone who joins the team later gets the project too, and loses it on leaving.
+    expect((await api('GET', `/api/projects/${proj.id}`, late.token)).status).toBe(404);
+    await api('POST', `/api/teams/${teamId}/members`, owner.token, { userId: late.user.id });
+    const list = await api<{ projects: { id: string; role: string; team?: string }[] }>(
+      'GET',
+      '/api/projects',
+      late.token,
+    );
+    expect(list.data.projects.find((p) => p.id === proj.id)).toMatchObject({
+      role: 'editor',
+      team: 'Lab group 4',
+    });
+    await api('DELETE', `/api/teams/${teamId}/members/${late.user.id}`, late.token);
+    expect((await api('GET', `/api/projects/${proj.id}`, late.token)).status).toBe(404);
+
+    // Removing the team from the project: Pablo keeps his own viewer role.
+    await api('DELETE', `/api/projects/${proj.id}/teams/${teamId}`, owner.token);
+    expect(
+      (await api<{ role: string }>('GET', `/api/projects/${proj.id}`, pal.token)).data.role,
+    ).toBe('viewer');
+    // Only the creator manages the team.
+    expect((await api('DELETE', `/api/teams/${teamId}`, pal.token)).status).toBe(403);
+    expect((await api('DELETE', `/api/teams/${teamId}`, owner.token)).status).toBe(200);
+  });
+});

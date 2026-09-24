@@ -1,5 +1,9 @@
 # Collaboration plan: contacts, teams, per-sheet rights
 
+> **Status**: the simple version is done — @usernames, friends (request / accept), teams, and
+> sharing a project with a friend or a whole team from the Share button. Per-sheet rights
+> (sections 1, 5) are left for later, on purpose: collaboration stays simple.
+
 Goal: after creating an account, working together is easy. You add friends, create a team,
 add people to a project, and the owner decides who may **see**, **comment** or **edit**, down
 to a single sheet ("Alice may only edit sheet 2", "Bob must not see the controller").

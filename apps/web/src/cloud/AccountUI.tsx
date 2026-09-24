@@ -1,5 +1,6 @@
 import { ROLE_LABELS, type Role } from '@overleagger/core';
-import { Cloud, CloudOff, LogIn, LogOut, Server, UserRound } from 'lucide-react';
+import { Cloud, CloudOff, LogIn, LogOut, Server, UserRound, Users } from 'lucide-react';
+import { useSocial } from './social';
 import { useEffect, useState } from 'react';
 import { Field, Modal } from '../panels/common';
 import { navigate } from '../router';
@@ -204,6 +205,7 @@ export function AccountMenu() {
   const cloud = useCloud();
   const [dialog, setDialog] = useState<'server' | 'signin' | null>(null);
   const [open, setOpen] = useState(false);
+  const requests = useSocial((s) => s.incoming.length);
   useEffect(() => {
     void cloud.init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,17 +240,35 @@ export function AccountMenu() {
         >
           <Avatar name={cloud.user.name} color={cloud.user.color} />
           <span>{cloud.user.name}</span>
+          {requests > 0 && (
+            <span className="count-badge" title={`${requests} friend request(s)`}>
+              {requests}
+            </span>
+          )}
         </button>
       )}
       {open && cloud.user && (
         <div className="menu" onMouseLeave={() => setOpen(false)}>
           <div className="menu-head">
             <b>{cloud.user.name}</b>
-            <span className="muted small">{cloud.user.email}</span>
+            <span className="muted small">
+              @{cloud.user.handle} · {cloud.user.email}
+            </span>
             <span className="muted small mono">
               <Cloud size={12} /> {cloud.server}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate('/people');
+            }}
+            data-testid="open-people"
+          >
+            <Users size={14} /> Friends &amp; teams
+            {requests > 0 && <span className="count-badge">{requests}</span>}
+          </button>
           <button
             type="button"
             onClick={async () => {

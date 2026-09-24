@@ -14,6 +14,7 @@ const localSession = create<SessionState>(() => ({
   peers: [],
   following: null,
   members: [],
+  teams: [],
 }));
 
 /** Read the collaboration state (works for local projects too). */
