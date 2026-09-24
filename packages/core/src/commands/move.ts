@@ -1,0 +1,219 @@
+import { elementPins, elementBBox, type SheetContext } from '../geometry/elements';
+import { normalizeWire, ptKey, rectUnion, snap, samePt } from '../geometry/geom';
+import type { Element, Id, Rot, WireElement } from '../model/types';
+import { GRID } from '../model/types';
+
+/** Translate one element (wires move all their vertices). */
+export function translated(el: Element, dx: number, dy: number): Element {
+  switch (el.type) {
+    case 'wire': {
+      const pts = el.pts.map((v, i) => (i % 2 === 0 ? v + dx : v + dy));
+      return { ...el, pts };
+    }
+    case 'group':
+      return el;
+    default:
+      return { ...el, x: el.x + dx, y: el.y + dy };
+  }
+}
+
+/** Move the last vertex of a wire by (dx, dy) keeping every segment orthogonal. */
+function moveWireEnd(pts: number[], dx: number, dy: number): number[] {
+  const p = [...pts];
+  const n = p.length / 2;
+  const ex = p[2 * n - 2]!;
+  const ey = p[2 * n - 1]!;
+  const px = p[2 * n - 4]!;
+  const py = p[2 * n - 3]!;
+  const nx = ex + dx;
+  const ny = ey + dy;
+  const horizontal = Math.abs(py - ey) < 1e-6 && Math.abs(px - ex) > 1e-6;
+  const vertical = Math.abs(px - ex) < 1e-6 && Math.abs(py - ey) > 1e-6;
+  if (n === 2) {
+    if (horizontal && dy !== 0) {
+      const mx = snap((px + nx) / 2, GRID);
+      return normalizeWire([px, py, mx, py, mx, ny, nx, ny]);
+    }
+    if (vertical && dx !== 0) {
+      const my = snap((py + ny) / 2, GRID);
+      return normalizeWire([px, py, px, my, nx, my, nx, ny]);
+    }
+    return normalizeWire([px, py, nx, ny]);
+  }
+  if (horizontal) p[2 * n - 3] = py + dy;
+  else if (vertical) p[2 * n - 4] = px + dx;
+  p[2 * n - 2] = nx;
+  p[2 * n - 1] = ny;
+  return normalizeWire(p);
+}
+
+function reversePts(pts: number[]): number[] {
+  const out: number[] = [];
+  for (let i = pts.length - 2; i >= 0; i -= 2) out.push(pts[i]!, pts[i + 1]!);
+  return out;
+}
+
+/**
+ * Compute the result of moving `ids` by (dx, dy): moved elements are translated, and wires that
+ * are attached to them (by an end point) are stretched so they stay connected and orthogonal.
+ * Returns only the changed elements.
+ */
+export function computeMove(
+  elements: Element[],
+  ids: Set<Id>,
+  dx: number,
+  dy: number,
+  ctx: SheetContext,
+): Element[] {
+  if (dx === 0 && dy === 0) return [];
+  const out: Element[] = [];
+  const anchors = new Set<string>();
+  for (const el of elements) {
+    if (!ids.has(el.id)) continue;
+    out.push(translated(el, dx, dy));
+    for (const p of elementPins(el, ctx)) anchors.add(ptKey(p.x, p.y));
+    if (el.type === 'wire')
+      for (let i = 0; i < el.pts.length; i += 2) anchors.add(ptKey(el.pts[i]!, el.pts[i + 1]!));
+  }
+  for (const el of elements) {
+    if (ids.has(el.id) || el.type !== 'wire' || el.pts.length < 4) continue;
+    const n = el.pts.length;
+    const startOn = anchors.has(ptKey(el.pts[0]!, el.pts[1]!));
+    const endOn = anchors.has(ptKey(el.pts[n - 2]!, el.pts[n - 1]!));
+    if (startOn && endOn) {
+      out.push(translated(el, dx, dy));
+    } else if (endOn) {
+      out.push({ ...el, pts: moveWireEnd(el.pts, dx, dy) });
+    } else if (startOn) {
+      out.push({ ...el, pts: reversePts(moveWireEnd(reversePts(el.pts), dx, dy)) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Drag segment `seg` (between vertex seg and seg+1) of a wire perpendicular to itself.
+ * End points stay where they are: a new vertex is inserted when an end segment moves.
+ */
+export function dragSegment(w: WireElement, seg: number, dx: number, dy: number): number[] {
+  const pts = [...w.pts];
+  const n = pts.length / 2;
+  if (seg < 0 || seg >= n - 1) return pts;
+  const ax = pts[2 * seg]!;
+  const ay = pts[2 * seg + 1]!;
+  const bx = pts[2 * seg + 2]!;
+  const by = pts[2 * seg + 3]!;
+  const horizontal = Math.abs(ay - by) < 1e-6;
+  const vertical = Math.abs(ax - bx) < 1e-6;
+  const mx = horizontal ? 0 : dx;
+  const my = vertical ? 0 : dy;
+  if (horizontal && vertical) return pts;
+  const moved = [...pts];
+  moved[2 * seg] = ax + mx;
+  moved[2 * seg + 1] = ay + my;
+  moved[2 * seg + 2] = bx + mx;
+  moved[2 * seg + 3] = by + my;
+  let out = moved;
+  // Keep the wire's end points fixed.
+  if (seg === n - 2) out = [...out, bx, by];
+  if (seg === 0) out = [ax, ay, ...out];
+  return normalizeWire(out);
+}
+
+/** Index of the segment of `w` closest to (x, y). */
+export function nearestSegment(w: WireElement, x: number, y: number): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i + 3 < w.pts.length; i += 2) {
+    const ax = w.pts[i]!;
+    const ay = w.pts[i + 1]!;
+    const bx = w.pts[i + 2]!;
+    const by = w.pts[i + 3]!;
+    const l2 = (bx - ax) ** 2 + (by - ay) ** 2;
+    let t = l2 ? ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay)));
+    if (d < bestD) {
+      bestD = d;
+      best = i / 2;
+    }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// Rotation & mirroring
+// ---------------------------------------------------------------------------
+
+type PtFn = (x: number, y: number) => [number, number];
+
+function transformElement(
+  el: Element,
+  f: PtFn,
+  comp: (rot: Rot, mirror: boolean) => [Rot, boolean],
+): Element {
+  switch (el.type) {
+    case 'wire': {
+      const pts: number[] = [];
+      for (let i = 0; i < el.pts.length; i += 2) pts.push(...f(el.pts[i]!, el.pts[i + 1]!));
+      return { ...el, pts };
+    }
+    case 'component': {
+      const [x, y] = f(el.x, el.y);
+      const [rot, mirror] = comp(el.rot, el.mirror);
+      return { ...el, x, y, rot, mirror };
+    }
+    case 'block': {
+      // Blocks keep their orientation: move their centre.
+      const [cx, cy] = f(el.x + el.w / 2, el.y + el.h / 2);
+      return { ...el, x: snap(cx - el.w / 2, GRID), y: snap(cy - el.h / 2, GRID) };
+    }
+    case 'group':
+      return el;
+    default: {
+      const [x, y] = f(el.x, el.y);
+      return { ...el, x, y };
+    }
+  }
+}
+
+function selectionCenter(elements: Element[], ctx: SheetContext): [number, number] {
+  if (elements.length === 1 && elements[0]!.type === 'component')
+    return [elements[0]!.x, elements[0]!.y];
+  const r = rectUnion(elements.map((e) => elementBBox(e, ctx, elements)));
+  if (!r) return [0, 0];
+  return [snap(r.x + r.w / 2, GRID), snap(r.y + r.h / 2, GRID)];
+}
+
+/** Rotate elements by a quarter turn clockwise (or counter-clockwise) around their common centre. */
+export function rotateElements(elements: Element[], ctx: SheetContext, ccw = false): Element[] {
+  const [cx, cy] = selectionCenter(elements, ctx);
+  const f: PtFn = ccw
+    ? (x, y) => [cx + (y - cy), cy - (x - cx)]
+    : (x, y) => [cx - (y - cy), cy + (x - cx)];
+  return elements.map((el) =>
+    transformElement(el, f, (rot, mirror) => [((rot + (ccw ? 3 : 1)) % 4) as Rot, mirror]),
+  );
+}
+
+/** Mirror elements horizontally (axis = 'x', left↔right) or vertically (axis = 'y'). */
+export function mirrorElements(
+  elements: Element[],
+  ctx: SheetContext,
+  axis: 'x' | 'y' = 'x',
+): Element[] {
+  const [cx, cy] = selectionCenter(elements, ctx);
+  const f: PtFn = axis === 'x' ? (x, y) => [2 * cx - x, y] : (x, y) => [x, 2 * cy - y];
+  return elements.map((el) =>
+    transformElement(el, f, (rot, mirror) => [
+      (axis === 'x' ? (4 - rot) % 4 : (6 - rot) % 4) as Rot,
+      !mirror,
+    ]),
+  );
+}
+
+/** True when the point is one of the end points of the wire. */
+export function isWireEnd(w: WireElement, x: number, y: number): boolean {
+  const n = w.pts.length;
+  return samePt(w.pts[0]!, w.pts[1]!, x, y) || samePt(w.pts[n - 2]!, w.pts[n - 1]!, x, y);
+}
