@@ -1,9 +1,20 @@
 import { ROLE_LABELS, type Role } from '@overleagger/core';
-import { Cloud, CloudOff, LogIn, LogOut, Server, UserRound, Users } from 'lucide-react';
+import {
+  Cloud,
+  CloudOff,
+  Gauge,
+  Heart,
+  LogIn,
+  LogOut,
+  Server,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import { useSocial } from './social';
 import { useEffect, useState } from 'react';
 import { Field, Modal } from '../panels/common';
 import { navigate } from '../router';
+import { SUPPORT_URL } from '../site';
 import { Loading, Logo } from '../brand/Logo';
 import { ApiError, api, useCloud } from './cloud';
 
@@ -269,6 +280,21 @@ export function AccountMenu() {
             <Users size={14} /> Friends &amp; teams
             {requests > 0 && <span className="count-badge">{requests}</span>}
           </button>
+          {cloud.user.admin && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate('/admin');
+              }}
+              data-testid="open-admin"
+            >
+              <Gauge size={14} /> Administration
+            </button>
+          )}
+          <a href={SUPPORT_URL} target="_blank" rel="noopener" onClick={() => setOpen(false)}>
+            <Heart size={14} /> Support the project
+          </a>
           <button
             type="button"
             onClick={async () => {

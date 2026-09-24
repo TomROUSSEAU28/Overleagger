@@ -17,6 +17,7 @@ const localSession = create<SessionState>(() => ({
   teams: [],
   rules: [],
   denied: [],
+  size: null,
 }));
 
 /** Read the collaboration state (works for local projects too). */

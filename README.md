@@ -185,6 +185,9 @@ copying `/data/circuit-notebook.sqlite`. Settings (environment variables, see `d
 | `DB_FILE`                                   | `/data/circuit-notebook.sqlite` | SQLite file                                                 |
 | `SESSION_DAYS` / `AUTO_VERSION_MINUTES`     | `30` / `10`                     | Sign-in lifetime / time between automatic versions          |
 | `TRUST_PROXY`                               | `false`                         | `true` behind a reverse proxy or Cloudflare Tunnel          |
+| `MAX_PROJECTS` / `MAX_PROJECT_MB`           | `5` / `5`                       | Projects each account keeps on the server, MB per project   |
+| `ADMIN_EMAILS`                              | —                               | Accounts that see the Administration page (`@domain` = all) |
+| `BACKUP_KEEP_DAYS`                          | `7`                             | Days of nightly database copies (next to the database)      |
 
 Put it behind HTTPS (Caddy, nginx, Traefik…) for real use: WebSockets go through `/collab`. The
 GitHub Pages version of the app can use any server: _Connect to a server_ on the dashboard.

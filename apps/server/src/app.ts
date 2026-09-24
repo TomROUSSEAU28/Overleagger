@@ -14,10 +14,14 @@ import {
   type Role,
   type SheetLevel,
 } from '@overleagger/core';
+import { statSync } from 'node:fs';
+import { statfs } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { colorFor, hashPassword, hashToken, randomToken, verifyPassword } from './auth';
+import { startBackups } from './backup';
 import { createCollab, visibleParts } from './collab';
-import type { Config } from './config';
+import { isAdminEmail, type Config } from './config';
 import { Store, type UserRow } from './db';
 
 const publicUser = (u: UserRow) => ({
@@ -46,6 +50,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function createApp(config: Config) {
   const store = new Store(config.dbFile);
   const collab = createCollab(store, config);
+  const backups = startBackups(store.db, config);
   const app = Fastify({
     logger: false,
     bodyLimit: 8 * 1024 * 1024,
@@ -88,6 +93,30 @@ export async function createApp(config: Config) {
     if (!role) throw new HttpError(404, 'Project not found.');
     if (!roleAtLeast(role, min)) throw new HttpError(403, 'You do not have the rights for this.');
     return { user, role };
+  };
+  const isAdmin = (u: UserRow) => isAdminEmail(config, u.email);
+  const requireAdmin = (req: FastifyRequest) => {
+    const u = requireUser(req);
+    if (!isAdmin(u)) throw new HttpError(403, 'This page is for the administrators.');
+    return u;
+  };
+  /** Projects a person may keep on the server (no limit for admins). */
+  const maxProjectsOf = (u: UserRow) =>
+    isAdmin(u) ? Infinity : (u.max_projects ?? config.maxProjects);
+  /** The signed-in person: public profile, plus their rights and room on the server. */
+  const account = (u: UserRow) => {
+    const used = store.ownedUsage(u.id);
+    const max = maxProjectsOf(u);
+    return {
+      ...publicUser(u),
+      admin: isAdmin(u),
+      quota: {
+        projects: used.projects,
+        maxProjects: Number.isFinite(max) ? max : null,
+        bytes: used.bytes,
+        maxProjectBytes: isAdmin(u) ? null : config.maxProjectBytes,
+      },
+    };
   };
   const newSession = (userId: string) => {
     const token = randomToken(32);
@@ -150,7 +179,7 @@ export async function createApp(config: Config) {
       created_at: Date.now(),
     };
     store.createUser(user);
-    return { token: newSession(user.id), user: publicUser(user) };
+    return { token: newSession(user.id), user: account(user) };
   });
 
   app.post('/api/auth/login', async (req) => {
@@ -164,7 +193,7 @@ export async function createApp(config: Config) {
       throw new HttpError(401, 'Wrong email or password.');
     }
     failures.delete(key);
-    return { token: newSession(user.id), user: publicUser(user) };
+    return { token: newSession(user.id), user: account(user) };
   });
 
   app.post('/api/auth/logout', async (req) => {
@@ -173,7 +202,7 @@ export async function createApp(config: Config) {
     return { ok: true };
   });
 
-  app.get('/api/auth/me', async (req) => ({ user: publicUser(requireUser(req)) }));
+  app.get('/api/auth/me', async (req) => ({ user: account(requireUser(req)) }));
 
   app.patch('/api/auth/me', async (req) => {
     const user = requireUser(req);
@@ -190,7 +219,7 @@ export async function createApp(config: Config) {
       ...(b.name?.trim() ? { name: b.name.trim().slice(0, 60) } : {}),
       ...(b.color && /^#[0-9a-f]{6}$/i.test(b.color) ? { color: b.color } : {}),
     });
-    return { user: publicUser(store.userById(user.id)!) };
+    return { user: account(store.userById(user.id)!) };
   });
 
   // GitHub sign-in (only when GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET are set).
@@ -295,6 +324,12 @@ export async function createApp(config: Config) {
 
   app.post('/api/projects', async (req) => {
     const user = requireUser(req);
+    const max = maxProjectsOf(user);
+    if (store.ownedUsage(user.id).projects >= max)
+      throw new HttpError(
+        403,
+        `You already have ${max} projects on the server (the beta limit). Move one to this computer or delete it, or keep this one on your computer.`,
+      );
     const b = (req.body ?? {}) as { name?: string; state?: string };
     const id = randomToken(12);
     let parts: ProjectParts;
@@ -312,6 +347,13 @@ export async function createApp(config: Config) {
       name = name || p.getMeta().name;
       parts = p.encodeParts();
       p.destroy();
+      const bytes =
+        parts.root.length + [...parts.sheets.values()].reduce((a, x) => a + x.length, 0);
+      if (!isAdmin(user) && bytes > config.maxProjectBytes)
+        throw new HttpError(
+          413,
+          `This project is too big for the server (${Math.round((bytes / 1048576) * 10) / 10} MB, ${Math.round(config.maxProjectBytes / 1048576)} MB at most). Keep it on your computer, or remove large images first.`,
+        );
     } else {
       parts = Project.create(name || 'Untitled project').encodeParts();
     }
@@ -332,8 +374,10 @@ export async function createApp(config: Config) {
     const { id } = req.params as { id: string };
     const { role } = requireRole(req, id, 'viewer');
     const p = store.project(id)!;
+    const size = collab.projectSize(id);
     return {
       project: { id, name: p.name, updatedAt: p.updated_at, ownerId: p.owner_id },
+      size: { bytes: size.bytes, max: Number.isFinite(size.max) ? size.max : null },
       role,
       members: store.members(id),
       teams: store.projectTeams(id),
@@ -702,6 +746,80 @@ export async function createApp(config: Config) {
     return { ok: true };
   });
 
+  /** The whole project (without the sheets hidden from this person): to keep a local copy. */
+  app.get('/api/projects/:id/state', async (req) => {
+    const { id } = req.params as { id: string };
+    const { user, role } = requireRole(req, id, 'viewer');
+    const parts = visibleParts(collab.currentParts(id), role, store.rulesFor(id, user.id));
+    return { state: Buffer.from(encodeBundle(parts)).toString('base64') };
+  });
+
+  // Administration --------------------------------------------------------------
+
+  app.get('/api/admin/stats', async (req) => {
+    requireAdmin(req);
+    const week = Date.now() - 7 * 24 * 3600 * 1000;
+    const disk = await statfs(config.dbFile === ':memory:' ? '.' : dirname(config.dbFile))
+      .then((st) => ({ free: st.bavail * st.bsize, total: st.blocks * st.bsize }))
+      .catch(() => null);
+    const dbBytes = (() => {
+      try {
+        return config.dbFile === ':memory:' ? 0 : statSync(config.dbFile).size;
+      } catch {
+        return 0;
+      }
+    })();
+    const last = backups.last();
+    return {
+      ...store.stats(week),
+      dbBytes,
+      disk,
+      backup: last ? { at: last.at, bytes: last.bytes } : null,
+      limits: { maxProjects: config.maxProjects, maxProjectBytes: config.maxProjectBytes },
+      biggest: store.biggestProjects(),
+    };
+  });
+
+  app.get('/api/admin/users', async (req) => {
+    requireAdmin(req);
+    return {
+      users: store.usersWithUsage().map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        handle: u.handle ?? '',
+        createdAt: u.created_at,
+        lastSignIn: u.last_sign_in,
+        projects: u.projects,
+        bytes: u.bytes,
+        maxProjects: u.max_projects,
+        admin: isAdminEmail(config, u.email),
+      })),
+      defaultMaxProjects: config.maxProjects,
+    };
+  });
+
+  /** Change how many projects an account may keep on the server (null: the default). */
+  app.patch('/api/admin/users/:userId', async (req) => {
+    requireAdmin(req);
+    const { userId } = req.params as { userId: string };
+    const b = (req.body ?? {}) as { maxProjects?: number | null };
+    if (!store.userById(userId)) throw new HttpError(404, 'Unknown account.');
+    const v = b.maxProjects;
+    if (v !== null && (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 10000))
+      throw bad('Give a whole number of projects (or nothing for the default).');
+    store.setMaxProjects(userId, v);
+    return { ok: true };
+  });
+
+  /** Make the nightly database copy now. */
+  app.post('/api/admin/backup', async (req) => {
+    requireAdmin(req);
+    await backups.run();
+    const last = backups.last();
+    return { backup: last ? { at: last.at, bytes: last.bytes } : null };
+  });
+
   // Personal library (symbols + templates of the account) ----------------------
 
   app.get('/api/library', async (req) => {
@@ -749,6 +867,7 @@ export async function createApp(config: Config) {
     await app.register(fastifyStatic, { root: config.webDir, index: 'index.html', redirect: true });
 
   async function close() {
+    backups.stop();
     await app.close();
     await collab.hocuspocus.flushPendingStores?.();
     store.close();

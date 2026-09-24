@@ -8,7 +8,8 @@ export type Route =
   | { page: 'auth'; token: string }
   | { page: 'example' }
   | { page: 'gallery' }
-  | { page: 'people' };
+  | { page: 'people' }
+  | { page: 'admin' };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
@@ -22,6 +23,7 @@ export function parseHash(hash: string): Route {
   if (a) return { page: 'auth', token: a[1]! };
   if (h.startsWith('gallery')) return { page: 'gallery' };
   if (h.startsWith('people')) return { page: 'people' };
+  if (h.startsWith('admin')) return { page: 'admin' };
   if (h.startsWith('example')) return { page: 'example' };
   return { page: 'dashboard' };
 }

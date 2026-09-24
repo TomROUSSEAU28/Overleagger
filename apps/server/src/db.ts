@@ -28,6 +28,8 @@ export interface UserRow {
   created_at: number;
   /** Short public name (@tom) to be found by friends. */
   handle?: string | null;
+  /** Projects this account may keep on the server (null: the server's default). */
+  max_projects?: number | null;
 }
 
 /** What other people may see of an account. */
@@ -212,6 +214,8 @@ export class Store {
       }
     }
     const cols = this.db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'max_projects'))
+      this.db.exec('ALTER TABLE users ADD COLUMN max_projects INTEGER');
     if (!cols.some((c) => c.name === 'handle'))
       this.db.exec('ALTER TABLE users ADD COLUMN handle TEXT');
     this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_handle ON users(handle)');
@@ -751,14 +755,124 @@ export class Store {
     return r?.state;
   }
 
-  /** Keep every labelled version and the most recent `keep` automatic ones. */
-  pruneAutoVersions(projectId: string, keep = 50) {
+  /**
+   * Keep every labelled version and the most recent `keep` automatic ones, and drop the oldest
+   * automatic ones while all the versions of the project weigh more than `maxBytes`.
+   */
+  pruneAutoVersions(projectId: string, keep = 20, maxBytes = Infinity) {
     this.db
       .prepare(
         `DELETE FROM versions WHERE project_id = ? AND auto = 1 AND id NOT IN (
            SELECT id FROM versions WHERE project_id = ? AND auto = 1 ORDER BY created_at DESC LIMIT ?)`,
       )
       .run(projectId, projectId, keep);
+    if (!Number.isFinite(maxBytes)) return;
+    const autos = this.db
+      .prepare(
+        'SELECT id, size FROM versions WHERE project_id = ? AND auto = 1 ORDER BY created_at ASC',
+      )
+      .all(projectId) as { id: string; size: number }[];
+    let total = this.versionsSize(projectId);
+    const del = this.db.prepare('DELETE FROM versions WHERE id = ?');
+    for (const v of autos) {
+      if (total <= maxBytes) break;
+      del.run(v.id);
+      total -= v.size;
+    }
+  }
+
+  // Quotas & statistics ---------------------------------------------------------
+
+  /** Bytes of the current documents of a project (history not included). */
+  projectSize(projectId: string): number {
+    const r = this.db
+      .prepare('SELECT COALESCE(SUM(length(state)), 0) AS n FROM docs WHERE project_id = ?')
+      .get(projectId) as { n: number };
+    return r.n;
+  }
+
+  versionsSize(projectId: string): number {
+    const r = this.db
+      .prepare('SELECT COALESCE(SUM(size), 0) AS n FROM versions WHERE project_id = ?')
+      .get(projectId) as { n: number };
+    return r.n;
+  }
+
+  /** Projects a person owns on the server, and the bytes they take (history not included). */
+  ownedUsage(userId: string): { projects: number; bytes: number } {
+    const r = this.db
+      .prepare(
+        `SELECT COUNT(*) AS projects,
+                COALESCE((SELECT SUM(length(d.state)) FROM docs d
+                          JOIN projects p ON p.id = d.project_id WHERE p.owner_id = ?), 0) AS bytes
+         FROM projects WHERE owner_id = ?`,
+      )
+      .get(userId, userId) as { projects: number; bytes: number };
+    return r;
+  }
+
+  setMaxProjects(userId: string, max: number | null) {
+    this.db.prepare('UPDATE users SET max_projects = ? WHERE id = ?').run(max, userId);
+  }
+
+  /** Figures for the admin page. */
+  stats(since: number) {
+    const one = (sql: string, ...args: (string | number)[]) =>
+      (this.db.prepare(sql).get(...args) as { n: number }).n;
+    return {
+      users: one('SELECT COUNT(*) AS n FROM users'),
+      newUsers: one('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', since),
+      projects: one('SELECT COUNT(*) AS n FROM projects'),
+      activeProjects: one('SELECT COUNT(*) AS n FROM projects WHERE updated_at >= ?', since),
+      teams: one('SELECT COUNT(*) AS n FROM teams'),
+      docsBytes: one('SELECT COALESCE(SUM(length(state)), 0) AS n FROM docs'),
+      versionsBytes: one('SELECT COALESCE(SUM(size), 0) AS n FROM versions'),
+    };
+  }
+
+  /** Every account with its usage (admin page). */
+  usersWithUsage() {
+    return this.db
+      .prepare(
+        `SELECT u.id, u.name, u.email, u.handle, u.created_at, u.max_projects,
+                (SELECT COUNT(*) FROM projects p WHERE p.owner_id = u.id) AS projects,
+                COALESCE((SELECT SUM(length(d.state)) FROM docs d
+                          JOIN projects p ON p.id = d.project_id WHERE p.owner_id = u.id), 0) AS bytes,
+                (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = u.id) AS last_sign_in
+         FROM users u ORDER BY u.created_at DESC`,
+      )
+      .all() as {
+      id: string;
+      name: string;
+      email: string;
+      handle: string | null;
+      created_at: number;
+      max_projects: number | null;
+      projects: number;
+      bytes: number;
+      last_sign_in: number | null;
+    }[];
+  }
+
+  /** The heaviest projects (admin page). */
+  biggestProjects(limit = 15) {
+    return this.db
+      .prepare(
+        `SELECT p.id, p.name, p.updated_at, u.name AS owner_name, u.email AS owner_email,
+                COALESCE((SELECT SUM(length(d.state)) FROM docs d WHERE d.project_id = p.id), 0) AS bytes,
+                COALESCE((SELECT SUM(v.size) FROM versions v WHERE v.project_id = p.id), 0) AS versions_bytes
+         FROM projects p JOIN users u ON u.id = p.owner_id
+         ORDER BY bytes + versions_bytes DESC LIMIT ?`,
+      )
+      .all(limit) as {
+      id: string;
+      name: string;
+      updated_at: number;
+      owner_name: string;
+      owner_email: string;
+      bytes: number;
+      versions_bytes: number;
+    }[];
   }
 
   // Personal library ----------------------------------------------------------

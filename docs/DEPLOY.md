@@ -57,8 +57,15 @@ certificates and caches the static files close to visitors.
       environment:
         PUBLIC_URL: https://circuitnotebook.com
         TRUST_PROXY: 'true'
+        # Your account sees the Administration page (menu of your avatar).
+        ADMIN_EMAILS: you@example.com
+        # Beta limits (these are the defaults): projects per account, MB per project.
+        MAX_PROJECTS: '5'
+        MAX_PROJECT_MB: '5'
   EOF
   ```
+
+  If you change the limits, also update the FAQ of the homepage (`apps/web/index.html`).
 
 - [ ] `docker compose up -d --build`, then `curl localhost:8787/api/health`.
 
@@ -91,23 +98,27 @@ ranges** (<https://www.cloudflare.com/ips/>). Also set `TRUST_PROXY: 'true'`.
 
 ## 4. Backups
 
-- [ ] Hetzner **automatic backups** (+20 % of the server price) or weekly snapshots.
-- [ ] Nightly copy of the database, consistent while the server runs (`VACUUM INTO`):
+Two layers, both automatic:
 
-  ```bash
-  # /root/backup.sh — run every night: echo '30 3 * * * root /root/backup.sh' > /etc/cron.d/cn-backup
-  set -e
-  cd /root/circuit-notebook
-  docker compose exec -T circuit-notebook node -e \
-    "new (require('node:sqlite').DatabaseSync)('/data/circuit-notebook.sqlite').exec(\"VACUUM INTO '/data/backup.sqlite'\")"
-  mkdir -p /root/backups
-  docker compose cp circuit-notebook:/data/backup.sqlite /root/backups/cn-$(date +%F).sqlite
-  docker compose exec -T circuit-notebook rm /data/backup.sqlite
-  find /root/backups -name 'cn-*.sqlite' -mtime +30 -delete
-  ```
+- **The server copies its database every night** into the data volume
+  (`/data/backups/circuit-notebook-YYYY-MM-DD.sqlite`, the last 7 days, `BACKUP_KEEP_DAYS`).
+  SQLite makes the copy itself, so it is a clean file even while people are drawing. The
+  Administration page shows the last copy and has a "Make one now" button.
+- **Hetzner Backups** (Hetzner console → your server → _Backups_ → enable, +20 % of the server
+  price): every night Hetzner takes a picture of the whole disk and keeps the last 7, **on
+  other machines**. If the server breaks or is erased by mistake, you rebuild it from one of
+  those pictures in one click (_Backups_ → _Restore_, or _Create server from backup_), and the
+  nightly database copies above come back with it.
 
-  Then send `/root/backups` off the machine (**Hetzner Storage Box** with `rsync`, or
-  **Backblaze B2** with `rclone`).
+To bring back one database copy without restoring the whole server:
+
+```bash
+cd ~/circuit-notebook
+docker compose stop
+docker compose run --rm --entrypoint sh circuit-notebook -c \
+  'cp /data/backups/circuit-notebook-2026-09-24.sqlite /data/circuit-notebook.sqlite && rm -f /data/circuit-notebook.sqlite-wal /data/circuit-notebook.sqlite-shm'
+docker compose start
+```
 
 - [ ] Try a restore once, before anyone relies on it.
 

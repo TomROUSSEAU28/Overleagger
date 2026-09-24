@@ -32,7 +32,7 @@ import {
 } from '@overleagger/core';
 import * as Y from 'yjs';
 import { hashToken, randomToken } from './auth';
-import type { Config } from './config';
+import { isAdminEmail, type Config } from './config';
 import type { Store } from './db';
 
 export interface CollabContext {
@@ -44,6 +44,16 @@ export interface CollabContext {
 
 /** WebSocket close code for a refused change (the client shows the reason). */
 export const FORBIDDEN_CHANGE = 4403;
+
+/** Largest single change accepted (a big image, a huge paste). */
+const MAX_UPDATE_BYTES = 2 * 1024 * 1024;
+/** Once a project is full, only changes smaller than this pass (deleting, small edits). */
+const SMALL_UPDATE_BYTES = 4 * 1024;
+
+const refuse = (reason: string) =>
+  Object.assign(new Error(reason), { code: FORBIDDEN_CHANGE, reason });
+
+const mb = (bytes: number) => `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB`;
 
 /** What the rights depend on in the root document: the sheet tree and the locks. */
 interface Manifest {
@@ -84,6 +94,20 @@ export function visibleParts(
 export function createCollab(store: Store, config: Config) {
   // Sheet tree of projects whose root document is not open (short cache).
   const stored = new Map<string, { at: number; m: Manifest }>();
+
+  // Size of each project: what is stored, plus the changes accepted since (an estimate until
+  // the next store), and the most it may weigh (projects of admins have no limit).
+  const sizes = new Map<string, { bytes: number; max: number }>();
+  const sizeOf = (projectId: string) => {
+    let s = sizes.get(projectId);
+    if (!s) {
+      const owner = store.userById(store.project(projectId)?.owner_id ?? '');
+      const admin = owner ? isAdminEmail(config, owner.email) : false;
+      s = { bytes: store.projectSize(projectId), max: admin ? Infinity : config.maxProjectBytes };
+      sizes.set(projectId, s);
+    }
+    return s;
+  };
 
   /** The sheet tree and locks of a project, from its live root document if open. */
   function manifest(projectId: string): Manifest {
@@ -142,8 +166,19 @@ export function createCollab(store: Store, config: Config) {
       // 1 = SyncStep2, 2 = Update: messages that carry changes.
       if (type !== 1 && type !== 2) return;
       const { role, rules } = context;
-      if (role === 'owner') return;
       const name = parseDocName(documentName)!;
+      // Room on the server (everyone, owner included).
+      const size = sizeOf(name.projectId);
+      if (payload.length > Math.min(MAX_UPDATE_BYTES, size.max))
+        throw refuse(
+          `This change is too big for the server (${mb(MAX_UPDATE_BYTES)} at most): use a smaller image.`,
+        );
+      if (size.bytes + payload.length > size.max && payload.length > SMALL_UPDATE_BYTES)
+        throw refuse(
+          `This project is full (${mb(size.max)}). Delete images or large parts, or move it to your computer.`,
+        );
+      size.bytes += payload.length;
+      if (role === 'owner') return;
       const m = manifest(name.projectId);
       // Fast path: an editor of the whole project, no lock, no rule lowering anything.
       if (role === 'editor' && !m.locked.length && rules.every((r) => r.level === 'editor')) return;
@@ -170,6 +205,7 @@ export function createCollab(store: Store, config: Config) {
       if (!name || !store.project(name.projectId)) return;
       const { projectId, sheetId } = name;
       store.saveDoc(projectId, sheetId ?? 'root', Y.encodeStateAsUpdate(document));
+      sizes.delete(projectId);
       const title = sheetId ? undefined : document.getMap('meta').get('name');
       store.updateProject(projectId, {
         ...(typeof title === 'string' && title ? { name: title } : {}),
@@ -185,10 +221,21 @@ export function createCollab(store: Store, config: Config) {
           auto: 1,
           state: encodeBundle(currentParts(projectId)),
         });
-        store.pruneAutoVersions(projectId);
+        store.pruneAutoVersions(projectId, 20, versionsBudget(projectId));
       }
     },
   });
+
+  /** History kept for a project: ten times its size limit (none for admins' projects). */
+  function versionsBudget(projectId: string) {
+    return sizeOf(projectId).max * 10;
+  }
+
+  /** Current size and limit of a project (the editor warns before it is full). */
+  function projectSize(projectId: string) {
+    const s = sizeOf(projectId);
+    return { bytes: s.bytes, max: s.max };
+  }
 
   /** Current documents of a project (live ones if open, else the stored ones). */
   function currentParts(projectId: string): ProjectParts {
@@ -266,7 +313,7 @@ export function createCollab(store: Store, config: Config) {
       if (parseDocName(name)?.projectId === projectId) hocuspocus.closeConnections(name);
   }
 
-  return { hocuspocus, saveVersion, restoreVersion, refreshAccess, currentParts };
+  return { hocuspocus, saveVersion, restoreVersion, refreshAccess, currentParts, projectSize };
 }
 
 export type Collab = ReturnType<typeof createCollab>;

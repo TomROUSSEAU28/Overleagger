@@ -154,8 +154,9 @@ function useIndexSync(opened: Opened | null) {
           () => undefined,
         );
     };
-    // A project that is only opened (an example, an imported file) also gets its preview.
-    if (source.kind === 'local') t2 = setTimeout(() => void thumbnail(), 800);
+    // A project that is only opened (an example, an imported file, a project just put on the
+    // server) also gets its preview; shared ones once their sheets have arrived.
+    t2 = setTimeout(() => void thumbnail(), source.kind === 'local' ? 800 : 2500);
     const onChange = () => {
       if (source.kind === 'local') {
         clearTimeout(t1);

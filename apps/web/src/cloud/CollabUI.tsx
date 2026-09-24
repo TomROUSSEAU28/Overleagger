@@ -44,6 +44,7 @@ import { THEMES } from '../theme';
 import { Avatar } from './AccountUI';
 import { api, base64ToBytes, bytesToBase64, inviteLink, useCloud, type Member } from './cloud';
 import { useSession } from './hooks';
+import { FULL_HINT, formatBytes, serverFull } from './quota';
 
 // ---------------------------------------------------------------------------
 // Top bar: status, people, share, history
@@ -184,8 +185,17 @@ export function AccessBanner() {
       : ed.session.levelOf(sheetId)
     : role;
   const perSheet = role !== 'owner' && rules.length > 0;
+  const size = useSession((s) => s.size);
   let msg: React.ReactNode = null;
-  if (level === 'hidden')
+  if (size?.max && size.bytes >= size.max * 0.9 && level !== 'viewer' && level !== 'hidden')
+    msg = (
+      <span data-testid="project-full">
+        {size.bytes >= size.max ? 'This project is full' : 'This project is almost full'} (
+        {formatBytes(size.bytes)} / {formatBytes(size.max)} during the beta): delete large images,
+        or move it to your computer from your projects page.
+      </span>
+    );
+  else if (level === 'hidden')
     msg = (
       <>
         <EyeOff size={13} /> This sheet is hidden from you by the owner of the project.
@@ -364,42 +374,72 @@ interface InviteInfo {
   uses: number;
 }
 
+/** A project of this browser: upload a copy to the server to share it. */
+function UploadDialog({ onClose }: { onClose: () => void }) {
+  const ed = useEditor();
+  const user = useCloud((s) => s.user);
+  const full = serverFull(user);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const upload = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await api<{ id: string }>('POST', '/api/projects', {
+        name: ed.project.getMeta().name,
+        state: bytesToBase64(ed.project.encodeState()),
+      });
+      void useCloud.getState().refreshUser();
+      onClose();
+      navigate(`/cloud/${r.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="Share this project" onClose={onClose}>
+      <p>
+        This project lives only in this browser. Upload a copy to the server to invite people and
+        work on it together in real time (this local copy is kept).
+      </p>
+      {user?.quota && user.quota.maxProjects !== null && (
+        <p className="muted small" data-testid="upload-quota">
+          On the server: {user.quota.projects} / {user.quota.maxProjects} projects during the beta
+          {user.quota.maxProjectBytes ? `, ${formatBytes(user.quota.maxProjectBytes)} each` : ''}.
+        </p>
+      )}
+      {full && <p className="warning small">{FULL_HINT}</p>}
+      {error && (
+        <p className="warning small" data-testid="upload-error">
+          {error}
+        </p>
+      )}
+      <div className="modal-foot">
+        <button type="button" className="btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn primary"
+          data-testid="share-upload"
+          disabled={busy || full}
+          onClick={() => void upload()}
+        >
+          <UploadCloud size={15} /> Upload and share
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function ShareDialog({ onClose, focusSheet }: { onClose: () => void; focusSheet?: string }) {
   const ed = useEditor();
   const session = ed.session;
   const close = onClose;
 
   // Local project: offer to upload it first.
-  if (!session) {
-    return (
-      <Modal title="Share this project" onClose={close}>
-        <p>
-          This project lives only in this browser. Upload a copy to the server to invite people and
-          work on it together in real time (this local copy is kept).
-        </p>
-        <div className="modal-foot">
-          <button type="button" className="btn" onClick={close}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn primary"
-            data-testid="share-upload"
-            onClick={async () => {
-              const r = await api<{ id: string }>('POST', '/api/projects', {
-                name: ed.project.getMeta().name,
-                state: bytesToBase64(ed.project.encodeState()),
-              });
-              close();
-              navigate(`/cloud/${r.id}`);
-            }}
-          >
-            <UploadCloud size={15} /> Upload and share
-          </button>
-        </div>
-      </Modal>
-    );
-  }
+  if (!session) return <UploadDialog onClose={close} />;
   return <CloudShare onClose={close} focusSheet={focusSheet} />;
 }
 

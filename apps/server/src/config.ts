@@ -19,6 +19,16 @@ export interface Config {
   autoVersionEveryMs: number;
   /** Behind a reverse proxy / tunnel: take the visitor's IP from X-Forwarded-For. */
   trustProxy: boolean;
+  /** Projects a person may keep on the server (beta; an admin can change it per account). */
+  maxProjects: number;
+  /** Size of one project on the server (all its documents), in bytes. */
+  maxProjectBytes: number;
+  /** E-mail addresses of the accounts that see the admin page (lower case; "@domain" = all). */
+  adminEmails: string[];
+  /** Folder of the nightly database copies (none for an in-memory database). */
+  backupDir?: string;
+  /** Days of nightly database copies kept. */
+  backupKeepDays: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -38,5 +48,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionTtlMs: Number(env.SESSION_DAYS ?? 30) * 24 * 3600 * 1000,
     autoVersionEveryMs: Number(env.AUTO_VERSION_MINUTES ?? 10) * 60 * 1000,
     trustProxy: env.TRUST_PROXY === 'true',
+    maxProjects: Number(env.MAX_PROJECTS ?? 5),
+    maxProjectBytes: Math.round(Number(env.MAX_PROJECT_MB ?? 5) * 1024 * 1024),
+    adminEmails: (env.ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+    ...(env.BACKUP_DIR ? { backupDir: env.BACKUP_DIR } : {}),
+    backupKeepDays: Number(env.BACKUP_KEEP_DAYS ?? 7),
   };
+}
+
+/** Is this e-mail an administrator's (listed, or its domain listed as "@domain")? */
+export function isAdminEmail(config: Pick<Config, 'adminEmails'>, email: string): boolean {
+  const e = email.toLowerCase();
+  return config.adminEmails.some((a) => (a.startsWith('@') ? e.endsWith(a) : e === a));
 }

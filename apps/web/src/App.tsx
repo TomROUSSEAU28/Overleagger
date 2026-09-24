@@ -7,6 +7,7 @@ import { Dashboard } from './dashboard/Dashboard';
 import { seedBuckExample } from './examples/buck';
 import { createProject } from './storage/projects';
 import { EditorPage } from './editor/EditorPage';
+import { AdminPage } from './cloud/AdminPage';
 import { PeoplePage } from './cloud/PeoplePage';
 import { Gallery } from './gallery/Gallery';
 import { parseHash, useHash } from './router';
@@ -51,6 +52,8 @@ export function App() {
       return <Gallery />;
     case 'people':
       return <PeoplePage />;
+    case 'admin':
+      return <AdminPage />;
     case 'example':
       return <ExamplePage />;
     default:

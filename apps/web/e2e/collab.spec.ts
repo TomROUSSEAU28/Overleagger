@@ -3,7 +3,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 const SERVER = 'http://localhost:8788';
 const stamp = Date.now();
 
-async function person(browser: Browser, name: string): Promise<Page> {
+async function person(browser: Browser, name: string, domain = 'lab.test'): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   page.on('dialog', (d) => void d.accept());
@@ -14,7 +14,7 @@ async function person(browser: Browser, name: string): Promise<Page> {
   await page.getByTestId('sign-in').click();
   await page.getByTestId('auth-switch').click();
   await page.getByTestId('auth-name').fill(name);
-  await page.getByTestId('auth-email').fill(`${name.toLowerCase()}.${stamp}@lab.test`);
+  await page.getByTestId('auth-email').fill(`${name.toLowerCase()}.${stamp}@${domain}`);
   await page.getByTestId('auth-password').fill('correct horse battery');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('account-menu')).toContainText(name);
@@ -302,4 +302,52 @@ test('rights per sheet: edit one sheet only, then a hidden sheet', async ({ brow
   await emma.keyboard.press('Escape');
   await expect.poll(fredSees).toBeGreaterThan(0);
   await expect(fred.locator('[data-restricted]')).toHaveCount(0);
+});
+
+test('beta limits: a few projects on the server, the rest in this browser; admin page', async ({
+  browser,
+}) => {
+  const ida = await person(browser, 'Ida');
+  const quota = ida.getByTestId('server-quota');
+  await expect(quota).toContainText('0 / 2 projects');
+  // Two projects on the server (the test server allows 2).
+  for (const name of ['Lab 1', 'Lab 2']) {
+    await ida.goto('/app/');
+    await ida.getByTestId('new-project').click();
+    await ida.getByTestId('new-project-name').fill(name);
+    await ida.getByTestId('new-project-where').selectOption('cloud');
+    await ida.getByTestId('create-project').click();
+    await expect(ida.getByTestId('canvas')).toBeVisible();
+  }
+  await ida.goto('/app/');
+  await expect(quota).toContainText('2 / 2 projects');
+  await expect(quota).toContainText('full');
+  // A third one can only stay in this browser.
+  await ida.getByTestId('new-project').click();
+  await expect(
+    ida.getByTestId('new-project-where').locator('option[value="cloud"]'),
+  ).toHaveAttribute('disabled', '');
+  await ida.keyboard.press('Escape');
+  // Move "Lab 1" to this computer: it is saved locally and frees a place.
+  const lab1 = ida.getByTestId('cloud-card').filter({ hasText: 'Lab 1' });
+  await lab1.getByTestId('card-menu').click();
+  await ida.getByTestId('move-local').click();
+  await expect(ida.getByTestId('project-card').filter({ hasText: 'Lab 1' })).toHaveCount(1);
+  await expect(quota).toContainText('1 / 2 projects');
+  await expect(ida.getByTestId('cloud-card').filter({ hasText: 'Lab 1' })).toHaveCount(0);
+
+  // The administrator sees the accounts and gives Ida more room.
+  const boss = await person(browser, 'Boss', 'admin.test');
+  await boss.getByTestId('account-menu').click();
+  await boss.getByTestId('open-admin').click();
+  await expect(boss.getByTestId('admin-stats')).toContainText('Accounts');
+  const row = boss.getByTestId('admin-users').locator('tr', { hasText: `ida.${stamp}` });
+  await expect(row).toContainText('1');
+  await row.getByTestId('admin-limit').fill('5');
+  await row.getByTestId('admin-limit').press('Enter');
+  await ida.reload();
+  await expect(quota).toContainText('1 / 5 projects');
+  // Ida is not an administrator.
+  await ida.goto('/app/#/admin');
+  await expect(ida.getByText('This page is for the administrators')).toBeVisible();
 });

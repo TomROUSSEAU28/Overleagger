@@ -3,6 +3,8 @@ import {
   Copy,
   Download,
   FilePlus2,
+  HardDriveDownload,
+  Heart,
   LogOut,
   MoreHorizontal,
   Pencil,
@@ -18,7 +20,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Project, ROLE_LABELS } from '@overleagger/core';
 import { Logo } from '../brand/Logo';
 import { AccountMenu } from '../cloud/AccountUI';
-import { api, bytesToBase64, useCloud, type CloudProjectEntry } from '../cloud/cloud';
+import {
+  api,
+  base64ToBytes,
+  bytesToBase64,
+  useCloud,
+  type CloudProjectEntry,
+} from '../cloud/cloud';
+import { FULL_HINT, formatBytes, serverFull } from '../cloud/quota';
 import { useSocial } from '../cloud/social';
 import { seedBuckExample } from '../examples/buck';
 import { Field, Modal } from '../panels/common';
@@ -35,7 +44,34 @@ import {
   renameProject,
   type ProjectEntry,
 } from '../storage/projects';
+import { SUPPORT_URL } from '../site';
 import { useUI } from '../store/ui';
+
+/** "On the server: 3 / 5 projects · 1.2 MB" (projects you own, during the beta). */
+function ServerRoom() {
+  const q = useCloud((s) => s.user?.quota);
+  if (!q) return null;
+  const full = q.maxProjects !== null && q.projects >= q.maxProjects;
+  const part = q.maxProjects ? Math.min(1, q.projects / q.maxProjects) : 0;
+  return (
+    <p
+      className={`server-room${full ? ' full' : ''}`}
+      data-testid="server-quota"
+      title="During the beta, each account keeps a few projects on the server. Projects in this browser are unlimited."
+    >
+      <span>
+        On the server: <b>{q.projects}</b>
+        {q.maxProjects !== null && <> / {q.maxProjects}</>} projects · {formatBytes(q.bytes)}
+      </span>
+      {q.maxProjects !== null && (
+        <span className="room-bar" aria-hidden="true">
+          <span style={{ width: `${part * 100}%` }} />
+        </span>
+      )}
+      {full && <span className="small">full — new projects stay in this browser</span>}
+    </p>
+  );
+}
 
 type StartFrom = 'blank' | 'buck';
 const DEFAULT_NAME = 'Untitled project';
@@ -50,7 +86,9 @@ function NewProjectDialog({
   const [from, setFrom] = useState<StartFrom>(start);
   const [name, setName] = useState(start === 'buck' ? 'Buck converter example' : DEFAULT_NAME);
   const [standard, setStandard] = useState<Standard>('IEC');
-  const signedIn = useCloud((s) => Boolean(s.user));
+  const user = useCloud((s) => s.user);
+  const signedIn = Boolean(user);
+  const full = serverFull(user);
   const [where, setWhere] = useState<'local' | 'cloud'>('local');
   const [error, setError] = useState('');
   const pick = (f: StartFrom) => {
@@ -70,6 +108,7 @@ function NewProjectDialog({
           name: title,
           state: bytesToBase64(p.encodeState()),
         });
+        void useCloud.getState().refreshUser();
         navigate(`/cloud/${r.id}`);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -128,8 +167,13 @@ function NewProjectDialog({
               data-testid="new-project-where"
             >
               <option value="local">This browser only</option>
-              <option value="cloud">On the server (shareable, real-time)</option>
+              <option value="cloud" disabled={full}>
+                {full
+                  ? 'On the server — full during the beta'
+                  : 'On the server (shareable, real-time)'}
+              </option>
             </select>
+            {full && <span className="muted small">{FULL_HINT}</span>}
           </Field>
         )}
         {error && <p className="warning small">{error}</p>}
@@ -187,6 +231,8 @@ interface MenuItem {
   run: () => void;
   danger?: boolean;
   testId?: string;
+  /** Greyed out, with this explanation. */
+  disabled?: string;
 }
 
 /** The "⋯" menu of a project card. */
@@ -227,6 +273,8 @@ function CardMenu({ items, name }: { items: MenuItem[]; name: string }) {
               type="button"
               role="menuitem"
               className={it.danger ? 'danger' : ''}
+              disabled={Boolean(it.disabled)}
+              title={it.disabled}
               onClick={() => {
                 setOpen(false);
                 it.run();
@@ -304,13 +352,18 @@ export function Dashboard() {
       .catch((e: unknown) => setError(String(e)));
   }, []);
   useEffect(refresh, [refresh]);
+  const userId = user?.id;
   const refreshCloud = useCallback(() => {
-    if (!user) return setCloudProjects(null);
+    if (!userId) return setCloudProjects(null);
     api<{ projects: CloudProjectEntry[] }>('GET', '/api/projects')
       .then((r) => setCloudProjects(r.projects))
       .catch(() => setCloudProjects(null));
-  }, [user]);
+  }, [userId]);
   useEffect(refreshCloud, [refreshCloud]);
+  // Room on the server may have changed elsewhere (another tab, a collaborator).
+  useEffect(() => {
+    if (userId) void useCloud.getState().refreshUser();
+  }, [userId]);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
@@ -321,6 +374,7 @@ export function Dashboard() {
         name: r.name,
         state: bytesToBase64(r.update),
       });
+      void useCloud.getState().refreshUser();
       navigate(`/cloud/${res.id}`);
     } catch (e) {
       fail(e);
@@ -397,6 +451,7 @@ export function Dashboard() {
             icon: <UploadCloud size={14} />,
             run: () => void upload(p),
             testId: 'upload-project',
+            ...(serverFull(user) ? { disabled: FULL_HINT } : {}),
           },
         ]
       : []),
@@ -413,9 +468,36 @@ export function Dashboard() {
     },
   ];
 
+  /** Save a server project in this browser; `move`: then remove it from the server. */
+  const toLocal = async (p: CloudProjectEntry, move: boolean) => {
+    try {
+      const r = await api<{ state: string }>('GET', `/api/projects/${p.id}/state`);
+      await createProjectFromUpdate(base64ToBytes(r.state), move ? p.name : `${p.name} (copy)`);
+      refresh();
+      if (
+        move &&
+        confirm(
+          `“${p.name}” is now saved in this browser.\n\nAlso remove it from the server, to free a place? The people you shared it with lose access.`,
+        )
+      ) {
+        await api('DELETE', `/api/projects/${p.id}`);
+        refreshCloud();
+        void useCloud.getState().refreshUser();
+      }
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const cloudMenu = (p: CloudProjectEntry): MenuItem[] =>
     p.role === 'owner'
       ? [
+          {
+            label: 'Move to this computer',
+            icon: <HardDriveDownload size={14} />,
+            run: () => void toLocal(p, true),
+            testId: 'move-local',
+          },
           {
             label: 'Delete for everyone',
             icon: <Trash size={14} />,
@@ -424,11 +506,18 @@ export function Dashboard() {
               if (confirm(`Delete “${p.name}” for everyone? This cannot be undone.`)) {
                 await api('DELETE', `/api/projects/${p.id}`).catch(fail);
                 refreshCloud();
+                void useCloud.getState().refreshUser();
               }
             },
           },
         ]
       : [
+          {
+            label: 'Keep a copy on this computer',
+            icon: <HardDriveDownload size={14} />,
+            run: () => void toLocal(p, false),
+            testId: 'copy-local',
+          },
           {
             label: 'Leave this project',
             icon: <LogOut size={14} />,
@@ -449,6 +538,16 @@ export function Dashboard() {
           <span className="logo">Circuit Notebook</span>
         </a>
         <div className="dash-top-right">
+          <a
+            className="btn support-btn"
+            href={SUPPORT_URL}
+            target="_blank"
+            rel="noopener"
+            title="Circuit Notebook is made by one student: help keep the server running"
+            data-testid="support"
+          >
+            <Heart size={15} /> Support
+          </a>
           {user && (
             <a className="btn" href="#/people" data-testid="dash-people">
               <Users size={15} /> Friends &amp; teams
@@ -468,6 +567,7 @@ export function Dashboard() {
               ? 'In this browser and shared with you on the server.'
               : 'Saved in this browser. Connect to a server to share and work together.'}
           </p>
+          {user?.quota && <ServerRoom />}
         </div>
         <div className="dash-title-actions">
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>

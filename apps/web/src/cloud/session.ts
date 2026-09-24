@@ -54,6 +54,8 @@ export interface SessionState {
   rules: SheetRule[];
   /** Sheets the server refused to send me (hidden from me). */
   denied: Id[];
+  /** Weight of the project on the server, and its limit (null: none). */
+  size: { bytes: number; max: number | null } | null;
 }
 
 interface ProjectInfo {
@@ -61,6 +63,7 @@ interface ProjectInfo {
   members: Members;
   teams?: ProjectTeam[];
   rules?: SheetRule[];
+  size?: { bytes: number; max: number | null };
 }
 
 /** Cache of the first versions of the app (one document): deleted, the server has it all. */
@@ -90,6 +93,7 @@ export class CloudSession {
   private me: Person;
   private token: string;
   private closed = false;
+  private sizeTimer: ReturnType<typeof setInterval> | undefined;
 
   private constructor(
     id: string,
@@ -120,7 +124,10 @@ export class CloudSession {
       teams: info.teams ?? [],
       rules: info.rules ?? [],
       denied: [],
+      size: info.size ?? null,
     }));
+    // The project's weight changes as people draw: read it again now and then.
+    this.sizeTimer = setInterval(() => void this.refreshRole(), 90_000);
     this.offCache = this.cache.bindProject(this.project);
     this.socket = new HocuspocusProviderWebsocket({
       url: collabUrl(server!),
@@ -294,6 +301,7 @@ export class CloudSession {
 
   close() {
     this.closed = true;
+    clearInterval(this.sizeTimer);
     for (const p of this.sheetProviders.values()) p.destroy();
     this.sheetProviders.clear();
     this.provider.destroy();
@@ -368,6 +376,7 @@ export class CloudSession {
             members: info.members,
             teams: info.teams ?? [],
             rules: info.rules ?? [],
+            size: info.size ?? null,
           });
         } catch {
           // offline: keep the last known role

@@ -15,6 +15,18 @@ export interface CloudUser {
   color: string;
   /** Public username (@tom), how friends find you. */
   handle: string;
+  /** Sees the admin page. */
+  admin?: boolean;
+  /** Room on the server during the beta (projects you own). */
+  quota?: Quota;
+}
+
+export interface Quota {
+  projects: number;
+  /** null: no limit. */
+  maxProjects: number | null;
+  bytes: number;
+  maxProjectBytes: number | null;
 }
 
 export interface ServerInfo {
@@ -95,6 +107,8 @@ interface CloudState {
   acceptToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateMe: (patch: { name?: string; color?: string; handle?: string }) => Promise<void>;
+  /** Read the account again (its room on the server changed). */
+  refreshUser: () => Promise<void>;
 }
 
 const normalize = (url: string) => url.trim().replace(/\/+$/, '');
@@ -197,6 +211,8 @@ export const useCloud = create<CloudState>((set, get) => ({
     const r = await api<{ user: CloudUser }>('PATCH', '/api/auth/me', patch);
     set({ user: r.user });
   },
+
+  refreshUser: () => loadUser(),
 }));
 
 async function loadUser() {

@@ -1657,7 +1657,8 @@ html[data-anim='off'] *::after {
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
-.menu > button {
+.menu > button,
+.menu > a {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1669,8 +1670,17 @@ html[data-anim='off'] *::after {
   color: var(--ink);
   text-align: left;
 }
-.menu > button:hover {
+.menu > button:hover,
+.menu > a:hover {
   background: var(--hover);
+}
+.menu > a {
+  text-decoration: none;
+}
+.menu > button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: none;
 }
 .cloud-section h2 {
   display: flex;
@@ -2770,4 +2780,113 @@ body.resizing-panel {
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* Beta: room on the server */
+.server-room {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.server-room b {
+  color: var(--ink);
+}
+.room-bar {
+  display: inline-block;
+  width: 90px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.room-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.server-room.full .room-bar > span {
+  background: #c0392b;
+}
+.server-room.full .small {
+  color: #b03a2e;
+}
+.support-btn svg {
+  color: #d0473d;
+}
+.support-btn:hover svg {
+  animation: olg-beat 0.8s ease-in-out;
+}
+@keyframes olg-beat {
+  30% {
+    transform: scale(1.25);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+}
+
+/* Administration */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.admin-tile b {
+  font-size: 22px;
+  font-weight: 600;
+}
+.admin-tile b.admin-date {
+  font-size: 16px;
+}
+.admin-tile .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  align-self: flex-start;
+}
+.admin-page .people-card {
+  margin-bottom: 20px;
+}
+.admin-table-wrap {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.admin-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.admin-limit {
+  display: inline-flex;
+  flex-direction: column;
+}
+.admin-limit input {
+  width: 72px;
 }

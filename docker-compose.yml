@@ -21,6 +21,11 @@ services:
       # CORS_ORIGINS: https://you.github.io
       # Behind a reverse proxy or Cloudflare Tunnel (real visitor IPs for the login throttle):
       # TRUST_PROXY: 'true'
+      # Accounts that see the Administration page (comma separated; "@domain" = a whole domain):
+      # ADMIN_EMAILS: you@example.com
+      # Beta limits: projects each account keeps on the server, and MB per project.
+      # MAX_PROJECTS: '5'
+      # MAX_PROJECT_MB: '5'
 
 volumes:
   circuit-notebook-data:

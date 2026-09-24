@@ -31,7 +31,14 @@ export default defineConfig({
       url: 'http://localhost:8788/api/health',
       reuseExistingServer: true,
       timeout: 60_000,
-      env: { PORT: '8788', DB_FILE: ':memory:', HOST: '127.0.0.1' },
+      // Small beta limits, and every @admin.test account is an administrator.
+      env: {
+        PORT: '8788',
+        DB_FILE: ':memory:',
+        HOST: '127.0.0.1',
+        MAX_PROJECTS: '2',
+        ADMIN_EMAILS: '@admin.test',
+      },
     },
   ],
 });

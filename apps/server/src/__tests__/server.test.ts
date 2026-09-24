@@ -1,20 +1,13 @@
-import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
-import {
-  Project,
-  addComponent,
-  createBlock,
-  docName,
-  makeContext,
-  type Person,
-} from '@overleagger/core';
+import { Project, addComponent, createBlock, makeContext, type Person } from '@overleagger/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { createApp, type App } from '../app';
 import { loadConfig } from '../config';
+import { testClient } from './helpers';
 
 let srv: App;
 let base = '';
-const providers: { destroy(): void }[] = [];
+let client: ReturnType<typeof testClient>;
 
 beforeAll(async () => {
   srv = await createApp({
@@ -25,100 +18,23 @@ beforeAll(async () => {
   await srv.app.listen({ port: 0, host: '127.0.0.1' });
   const addr = srv.app.server.address();
   base = `127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+  client = testClient(base);
 });
 
 afterAll(async () => {
-  for (const p of providers) p.destroy();
+  client.close();
   await srv.close();
 });
 
-async function api<T = Record<string, unknown>>(
+const api = <T = Record<string, unknown>>(
   method: string,
   path: string,
   token?: string,
   body?: unknown,
-): Promise<{ status: number; data: T }> {
-  const res = await fetch(`http://${base}${path}`, {
-    method,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  return { status: res.status, data: (await res.json()) as T };
-}
-
-async function signup(name: string) {
-  const r = await api<{ token: string; user: { id: string } }>(
-    'POST',
-    '/api/auth/signup',
-    undefined,
-    {
-      email: `${name.toLowerCase()}@lab.test`,
-      name,
-      password: 'correct horse battery',
-    },
-  );
-  expect(r.status).toBe(200);
-  return r.data;
-}
-
-async function until(fn: () => boolean, ms = 5000) {
-  const t0 = Date.now();
-  while (!fn()) {
-    if (Date.now() - t0 > ms) throw new Error('timeout');
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
-
-/**
- * Open a project like the web app: its root document and one document per sheet, all on one
- * WebSocket. `closed()` is the last refusal reason; `denied` the sheets the server refused.
- */
-async function connect(projectId: string, token: string) {
-  const socket = new HocuspocusProviderWebsocket({ url: `ws://${base}/collab` });
-  providers.push(socket);
-  let closed: string | null = null;
-  const denied = new Set<string>();
-  const byName = new Map<string, HocuspocusProvider>();
-  const open = (doc: Y.Doc, sheetId?: string) => {
-    const provider = new HocuspocusProvider({
-      websocketProvider: socket,
-      name: docName(projectId, sheetId),
-      document: doc,
-      token,
-      onAuthenticationFailed: () => denied.add(sheetId ?? 'root'),
-      onClose: ({ event }) => {
-        // Rights changed: join again, like the web app does.
-        if (event.reason === 'Reset Connection') {
-          void provider.sendToken().then(() => provider.startSync());
-          return;
-        }
-        // The refusal reason travels with the close event.
-        if (event.reason) closed = event.reason;
-      },
-    });
-    provider.attach();
-    providers.push(provider);
-    byName.set(sheetId ?? 'root', provider);
-    return provider;
-  };
-  const rootDoc = new Y.Doc();
-  const project = new Project(rootDoc, {
-    sheetDoc: (id) => {
-      const d = new Y.Doc();
-      open(d, id);
-      return d;
-    },
-  });
-  const provider = open(rootDoc);
-  await until(() => provider.isSynced && Boolean(project.rootSheetId));
-  const settled = () =>
-    [...byName].every(([k, p]) => denied.has(k) || (p.isSynced && p.unsyncedChanges === 0));
-  await until(settled);
-  return { project, provider, settled, denied, closed: () => closed };
-}
+) => client.api<T>(method, path, token, body);
+const signup = (name: string) => client.signup(name);
+const until = (fn: () => boolean, ms?: number) => client.until(fn, ms);
+const connect = (projectId: string, token: string) => client.connect(projectId, token);
 
 const person = (id: string): Person => ({ id, name: id, color: '#000' });
 

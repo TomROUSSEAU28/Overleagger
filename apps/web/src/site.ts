@@ -6,3 +6,6 @@ export function siteFile(path: string): string {
   const here = new URL('.', location.href);
   return new URL(here.pathname.endsWith('/app/') ? `../${path}` : path, here).href;
 }
+
+/** Where people can support the project (Ko-fi page). */
+export const SUPPORT_URL = 'https://ko-fi.com/circuitnotebook';
