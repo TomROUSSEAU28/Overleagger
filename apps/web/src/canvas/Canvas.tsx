@@ -1,4 +1,7 @@
 import {
+  anchorPoints,
+  elbowRoute,
+  followConnectors,
   GRID,
   HANDLES,
   computeMove,
@@ -127,6 +130,8 @@ export function Canvas() {
     }
     if (!changed.length) return elements;
     const map = new Map(changed.map((e) => [e.id, e]));
+    // Connectors attached to resized shapes follow.
+    if (resize) for (const l of followConnectors(elements, changed)) map.set(l.id, l);
     return elements.map((e) => map.get(e.id) ?? e);
   }, [elements, drag, resize, ed.ctx]);
 
@@ -519,6 +524,9 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   const blockDraft = useUI((s) => s.blockDraft);
   const rectDraft = useUI((s) => s.rectDraft);
   const lineDraft = useUI((s) => s.lineDraft);
+  const lineDraftEnds = useUI((s) => s.lineDraftEnds);
+  const anchorHover = useUI((s) => s.anchorHover);
+  const anchorEl = anchorHover ? elements.find((e) => e.id === anchorHover) : undefined;
   const strokeDraft = useUI((s) => s.strokeDraft);
   const prefs = useUI((s) => s.prefs);
   const hoverPin = useUI((s) => s.hoverPin);
@@ -655,17 +663,34 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
             ellipse={tool === 'shape' && prefs.shapeKind === 'ellipse'}
           />
         )}
-        {lineDraft && (
-          <line
-            x1={lineDraft[0]}
-            y1={lineDraft[1]}
-            x2={lineDraft[2]}
-            y2={lineDraft[3]}
-            stroke={inkColor}
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
-        )}
+        {lineDraft &&
+          (lineDraftEnds && (prefs.route ?? 'elbow') === 'elbow' ? (
+            <polyline
+              points={elbowRoute(
+                { x: lineDraft[0]!, y: lineDraft[1]! },
+                lineDraftEnds.from,
+                { x: lineDraft[2]!, y: lineDraft[3]! },
+                lineDraftEnds.to,
+              )
+                .flat()
+                .join(' ')}
+              fill="none"
+              stroke={inkColor}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+            />
+          ) : (
+            <line
+              x1={lineDraft[0]}
+              y1={lineDraft[1]}
+              x2={lineDraft[2]}
+              y2={lineDraft[3]}
+              stroke={inkColor}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+            />
+          ))}
+        {anchorEl && <AnchorDots el={anchorEl} color={sel} zoom={zoom} />}
         {strokeDraft && strokeDraft.length >= 6 && (
           <path
             d={strokePath(
@@ -712,7 +737,10 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
       )}
       {single && !single.locked && single.type === 'line' && (
         <g className="handles">
-          {(['p0', 'p1', 'bend'] as const).map((h) => {
+          {(single.route === 'elbow'
+            ? (['p0', 'p1'] as const)
+            : (['p0', 'p1', 'bend'] as const)
+          ).map((h) => {
             const [x1, y1, x2, y2] = single.pts as [number, number, number, number];
             const c = lineControlPoint(single.pts, single.bend ?? 0);
             const p =
@@ -750,6 +778,28 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
           })}
         </g>
       )}
+    </g>
+  );
+}
+
+/** Connection points of a shape (shown while drawing connectors). */
+function AnchorDots({ el, color, zoom }: { el: Element; color: string; zoom: number }) {
+  const pts = anchorPoints(el);
+  if (!pts) return null;
+  const r = 4 / zoom;
+  return (
+    <g className="anchor-dots" pointerEvents="none">
+      {Object.values(pts).map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={r}
+          fill="white"
+          stroke={color}
+          strokeWidth={1.5 / zoom}
+        />
+      ))}
     </g>
   );
 }

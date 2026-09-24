@@ -1,6 +1,9 @@
 import {
   GRID,
+  bindableAt,
   computeMove,
+  nearestAnchor,
+  type LineEnd,
   createBlock,
   dragSegment,
   elbow,
@@ -71,6 +74,10 @@ export const PICK_IMAGE_EVENT = 'overleagger:pick-image';
  */
 export class ToolController {
   private mode: Mode = 'idle';
+  /** Connector being drawn / edited: ends attached to shapes. */
+  private lineFrom: LineEnd | null = null;
+  private lineTo: LineEnd | null = null;
+  private editBind: { key: 'from' | 'to'; end: LineEnd | null } | null = null;
   private startScreen: Pt = { x: 0, y: 0 };
   private startWorld: Pt = { x: 0, y: 0 };
   private startVp = { x: 0, y: 0, zoom: 1 };
@@ -171,9 +178,15 @@ export class ToolController {
       case 'frame':
         this.mode = 'rect-draw';
         return;
-      case 'line':
+      case 'line': {
         this.mode = 'line-draw';
+        // Starting on a shape: attach to its nearest connection point.
+        const hit = bindableAt(this.ed.elements(), p.world, this.ed.ctx, 8 / this.zoom());
+        const na = hit && nearestAnchor(hit, p.world);
+        this.lineFrom = hit && na ? { id: hit.id, anchor: na.anchor } : null;
+        if (na) this.startWorld = na.pt;
         return;
+      }
       case 'note':
       case 'button':
         return this.createBoxAnnotation(ui.tool, this.snapPt(p.world));
@@ -297,10 +310,31 @@ export class ToolController {
         return;
       }
       case 'line-draw': {
-        const a = p.alt ? this.startWorld : this.snapPt(this.startWorld);
+        const a = p.alt || this.lineFrom ? this.startWorld : this.snapPt(this.startWorld);
         let b = p.alt ? world : this.snapPt(world);
         if (p.shift) b = snap45(a, b);
-        ui.set({ lineDraft: [a.x, a.y, b.x, b.y] });
+        // Ending on a shape: attach to its nearest connection point.
+        const hit = bindableAt(
+          this.ed.elements(),
+          world,
+          this.ed.ctx,
+          8 / this.zoom(),
+          this.lineFrom?.id,
+        );
+        const nb = hit && nearestAnchor(hit, world);
+        this.lineTo = hit && nb ? { id: hit.id, anchor: nb.anchor } : null;
+        if (nb) b = nb.pt;
+        ui.set({
+          lineDraft: [a.x, a.y, b.x, b.y],
+          anchorHover: hit?.id ?? this.lineFrom?.id ?? null,
+          lineDraftEnds:
+            this.lineFrom || this.lineTo
+              ? {
+                  ...(this.lineFrom ? { from: this.lineFrom.anchor } : {}),
+                  ...(this.lineTo ? { to: this.lineTo.anchor } : {}),
+                }
+              : null,
+        });
         return;
       }
       case 'stroke': {
@@ -321,6 +355,11 @@ export class ToolController {
         return;
     }
 
+    if (ui.tool === 'line') {
+      // Show the connection points of the shape under the pointer.
+      const hit = bindableAt(this.ed.elements(), world, this.ed.ctx, 8 / this.zoom());
+      if (ui.anchorHover !== (hit?.id ?? null)) ui.set({ anchorHover: hit?.id ?? null });
+    }
     if (ui.wireDraft) {
       const c = this.snapPt(world);
       const d = ui.wireDraft;
@@ -436,6 +475,10 @@ export class ToolController {
         if (r.rect) Object.assign(patch, r.rect);
         if (r.pts) patch.pts = r.pts;
         if (r.bend !== undefined) patch.bend = Math.abs(r.bend) < 2 ? undefined : r.bend;
+        if (this.editBind && el.type === 'line')
+          patch[this.editBind.key] = this.editBind.end ?? undefined;
+        this.editBind = null;
+        ui.set({ anchorHover: null });
         ed.applyElements([{ ...el, ...patch } as Element]);
         return;
       }
@@ -507,10 +550,25 @@ export class ToolController {
       if (t.handle === 'p0' || t.handle === 'p1') {
         const i = t.handle === 'p0' ? 0 : 2;
         const other = { x: pts[2 - i]!, y: pts[3 - i]! };
-        const q = p.shift ? snap45(other, w) : w;
+        let q = p.shift ? snap45(other, w) : w;
+        // Dropping an end on a shape attaches it; elsewhere it lets go.
+        const otherEnd = i === 0 ? el.to : el.from;
+        const hit = bindableAt(
+          this.ed.elements(),
+          p.world,
+          this.ed.ctx,
+          8 / this.zoom(),
+          otherEnd?.id,
+        );
+        const na = hit && nearestAnchor(hit, p.world);
+        this.editBind = {
+          key: i === 0 ? 'from' : 'to',
+          end: hit && na ? { id: hit.id, anchor: na.anchor } : null,
+        };
+        if (na) q = na.pt;
         pts[i] = q.x;
         pts[i + 1] = q.y;
-        this.ui.set({ resize: { id: el.id, pts } });
+        this.ui.set({ resize: { id: el.id, pts }, anchorHover: hit?.id ?? null });
       } else {
         const [x1, y1, x2, y2] = pts as [number, number, number, number];
         const len = Math.hypot(x2 - x1, y2 - y1) || 1;
@@ -598,11 +656,18 @@ export class ToolController {
   private finishLine() {
     const ui = this.ui;
     const d = ui.lineDraft;
-    ui.set({ lineDraft: null });
+    ui.set({ lineDraft: null, anchorHover: null, lineDraftEnds: null });
+    const from = this.lineFrom;
+    const to = this.lineTo;
+    this.lineFrom = this.lineTo = null;
     if (!d || Math.hypot(d[2]! - d[0]!, d[3]! - d[1]!) < 5) return;
+    const bound = Boolean(from || to);
     const el = this.ed.addElement({
       type: 'line',
       pts: d,
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(bound && (ui.prefs.route ?? 'elbow') === 'elbow' ? { route: 'elbow' as const } : {}),
       ...(ui.prefs.arrow ? { arrowEnd: true } : {}),
       ...(ui.prefs.sketch ? { sketch: true } : {}),
       ...(ui.prefs.inkColor ? { style: { color: ui.prefs.inkColor } } : {}),

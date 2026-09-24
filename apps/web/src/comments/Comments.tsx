@@ -264,3 +264,23 @@ export function CommentsPanel() {
     </div>
   );
 }
+
+/** Left panel tab: an icon with the number of open threads. */
+export function CommentsTab({ active }: { active: boolean }) {
+  const open = useComments().filter((t) => !t.resolved).length;
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-label="Comments"
+      title="Comments"
+      className={`tab-icon${active ? ' active' : ''}`}
+      onClick={() => useUI.getState().set({ leftTab: 'comments' })}
+      data-testid="tab-comments"
+    >
+      <MessageSquare size={15} />
+      {open > 0 && <span className="tab-badge">{open}</span>}
+    </button>
+  );
+}

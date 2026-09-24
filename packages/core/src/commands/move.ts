@@ -1,3 +1,4 @@
+import { followConnectors } from '../geometry/connectors';
 import { elementPins, elementBBox, type SheetContext } from '../geometry/elements';
 import { normalizeWire, ptKey, rectUnion, snap, samePt } from '../geometry/geom';
 import type { Element, Id, Rot, Side, WireElement } from '../model/types';
@@ -76,7 +77,17 @@ export function computeMove(
   const anchors = new Set<string>();
   for (const el of elements) {
     if (!ids.has(el.id)) continue;
-    out.push(translated(el, dx, dy));
+    let moved = translated(el, dx, dy);
+    // A connector moved without its shape lets go of it.
+    if (moved.type === 'line') {
+      const { from, to, ...rest } = moved;
+      moved = {
+        ...rest,
+        ...(from && ids.has(from.id) ? { from } : {}),
+        ...(to && ids.has(to.id) ? { to } : {}),
+      } as Element;
+    }
+    out.push(moved);
     for (const p of elementPins(el, ctx)) anchors.add(ptKey(p.x, p.y));
     if (el.type === 'wire')
       for (let i = 0; i < el.pts.length; i += 2) anchors.add(ptKey(el.pts[i]!, el.pts[i + 1]!));
@@ -94,7 +105,10 @@ export function computeMove(
       out.push({ ...el, pts: reversePts(moveWireEnd(reversePts(el.pts), dx, dy)) });
     }
   }
-  return out;
+  // Connectors attached to moved shapes follow them.
+  const moved = new Map(out.map((e) => [e.id, e]));
+  for (const l of followConnectors(elements, out)) moved.set(l.id, l);
+  return [...moved.values()];
 }
 
 /**

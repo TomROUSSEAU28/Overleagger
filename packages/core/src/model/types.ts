@@ -128,7 +128,31 @@ export interface BoxFields {
   h: number;
 }
 
-export type ShapeKind = 'rect' | 'ellipse' | 'diamond' | 'triangle';
+export type ShapeKind =
+  | 'rect'
+  | 'ellipse'
+  | 'diamond'
+  | 'triangle'
+  // Flowchart (ISO 5807) shapes
+  | 'terminator'
+  | 'data'
+  | 'document'
+  | 'predefined'
+  | 'database'
+  | 'manual-input'
+  | 'preparation'
+  | 'delay'
+  | 'offpage'
+  | 'manual-op';
+
+/** Connection point on the side of a shape (north, east, south, west). */
+export type Anchor = 'n' | 'e' | 's' | 'w';
+
+/** End of a connector attached to an element: it follows the element when it moves. */
+export interface LineEnd {
+  id: Id;
+  anchor: Anchor;
+}
 
 export interface ShapeElement extends BaseElement, BoxFields {
   type: 'shape';
@@ -154,6 +178,11 @@ export interface LineElement extends BaseElement {
   sketch?: boolean;
   /** Optional label (LaTeX with $…$) at the middle. */
   text?: string;
+  /** Straight (default, may be bent) or orthogonal "elbow" routing (flowchart connectors). */
+  route?: 'straight' | 'elbow';
+  /** Ends attached to connection points of shapes. */
+  from?: LineEnd;
+  to?: LineEnd;
 }
 
 export interface StrokeElement extends BaseElement {

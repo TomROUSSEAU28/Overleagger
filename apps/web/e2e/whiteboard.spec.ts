@@ -249,3 +249,35 @@ test('links on images/shapes and CircuiTikZ export', async ({ page }) => {
   await page.getByTestId('export-tikz').click();
   await expect(page.getByTestId('tikz-code')).toHaveValue(/\\begin\{circuitikz\}/);
 });
+
+test('flowchart: connectors attach to shapes and follow them', async ({ page }) => {
+  await newProject(page, 'Flow');
+  await page.keyboard.press('s');
+  await page.getByTestId('shape-terminator').click();
+  await dragWorld(page, [0, 0], [120, 60]);
+  await page.keyboard.press('s');
+  await page.getByTestId('shape-data').click();
+  await dragWorld(page, [0, 160], [120, 220]);
+  // Line from the bottom of the first shape to the top of the second one.
+  await page.keyboard.press('Shift+L');
+  await dragWorld(page, [60, 58], [62, 164]);
+  const line = () =>
+    page.evaluate(() => {
+      const els = (
+        window as unknown as {
+          __overleagger: {
+            ed: { elements(): { type: string; pts?: number[]; from?: object; to?: object }[] };
+          };
+        }
+      ).__overleagger.ed.elements();
+      return els.find((e) => e.type === 'line')!;
+    });
+  const l = await line();
+  expect(l.from).toMatchObject({ anchor: 's' });
+  expect(l.to).toMatchObject({ anchor: 'n' });
+  expect(l).toMatchObject({ route: 'elbow' });
+  // Move the second shape: the connector follows.
+  await page.keyboard.press('Escape');
+  await dragWorld(page, [60, 200], [160, 240]);
+  await expect.poll(async () => (await line()).pts![2]).toBe(160);
+});

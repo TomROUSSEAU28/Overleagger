@@ -18,6 +18,9 @@ import {
   componentPoint,
   elementPins,
   lineControlPoint,
+  linePoints,
+  polylineMiddle,
+  shapeGeometry,
   portShape,
   portTextPos,
   resolveComponent,
@@ -26,7 +29,6 @@ import {
   type Id,
   type Project,
   type SheetContext,
-  type ShapeElement,
   type WaveformElement,
 } from '@overleagger/core';
 import { fillTemplate, type Primitive } from '@overleagger/symbols';
@@ -256,43 +258,6 @@ function refTex(ref: string): string {
 // Other elements
 // ---------------------------------------------------------------------------
 
-function shapeCorners(el: ShapeElement): [number, number][] {
-  const { x, y, w, h } = el;
-  if (el.kind === 'diamond')
-    return [
-      [x + w / 2, y],
-      [x + w, y + h / 2],
-      [x + w / 2, y + h],
-      [x, y + h / 2],
-    ];
-  switch (el.dir) {
-    case 'b':
-      return [
-        [x, y],
-        [x + w, y],
-        [x + w / 2, y + h],
-      ];
-    case 'r':
-      return [
-        [x, y],
-        [x + w, y + h / 2],
-        [x, y + h],
-      ];
-    case 'l':
-      return [
-        [x + w, y],
-        [x + w, y + h],
-        [x, y + h / 2],
-      ];
-    default:
-      return [
-        [x + w / 2, y],
-        [x + w, y + h],
-        [x, y + h],
-      ];
-  }
-}
-
 /** Drop points that lie on a straight horizontal/vertical run (keeps square waves small). */
 function simplify(pts: [number, number][]): [number, number][] {
   const out: [number, number][] = [];
@@ -434,15 +399,15 @@ function element(w: Writer, el: Element, all: Element[], ctx: SheetContext, shee
         w.emit(
           `\\draw${o} ${w.p(el.x + el.w / 2, el.y + el.h / 2)} ellipse[x radius=${w.len(el.w / 2)}, y radius=${w.len(el.h / 2)}];`,
         );
-      else
-        w.emit(
-          `\\draw${o} ${shapeCorners(el)
-            .map(([a, b]) => w.p(a, b))
-            .join(' -- ')} -- cycle;`,
-        );
+      else {
+        const g = shapeGeometry(el);
+        w.emit(`\\draw${o} ${g.outline.map(([a, b]) => w.p(a, b)).join(' -- ')} -- cycle;`);
+        for (const e of g.extras)
+          w.emit(`\\draw${opts(w, s)} ${e.map(([a, b]) => w.p(a, b)).join(' -- ')};`);
+      }
       if (el.text)
         w.emit(
-          `\\node[align=center] at ${w.p(el.x + el.w / 2, el.y + el.h / 2)} {${texText(el.text)}};`,
+          `\\node[align=center, text width=${w.len(el.w * 0.8)}] at ${w.p(el.x + el.w / 2, el.y + el.h / 2)} {${texText(el.text)}};`,
         );
       return;
     }
@@ -457,6 +422,17 @@ function element(w: Writer, el: Element, all: Element[], ctx: SheetContext, shee
               ? 'latex-'
               : '';
       const o = opts(w, s, arrow ? [arrow] : []);
+      if (el.route === 'elbow') {
+        const pts = linePoints(el);
+        w.emit(`\\draw${o}[rounded corners=1pt] ${pts.map(([a, b]) => w.p(a, b)).join(' -- ')};`);
+        if (el.text) {
+          const m = polylineMiddle(pts);
+          w.emit(
+            `\\node[fill=white, inner sep=1pt, font=\\small] at ${w.p(m.x, m.y)} {${texText(el.text)}};`,
+          );
+        }
+        return;
+      }
       if (el.bend) {
         const c = lineControlPoint(el.pts, el.bend);
         // Quadratic Bézier → cubic control points.

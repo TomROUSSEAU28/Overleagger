@@ -1,4 +1,4 @@
-import type { Handle, Id, Pt, Rect, Rot, ShapeKind } from '@overleagger/core';
+import type { Anchor, Handle, Id, Pt, Rect, Rot, ShapeKind } from '@overleagger/core';
 import type { OptionValue } from '@overleagger/symbols';
 import { create } from 'zustand';
 import type { ThemeName } from '../theme';
@@ -30,6 +30,8 @@ export interface ToolPrefs {
   arrow: boolean;
   penSize: number;
   highlighter: boolean;
+  /** Routing of new connectors attached to shapes (flowcharts). */
+  route?: 'straight' | 'elbow';
   /** Ink colour used for new strokes, shapes and lines (`@name` or CSS colour). */
   inkColor?: string;
 }
@@ -133,6 +135,10 @@ export interface UIState extends Settings {
   leftTab: 'library' | 'sheets' | 'templates' | 'comments';
   /** New comment being written at this point (world px). */
   commentDraft: Pt | null;
+  /** Element whose connection points are shown (line tool). */
+  anchorHover: Id | null;
+  /** Connection points used by the connector being drawn. */
+  lineDraftEnds: { from?: Anchor; to?: Anchor } | null;
   /** Comment thread shown in its popup. */
   openThread: string | null;
   showResolved: boolean;
@@ -203,6 +209,8 @@ const transient = {
   presentFollow: null,
   commentDraft: null,
   openThread: null,
+  anchorHover: null,
+  lineDraftEnds: null,
 };
 
 export const useUI = create<UIState>((set, get) => ({

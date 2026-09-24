@@ -1,4 +1,4 @@
-import { Project, addComponent, makeContext } from '@overleagger/core';
+import { Project, addComponent, anchorPoints, makeContext } from '@overleagger/core';
 import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { seedBuckExample } from '../examples/buck';
@@ -45,6 +45,46 @@ describe('CircuiTikZ export', () => {
     expect(tex).toContain('$R_{1}$');
     expect(tex).not.toContain('nmos');
     expect(tex.split('\n').filter((l) => l.includes('\\draw')).length).toBeGreaterThan(4);
+  });
+
+  it('exports flowchart shapes and elbow connectors', () => {
+    const p = Project.create('Flow');
+    const ctx = makeContext(p);
+    const s = p.rootSheetId;
+    const a = p.addElement(s, {
+      type: 'shape',
+      kind: 'terminator',
+      x: 0,
+      y: 0,
+      w: 140,
+      h: 60,
+      text: 'Start',
+    });
+    const b = p.addElement(s, {
+      type: 'shape',
+      kind: 'database',
+      x: 0,
+      y: 140,
+      w: 140,
+      h: 80,
+      text: 'Log',
+    });
+    const pa = anchorPoints(a)!.s;
+    const pb = anchorPoints(b)!.n;
+    p.addElement(s, {
+      type: 'line',
+      pts: [pa.x, pa.y, pb.x + 0, pb.y],
+      route: 'elbow',
+      arrowEnd: true,
+      text: 'Yes',
+      from: { id: a.id, anchor: 's' },
+      to: { id: b.id, anchor: 'n' },
+    });
+    const tex = sheetToCircuitikz(p, ctx, s, { standalone: true });
+    expect(balanced(tex)).toBe(true);
+    expect(tex).toContain('-latex');
+    expect(tex).toContain('{Yes}');
+    if (process.env.TIKZ_OUT) writeFileSync(`${process.env.TIKZ_OUT}/Flow.tex`, tex);
   });
 
   it('escapes text but keeps math', () => {

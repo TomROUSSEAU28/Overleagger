@@ -433,14 +433,14 @@ button.kbd {
   overflow: hidden;
 }
 .tabs button {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   border: none;
   background: none;
-  padding: 8px 2px;
+  padding: 8px 0;
   cursor: pointer;
   color: var(--muted);
   font-variant: small-caps;
@@ -1979,4 +1979,33 @@ fieldset.plain {
   .topbar .divider {
     display: none;
   }
+}
+
+.tool-options .opt-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tabs button.tab-icon {
+  flex: 0 0 44px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tab-badge {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font:
+    600 10px/15px system-ui,
+    sans-serif;
+  font-variant: normal;
 }

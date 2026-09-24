@@ -55,6 +55,12 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
 - **Pencil** (pen pressure, highlighter), **eraser**, **shapes** (rectangle, ellipse, diamond,
   triangle) with an optional **hand-drawn look**, **lines and arrows** you can curve.
+- **Flowcharts and process charts**: ISO 5807 shapes (start/end, process, decision, input/output,
+  document, predefined process, database, manual input, preparation, delay, manual operation,
+  off-page connector) with text that wraps inside. Start or end a line on a shape and it
+  **attaches to a connection point** (shown as dots): the connector follows when the shape moves,
+  is resized or changes kind. Right-angle (**elbow**) or straight routing, labels such as
+  _Yes / No_ on the connectors, also in the CircuiTikZ export.
 - **Sticky notes**, **text with frames** (box, rounded, double, underline) and LaTeX everywhere.
 - **Images**: image tool, drag and drop, or paste from the clipboard (downscaled automatically).
 - **Link buttons** to a web page / online PDF or to another sheet (Ctrl+click to follow; they stay

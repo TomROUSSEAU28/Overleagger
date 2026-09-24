@@ -1,13 +1,32 @@
-import type { ShapeKind } from '@overleagger/core';
+import { shapeGeometry, type ShapeKind } from '@overleagger/core';
+import { SHAPE_KINDS } from './shapeKinds';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 
-const SHAPES: { kind: ShapeKind; label: string; icon: string }[] = [
-  { kind: 'rect', label: 'Rectangle', icon: 'M3 5h14v10H3z' },
-  { kind: 'ellipse', label: 'Ellipse', icon: 'M10 5a7 5 0 1 0 0.01 0z' },
-  { kind: 'diamond', label: 'Diamond', icon: 'M10 3l7 7-7 7-7-7z' },
-  { kind: 'triangle', label: 'Triangle', icon: 'M10 4l7 12H3z' },
-];
+/** Icon of a shape kind, drawn with the same geometry as the real shape. */
+export function ShapeIcon({ kind, size = 18 }: { kind: ShapeKind; size?: number }) {
+  const g = shapeGeometry({ kind, x: 1.5, y: 5, w: 17, h: 10 });
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20">
+      <polygon
+        points={g.outline.flat().join(' ')}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      {g.extras.map((e, i) => (
+        <polyline
+          key={i}
+          points={e.flat().join(' ')}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.3}
+        />
+      ))}
+    </svg>
+  );
+}
 
 /** Small floating bar with the options of the drawing tools. */
 export function ToolOptions() {
@@ -20,24 +39,19 @@ export function ToolOptions() {
   return (
     <div className="tool-options" data-testid="tool-options">
       {tool === 'shape' &&
-        SHAPES.map((s) => (
-          <button
-            key={s.kind}
-            type="button"
-            className={`opt${prefs.shapeKind === s.kind ? ' active' : ''}`}
-            title={s.label}
-            onClick={() => set({ shapeKind: s.kind })}
-          >
-            <svg width={18} height={18} viewBox="0 0 20 20">
-              <path
-                d={s.icon}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.6}
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+        SHAPE_KINDS.map((s, i) => (
+          <span key={s.kind} className="opt-wrap">
+            {s.flow && !SHAPE_KINDS[i - 1]?.flow && <span className="sep" title="Flowchart" />}
+            <button
+              type="button"
+              className={`opt${prefs.shapeKind === s.kind ? ' active' : ''}`}
+              title={s.label}
+              onClick={() => set({ shapeKind: s.kind })}
+              data-testid={`shape-${s.kind}`}
+            >
+              <ShapeIcon kind={s.kind} />
+            </button>
+          </span>
         ))}
       {tool === 'line' && (
         <>
@@ -59,6 +73,28 @@ export function ToolOptions() {
           >
             <svg width={18} height={18} viewBox="0 0 20 20">
               <path d="M3 16L16 5M10 5h6v6" fill="none" stroke="currentColor" strokeWidth={1.6} />
+            </svg>
+          </button>
+          <span className="sep" />
+          <button
+            type="button"
+            className={`opt${(prefs.route ?? 'elbow') === 'elbow' ? ' active' : ''}`}
+            title="Connectors between shapes: right angles (flowcharts)"
+            onClick={() => set({ route: 'elbow' })}
+            data-testid="route-elbow"
+          >
+            <svg width={18} height={18} viewBox="0 0 20 20">
+              <path d="M3 5h7v10h7" fill="none" stroke="currentColor" strokeWidth={1.6} />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`opt${prefs.route === 'straight' ? ' active' : ''}`}
+            title="Connectors between shapes: straight"
+            onClick={() => set({ route: 'straight' })}
+          >
+            <svg width={18} height={18} viewBox="0 0 20 20">
+              <path d="M3 5L17 15" fill="none" stroke="currentColor" strokeWidth={1.6} />
             </svg>
           </button>
         </>

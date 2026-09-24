@@ -22,6 +22,8 @@ import {
   alignUnits,
   distributeUnits,
   followPins,
+  followConnectors,
+  anchorPoints,
   moveToNewBlock,
   ReadOnlyError,
   newId,
@@ -89,6 +91,11 @@ export class EditorController {
 
   elements(): Element[] {
     return this.project.getElements(this.sheetId);
+  }
+
+  /** Connection points of an element (flowchart connectors). */
+  anchorsOf(el: Element) {
+    return anchorPoints(el);
   }
 
   /** May the local user edit this sheet (role, locks)? Always true for local projects. */
@@ -197,9 +204,12 @@ export class EditorController {
     popIn(out, 8);
   }
 
-  /** Replace elements by modified copies (same ids). */
+  /** Replace elements by modified copies (same ids). Attached connectors follow. */
   applyElements(changed: Element[]) {
     if (!changed.length) return;
+    const merged = new Map(changed.map((e) => [e.id, e]));
+    for (const l of followConnectors(this.elements(), changed)) merged.set(l.id, l);
+    changed = [...merged.values()];
     this.commit(() => {
       for (const el of changed) {
         const { id, type: _t, ...rest } = el;

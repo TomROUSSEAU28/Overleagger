@@ -1,3 +1,4 @@
+import { linePoints } from './connectors';
 import {
   getBuiltinSymbol,
   orient,
@@ -393,8 +394,9 @@ export function elementBBox(el: Element, ctx: SheetContext, all?: Element[]): Re
     case 'frame':
       return { x: el.x, y: el.y, w: el.w, h: el.h };
     case 'line': {
-      const b = ptsBBox(el.pts);
       const pad = el.arrowStart || el.arrowEnd ? 6 : 2;
+      if (el.route === 'elbow') return inflateRect(ptsBBox(linePoints(el).flat()), pad);
+      const b = ptsBBox(el.pts);
       const c = lineControlPoint(el.pts, el.bend ?? 0);
       return inflateRect(rectUnion([b, { x: c.x, y: c.y, w: 0, h: 0 }])!, pad);
     }

@@ -10,7 +10,7 @@ import { SheetsPanel } from '../panels/SheetsPanel';
 import { SaveTemplateDialog } from '../panels/SaveTemplateDialog';
 import { TemplatesPanel } from '../panels/TemplatesPanel';
 import { AccessBanner } from '../cloud/CollabUI';
-import { CommentsPanel } from '../comments/Comments';
+import { CommentsPanel, CommentsTab } from '../comments/Comments';
 import { Presentation } from '../present/Presentation';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
@@ -62,16 +62,7 @@ function EditorLayout() {
               >
                 Templates
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'comments'}
-                className={tab === 'comments' ? 'active' : ''}
-                onClick={() => useUI.getState().set({ leftTab: 'comments' })}
-                data-testid="tab-comments"
-              >
-                Comments
-              </button>
+              <CommentsTab active={tab === 'comments'} />
               <button
                 type="button"
                 role="tab"

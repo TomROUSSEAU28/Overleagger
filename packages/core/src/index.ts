@@ -12,3 +12,4 @@ export * from './clipboard';
 export * from './refdes';
 export * from './slides';
 export * from './collab';
+export * from './geometry/connectors';

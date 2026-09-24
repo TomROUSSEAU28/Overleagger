@@ -1,4 +1,7 @@
 import {
+  linePoints,
+  polylineMiddle,
+  shapeGeometry,
   lineControlPoint,
   textWidth,
   type ButtonElement,
@@ -45,45 +48,6 @@ function RoughPaths({ drawable }: { drawable: ReturnType<typeof generator.rectan
   );
 }
 
-function shapePoints(
-  el: Pick<ShapeElement, 'kind' | 'x' | 'y' | 'w' | 'h' | 'dir'>,
-): [number, number][] {
-  const { x, y, w, h } = el;
-  if (el.kind === 'diamond')
-    return [
-      [x + w / 2, y],
-      [x + w, y + h / 2],
-      [x + w / 2, y + h],
-      [x, y + h / 2],
-    ];
-  switch (el.dir) {
-    case 'b':
-      return [
-        [x, y],
-        [x + w, y],
-        [x + w / 2, y + h],
-      ];
-    case 'r':
-      return [
-        [x, y],
-        [x + w, y + h / 2],
-        [x, y + h],
-      ];
-    case 'l':
-      return [
-        [x + w, y],
-        [x + w, y + h],
-        [x, y + h / 2],
-      ];
-    default:
-      return [
-        [x + w / 2, y],
-        [x + w, y + h],
-        [x, y + h],
-      ];
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Shapes
 // ---------------------------------------------------------------------------
@@ -118,16 +82,27 @@ export const ShapeView = memo(function ShapeView({
       fillWeight: ink.width * 0.6,
       ...(dash ? { strokeLineDash: dash.split(' ').map(Number) } : {}),
     };
-    if (el.kind === 'rect') return generator.rectangle(el.x, el.y, el.w, el.h, opts);
+    if (el.kind === 'rect') return [generator.rectangle(el.x, el.y, el.w, el.h, opts)];
     if (el.kind === 'ellipse')
-      return generator.ellipse(el.x + el.w / 2, el.y + el.h / 2, el.w, el.h, opts);
-    return generator.polygon(shapePoints(el), opts);
+      return [generator.ellipse(el.x + el.w / 2, el.y + el.h / 2, el.w, el.h, opts)];
+    const g = shapeGeometry(el);
+    return [
+      generator.polygon(g.outline, opts),
+      ...g.extras.map((e) => generator.linearPath(e, { ...opts, fill: undefined })),
+    ];
   }, [el, ink.color, ink.width, fill, dash]);
+  const geo = el.kind === 'rect' || el.kind === 'ellipse' ? null : shapeGeometry(el);
+  // Flowchart boxes: the text wraps inside the shape.
+  const textSize = 15;
+  const lines = el.text
+    ? wrapText(el.text, Math.max(30, el.w * (geo ? 0.72 : 0.86)), textSize)
+    : [];
+  const lineH = textSize * 1.25;
   return (
     <g data-id={o.interactive ? el.id : undefined} className="el">
       {o.interactive && <rect className="hit" x={el.x} y={el.y} width={el.w} height={el.h} />}
       {drawable ? (
-        <RoughPaths drawable={drawable} />
+        drawable.map((d, i) => <RoughPaths key={i} drawable={d} />)
       ) : el.kind === 'rect' ? (
         <rect x={el.x} y={el.y} width={el.w} height={el.h} rx={el.radius ?? 0} {...common} />
       ) : el.kind === 'ellipse' ? (
@@ -139,18 +114,36 @@ export const ShapeView = memo(function ShapeView({
           {...common}
         />
       ) : (
-        <polygon points={shapePoints(el).flat().join(' ')} strokeLinejoin="round" {...common} />
+        <>
+          <polygon points={geo!.outline.flat().join(' ')} strokeLinejoin="round" {...common} />
+          {geo!.extras.map((e, i) => (
+            <polyline
+              key={i}
+              points={e.flat().join(' ')}
+              fill="none"
+              stroke={ink.color}
+              strokeWidth={ink.width}
+              strokeDasharray={dash}
+            />
+          ))}
+        </>
       )}
-      {el.text && (
+      {lines.map((line, i) => (
         <RichText
-          text={el.text}
+          key={i}
+          text={line}
           x={el.x + el.w / 2}
-          y={el.y + el.h / 2}
-          size={15}
+          y={
+            el.y +
+            el.h / 2 +
+            (i - (lines.length - 1) / 2) * lineH +
+            (el.kind === 'document' ? -el.h * 0.06 : el.kind === 'database' ? el.h * 0.06 : 0)
+          }
+          size={textSize}
           color={ink.color}
           anchor="middle"
         />
-      )}
+      ))}
     </g>
   );
 });
@@ -173,31 +166,33 @@ function head(x: number, y: number, fromX: number, fromY: number, w: number): st
 export const LineView = memo(function LineView({ el, o }: { el: LineElement; o: RenderOptions }) {
   const ink = inkOf(el, o);
   const [x1, y1, x2, y2] = el.pts as [number, number, number, number];
+  const elbow = el.route === 'elbow';
+  const route = elbow ? linePoints(el) : null;
   const c = el.bend ? lineControlPoint(el.pts, el.bend) : { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
-  const d = linePath(el);
-  const drawable = useMemo(
-    () =>
-      el.sketch
-        ? el.bend
-          ? generator.curve(
-              [
-                [x1, y1],
-                [(x1 + 2 * c.x + x2) / 4, (y1 + 2 * c.y + y2) / 4],
-                [x2, y2],
-              ],
-              { seed: seedOf(el.id), stroke: ink.color, strokeWidth: ink.width, roughness: 1 },
-            )
-          : generator.line(x1, y1, x2, y2, {
-              seed: seedOf(el.id),
-              stroke: ink.color,
-              strokeWidth: ink.width,
-              roughness: 1,
-            })
-        : null,
-    [el.sketch, el.bend, el.id, x1, y1, x2, y2, c.x, c.y, ink.color, ink.width],
-  );
-  // Tangents at the ends (towards the control point for curves).
-  const mid = { x: (x1 + 2 * c.x + x2) / 4, y: (y1 + 2 * c.y + y2) / 4 };
+  const d = route ? `M ${route.map((p) => p.join(' ')).join(' L ')}` : linePath(el);
+  const drawable = useMemo(() => {
+    if (!el.sketch) return null;
+    const opts = { seed: seedOf(el.id), stroke: ink.color, strokeWidth: ink.width, roughness: 1 };
+    if (route) return generator.linearPath(route, opts);
+    return el.bend
+      ? generator.curve(
+          [
+            [x1, y1],
+            [(x1 + 2 * c.x + x2) / 4, (y1 + 2 * c.y + y2) / 4],
+            [x2, y2],
+          ],
+          opts,
+        )
+      : generator.line(x1, y1, x2, y2, opts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [el.sketch, el.bend, el.id, d, ink.color, ink.width]);
+  // Arrow heads follow the first / last segment (or the tangent of a curve).
+  const n = route?.length ?? 0;
+  const endFrom = route ? route[n - 2]! : el.bend ? [c.x, c.y] : [x1, y1];
+  const startFrom = route ? route[1]! : el.bend ? [c.x, c.y] : [x2, y2];
+  const mid = route
+    ? polylineMiddle(route)
+    : { x: (x1 + 2 * c.x + x2) / 4, y: (y1 + 2 * c.y + y2) / 4 };
   return (
     <g data-id={o.interactive ? el.id : undefined} className="el wire">
       {o.interactive && <path className="hit" d={d} fill="none" strokeWidth={12} />}
@@ -209,31 +204,46 @@ export const LineView = memo(function LineView({ el, o }: { el: LineElement; o: 
           fill="none"
           stroke={ink.color}
           strokeWidth={ink.width}
+          strokeLinejoin="round"
           strokeDasharray={dashArray(el.style?.dash, ink.width)}
         />
       )}
       {el.arrowEnd && (
-        <polygon
-          points={head(x2, y2, el.bend ? c.x : x1, el.bend ? c.y : y1, ink.width)}
-          fill={ink.color}
-        />
+        <polygon points={head(x2, y2, endFrom[0]!, endFrom[1]!, ink.width)} fill={ink.color} />
       )}
       {el.arrowStart && (
-        <polygon
-          points={head(x1, y1, el.bend ? c.x : x2, el.bend ? c.y : y2, ink.width)}
-          fill={ink.color}
-        />
+        <polygon points={head(x1, y1, startFrom[0]!, startFrom[1]!, ink.width)} fill={ink.color} />
       )}
-      {el.text && (
-        <RichText
-          text={el.text}
-          x={mid.x}
-          y={mid.y - 12}
-          size={14}
-          color={ink.color}
-          anchor="middle"
-        />
-      )}
+      {el.text &&
+        (route ? (
+          <>
+            <rect
+              x={mid.x - el.text.length * 3.6 - 4}
+              y={mid.y - 10}
+              width={el.text.length * 7.2 + 8}
+              height={20}
+              fill={o.theme.paper}
+              rx={3}
+            />
+            <RichText
+              text={el.text}
+              x={mid.x}
+              y={mid.y}
+              size={14}
+              color={ink.color}
+              anchor="middle"
+            />
+          </>
+        ) : (
+          <RichText
+            text={el.text}
+            x={mid.x}
+            y={mid.y - 12}
+            size={14}
+            color={ink.color}
+            anchor="middle"
+          />
+        ))}
     </g>
   );
 });

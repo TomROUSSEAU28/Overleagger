@@ -16,6 +16,7 @@ import type {
 import { ExternalLink, Plus, Trash } from 'lucide-react';
 import { TRACE_KINDS, WAVE_PRESETS, newTrace } from '../canvas/render/waveforms';
 import { useEditor, useSheets } from '../editor/context';
+import { SHAPE_KINDS } from '../canvas/shapeKinds';
 import { useUI } from '../store/ui';
 import { INK_NAMES, NOTE_NAMES, THEMES, resolveNoteColor } from '../theme';
 import { Field, IconButton } from './common';
@@ -43,6 +44,7 @@ function Check({
 }
 
 export function ShapeProps({ el }: { el: ShapeElement }) {
+  const ed = useEditor();
   const upd = useUpd(el);
   return (
     <>
@@ -51,12 +53,16 @@ export function ShapeProps({ el }: { el: ShapeElement }) {
         <Field label="Kind">
           <select
             value={el.kind}
-            onChange={(e) => upd({ kind: e.target.value as ShapeElement['kind'] })}
+            onChange={(e) =>
+              // Attached connectors move to the new outline.
+              ed.patchWithFollow(el.id, { kind: e.target.value as ShapeElement['kind'] })
+            }
           >
-            <option value="rect">Rectangle</option>
-            <option value="ellipse">Ellipse</option>
-            <option value="diamond">Diamond</option>
-            <option value="triangle">Triangle</option>
+            {SHAPE_KINDS.map((k) => (
+              <option key={k.kind} value={k.kind}>
+                {k.label}
+              </option>
+            ))}
           </select>
         </Field>
         {el.kind === 'rect' && (
@@ -115,15 +121,33 @@ export function LineProps({ el }: { el: LineElement }) {
           onChange={(v) => upd({ arrowEnd: v || undefined })}
         />
       </div>
-      <Field label="Curvature">
-        <input
-          type="range"
-          min={-120}
-          max={120}
-          value={el.bend ?? 0}
-          onChange={(e) => upd({ bend: Number(e.target.value) || undefined })}
-        />
+      <Field label="Route">
+        <select
+          value={el.route ?? 'straight'}
+          onChange={(e) => upd({ route: e.target.value === 'elbow' ? 'elbow' : undefined })}
+          data-testid="prop-line-route"
+        >
+          <option value="straight">Straight / curved</option>
+          <option value="elbow">Right angles (flowchart)</option>
+        </select>
       </Field>
+      {el.route !== 'elbow' && (
+        <Field label="Curvature">
+          <input
+            type="range"
+            min={-120}
+            max={120}
+            value={el.bend ?? 0}
+            onChange={(e) => upd({ bend: Number(e.target.value) || undefined })}
+          />
+        </Field>
+      )}
+      {(el.from || el.to) && (
+        <p className="muted small">
+          Attached to {el.from && el.to ? 'two shapes' : 'a shape'}: it follows them when they move.
+          Drag an end away to detach it.
+        </p>
+      )}
       <Field label="Label ($…$ = LaTeX)">
         <input value={el.text ?? ''} onChange={(e) => upd({ text: e.target.value || undefined })} />
       </Field>
@@ -132,7 +156,10 @@ export function LineProps({ el }: { el: LineElement }) {
         checked={Boolean(el.sketch)}
         onChange={(v) => upd({ sketch: v || undefined })}
       />
-      <p className="muted small">Drag the round middle handle to curve the line.</p>
+      <p className="muted small">
+        Start or end a line on a shape to attach it to a connection point.
+        {el.route !== 'elbow' ? ' Drag the round middle handle to curve it.' : ''}
+      </p>
     </>
   );
 }
