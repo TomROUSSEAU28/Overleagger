@@ -549,11 +549,11 @@ export function Dashboard() {
             title="Circuit Notebook is made by one student: help keep the server running"
             data-testid="support"
           >
-            <Heart size={15} /> Support
+            <Heart size={15} /> <span className="btn-label">Support</span>
           </a>
           {user && (
             <a className="btn" href="#/people" data-testid="dash-people">
-              <Users size={15} /> Friends &amp; teams
+              <Users size={15} /> <span className="btn-label">Friends &amp; teams</span>
               {requests > 0 && <span className="count-badge">{requests}</span>}
             </a>
           )}

@@ -2166,30 +2166,24 @@ fieldset.plain {
 
 /* Phones: the editor works, but say it is made for a computer. */
 .small-screen-note {
-  display: none;
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(68px + env(safe-area-inset-bottom));
+  z-index: 40;
+  margin: 0;
+  padding: 10px 40px 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
 }
-@media (max-width: 760px) {
-  .small-screen-note {
-    display: block;
-    position: fixed;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    z-index: 40;
-    margin: 0;
-    padding: 8px 12px;
-    font-size: 13px;
-    background: var(--panel);
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    box-shadow: var(--shadow);
-    padding-right: 36px;
-  }
-  .small-screen-note .icon-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-  }
+.small-screen-note .icon-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 
 /* Short confirmation at the bottom of the editor */
@@ -2546,6 +2540,33 @@ body.resizing-panel {
   color: var(--accent);
 }
 @media (max-width: 640px) {
+  /* Phone: the brand on one line, the buttons below it, as icons. */
+  .dashboard,
+  .gallery {
+    padding: 16px 14px 40px;
+  }
+  .dash-top {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .dash-brand {
+    font-size: 18px;
+  }
+  .dash-top-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dash-top-right .btn-label,
+  .dash-top-right .account-name {
+    display: none;
+  }
+  .dash-top-right .btn {
+    padding-inline: 10px;
+  }
+  .dash-title-row h1 {
+    font-size: 26px;
+  }
   .start-from {
     grid-template-columns: 1fr;
   }
@@ -2944,4 +2965,300 @@ body.resizing-panel {
   margin-left: 4px;
   align-self: flex-start;
   transform: rotate(-4deg);
+}
+
+/* ---- Phone layout of the editor ------------------------------------------------------ */
+
+.editor.phone {
+  height: 100vh;
+  height: 100dvh;
+  /* No double-tap zoom of the page: the drawing zooms with two fingers. */
+  touch-action: manipulation;
+}
+.topbar.phone {
+  gap: 2px;
+  padding: 4px 6px;
+  padding-top: calc(4px + env(safe-area-inset-top));
+}
+.topbar.phone .brand {
+  gap: 4px;
+  padding: 4px;
+}
+.topbar.phone .project-name {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  font-size: 16px;
+}
+.topbar.phone .icon-btn {
+  width: 38px;
+  height: 38px;
+}
+.topbar.phone .collab-bar .avatars,
+.topbar.phone .collab-bar .btn-label {
+  display: none;
+}
+.phone-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.phone-top > * {
+  pointer-events: auto;
+}
+.phone-crumbs {
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  box-shadow: var(--shadow);
+}
+.phone-crumbs .breadcrumbs {
+  display: flex;
+  white-space: nowrap;
+}
+.phone-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 6px 6px 6px 12px;
+  font-size: 14px;
+  box-shadow: var(--shadow);
+}
+.phone-mode .btn {
+  flex: none;
+  min-height: 34px;
+}
+.phone-selection {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+  animation: olg-modal-in 140ms ease-out;
+}
+.phone-act,
+.phone-tab {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 56px;
+  min-height: 48px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 11px var(--sans);
+  cursor: pointer;
+  position: relative;
+}
+.phone-act:active,
+.phone-tab:active {
+  background: var(--hover);
+}
+.phone-act.danger {
+  color: var(--danger);
+}
+.phone-bar {
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  z-index: 30;
+}
+.phone-tab {
+  flex: 1;
+  min-width: 0;
+}
+.phone-tab.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.phone-tab .tab-badge {
+  top: 2px;
+  right: calc(50% - 22px);
+  font-style: normal;
+}
+.phone-tab > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phone-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(20, 16, 10, 0.22);
+}
+.phone-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  max-height: 72dvh;
+  background: var(--panel);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: phone-drawer-in 180ms ease-out;
+}
+.phone-drawer.parts,
+.phone-drawer.comments,
+.phone-drawer.edit {
+  height: 62dvh;
+}
+@keyframes phone-drawer-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+.phone-drawer > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 6px 16px;
+  font-family: var(--serif);
+  font-variant: small-caps;
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+}
+.phone-drawer > header::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: calc(50% - 18px);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.phone-drawer > header .icon-btn {
+  width: 38px;
+  height: 38px;
+}
+.phone-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* The desktop panels, made roomy for fingers. */
+.phone-drawer-body > * {
+  flex: 1;
+  min-height: 0;
+}
+.phone-drawer .library,
+.phone-drawer .props {
+  width: auto;
+}
+.phone-drawer input,
+.phone-drawer select,
+.phone-drawer textarea {
+  font-size: 16px;
+}
+.phone-parts-tabs {
+  flex: none !important;
+  margin: 10px 12px 0;
+  align-self: flex-start;
+}
+.phone-parts-tabs button {
+  padding: 6px 16px;
+  font-size: 15px;
+}
+.phone-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  padding: 12px;
+  flex: none !important;
+}
+.phone-tools button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font: 13px var(--sans);
+  text-align: center;
+  cursor: pointer;
+}
+.phone-tools button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.phone-more {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px 12px;
+  flex: none !important;
+}
+.phone-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font: 15px var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.phone-row.static {
+  justify-content: space-between;
+  cursor: default;
+}
+.phone-row .segmented button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+.phone-row .theme-swatch {
+  width: 34px;
+  height: 34px;
+}
+/* Dialogs fill the width of a phone. */
+.editor.phone .modal {
+  width: calc(100vw - 16px);
+  max-width: none;
+  max-height: calc(100dvh - 24px);
 }

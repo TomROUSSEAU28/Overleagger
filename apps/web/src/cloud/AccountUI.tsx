@@ -239,7 +239,7 @@ export function AccountMenu() {
           onClick={() => setDialog('server')}
           data-testid="connect-server"
         >
-          <Server size={15} /> Connect to a server
+          <Server size={15} /> Connect<span className="btn-label"> to a server</span>
         </button>
       ) : !cloud.user ? (
         <button
@@ -259,7 +259,7 @@ export function AccountMenu() {
           data-testid="account-menu"
         >
           <Avatar name={cloud.user.name} color={cloud.user.color} />
-          <span>{cloud.user.name}</span>
+          <span className="account-name">{cloud.user.name}</span>
           {requests > 0 && (
             <span className="count-badge" title={`${requests} friend request(s)`}>
               {requests}

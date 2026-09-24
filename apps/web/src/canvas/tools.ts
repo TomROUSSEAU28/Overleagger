@@ -63,6 +63,8 @@ export interface PointerInfo {
   pressure: number;
   /** Element under the pointer, looked up even while the pointer is captured. */
   hitTest: () => Id | null;
+  /** A finger: bigger targets, and dragging the empty page moves the view. */
+  touch?: boolean;
 }
 
 /** Ask the canvas to open the image file picker; the image goes to `at`. */
@@ -224,7 +226,10 @@ export class ToolController {
     const elements = ed.elements();
     // Grabbing a pin starts a wire.
     const editable = ed.canEdit();
-    const pin = editable ? pinAt(elements, ed.ctx, p.world.x, p.world.y, 6 / this.zoom()) : null;
+    // (Not with a finger: it covers the pins, and would start a wire instead of moving the part;
+    // the wire tool draws wires there.)
+    const pin =
+      editable && !p.touch ? pinAt(elements, ed.ctx, p.world.x, p.world.y, 6 / this.zoom()) : null;
     if (pin && !p.shift) {
       this.wireFromSelect = true;
       this.ui.set({ tool: 'wire', selection: [] });
@@ -253,7 +258,22 @@ export class ToolController {
       return;
     }
     if (!p.shift) ed.select([]);
-    this.mode = 'marquee';
+    // A finger on the empty page moves the view (two fingers zoom).
+    this.mode = p.touch ? 'pan' : 'marquee';
+  }
+
+  /** Forget the gesture in progress (a second finger came: it is a pinch). */
+  abort() {
+    this.mode = 'idle';
+    this.ui.set({
+      drag: null,
+      marquee: null,
+      blockDraft: null,
+      rectDraft: null,
+      lineDraft: null,
+      lineDraftEnds: null,
+      strokeDraft: null,
+    });
   }
 
   move(p: PointerInfo) {

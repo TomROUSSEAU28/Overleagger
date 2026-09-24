@@ -6,6 +6,7 @@ import {
   Download,
   Grid3x3,
   Keyboard,
+  MoreHorizontal,
   PanelLeft,
   PanelRight,
   Presentation,
@@ -43,7 +44,49 @@ export function Breadcrumbs() {
   );
 }
 
-export function TopBar() {
+export function TopBar({ phone = false }: { phone?: boolean }) {
+  const ed = useEditor();
+  const meta = useMeta();
+  const { canUndo, canRedo } = useUndoState();
+  if (phone)
+    return (
+      <header className="topbar phone">
+        <a className="brand" href="#/" title="All projects" aria-label="All projects">
+          <ArrowLeft size={18} />
+          <Logo size={22} />
+        </a>
+        <input
+          className="project-name"
+          value={meta.name}
+          aria-label="Project name"
+          onChange={(e) => ed.project.setMeta({ name: e.target.value })}
+          data-testid="project-name"
+        />
+        <CollabBar />
+        <IconButton title="Undo" onClick={() => ed.doUndo()} disabled={!canUndo} testId="undo">
+          <Undo2 size={18} />
+        </IconButton>
+        <IconButton title="Redo" onClick={() => ed.doRedo()} disabled={!canRedo} testId="redo">
+          <Redo2 size={18} />
+        </IconButton>
+        {/* Everything that does not need to be on screen. */}
+        <IconButton
+          title="More"
+          onClick={() =>
+            useUI
+              .getState()
+              .set({ phoneSheet: useUI.getState().phoneSheet === 'more' ? null : 'more' })
+          }
+          testId="phone-more"
+        >
+          <MoreHorizontal size={19} />
+        </IconButton>
+      </header>
+    );
+  return <DesktopTopBar />;
+}
+
+function DesktopTopBar() {
   const ed = useEditor();
   const meta = useMeta();
   const { canUndo, canRedo } = useUndoState();

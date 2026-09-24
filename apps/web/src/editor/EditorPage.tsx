@@ -26,6 +26,8 @@ import { openProject, updateEntry } from '../storage/projects';
 import { useUI } from '../store/ui';
 import { THEMES } from '../theme';
 import { EditorContext, useEditor } from './context';
+import { PhoneBar, PhoneDrawer, PhoneOverlay, PhoneSelectionBar } from './PhoneUI';
+import { usePhone } from './usePhone';
 import { EditorController } from './controller';
 
 function EditorLayout() {
@@ -39,6 +41,37 @@ function EditorLayout() {
   const rightWidth = useUI((s) => s.rightWidth);
   const tab = useUI((s) => s.leftTab);
   const theme = useUI((s) => s.theme);
+  const phone = usePhone();
+  const modals = (
+    <>
+      {modal === 'quickadd' && <QuickAdd />}
+      {modal === 'help' && <HelpOverlay />}
+      {modal === 'shortcuts' && <ShortcutsDialog />}
+      {modal === 'export' && <ExportDialog />}
+      {modal === 'symbol-editor' && <SymbolEditor />}
+      {modal === 'save-template' && <SaveTemplateDialog />}
+      {presenting && <Presentation />}
+      <Toast />
+    </>
+  );
+  if (phone)
+    return (
+      <div className="editor phone" data-theme={theme}>
+        <TopBar phone />
+        <AccessBanner />
+        <div className="editor-main">
+          <main className="canvas-area">
+            <Canvas />
+            <PhoneOverlay />
+            <PhoneSelectionBar />
+          </main>
+        </div>
+        <PhoneBar />
+        <PhoneDrawer />
+        {modals}
+        <PhoneTips />
+      </div>
+    );
   return (
     <div className="editor" data-theme={theme}>
       <TopBar />
@@ -106,15 +139,7 @@ function EditorLayout() {
         )}
       </div>
       <StatusBar />
-      {modal === 'quickadd' && <QuickAdd />}
-      {modal === 'help' && <HelpOverlay />}
-      {modal === 'shortcuts' && <ShortcutsDialog />}
-      {modal === 'export' && <ExportDialog />}
-      {modal === 'symbol-editor' && <SymbolEditor />}
-      {modal === 'save-template' && <SaveTemplateDialog />}
-      {presenting && <Presentation />}
-      <Toast />
-      <SmallScreenNote />
+      {modals}
     </div>
   );
 }
@@ -255,21 +280,21 @@ export function EditorPage({ source }: { source: ProjectSource }) {
   );
 }
 
-/** On a phone: a word that the editor is made for a computer screen (can be closed). */
-function SmallScreenNote() {
-  const key = 'sb.smallScreenNote';
+/** On a phone, the first time: how to move around with fingers (can be closed). */
+function PhoneTips() {
+  const key = 'sb.phoneTips';
   const [closed, setClosed] = useState(() => {
     try {
-      return sessionStorage.getItem(key) === 'closed';
+      return localStorage.getItem(key) === 'closed';
     } catch {
       return false;
     }
   });
   if (closed) return null;
   return (
-    <p className="small-screen-note">
-      Circuit Notebook is made for a computer screen: on a phone you can look at projects, but
-      drawing is much easier with a mouse.
+    <p className="small-screen-note" data-testid="phone-tips">
+      <b>On a phone:</b> drag to move around, pinch to zoom, tap to select. Big drawings are easier
+      on a computer.
       <button
         type="button"
         className="icon-btn"
@@ -277,7 +302,7 @@ function SmallScreenNote() {
         onClick={() => {
           setClosed(true);
           try {
-            sessionStorage.setItem(key, 'closed');
+            localStorage.setItem(key, 'closed');
           } catch {
             // private mode: it simply comes back next time
           }

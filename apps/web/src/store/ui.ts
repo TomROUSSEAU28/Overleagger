@@ -66,6 +66,9 @@ export interface DragPreview {
   segment?: { wireId: Id; index: number };
 }
 
+/** Bottom drawer of the phone layout. */
+export type PhoneSheet = null | 'tools' | 'parts' | 'sheets' | 'comments' | 'edit' | 'more';
+
 export type Modal =
   | null
   | 'quickadd'
@@ -153,6 +156,8 @@ export interface UIState extends Settings {
   showResolved: boolean;
   /** Presentation mode (full screen slides). */
   presenting: boolean;
+  /** Phone layout: the drawer open at the bottom. */
+  phoneSheet: PhoneSheet;
   /** Following someone else's presentation (their user id). */
   presentFollow: string | null;
   spaceDown: boolean;
@@ -219,6 +224,7 @@ const transient = {
   modal: null as Modal,
   inlineEdit: null,
   presenting: false,
+  phoneSheet: null as PhoneSheet,
   presentFollow: null,
   commentDraft: null,
   openThread: null,

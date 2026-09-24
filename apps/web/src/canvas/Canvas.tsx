@@ -37,6 +37,7 @@ import { useFollow, usePresencePublisher } from '../cloud/presenceHooks';
 import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { THEMES, resolveColor, type Theme } from '../theme';
+import { MAX_ZOOM, MIN_ZOOM } from '../editor/controller';
 import { InlineEditor } from './InlineEditor';
 import { ComponentView, type RenderOptions } from './render/ElementViews';
 import { SheetRenderer } from './render/SheetRenderer';
@@ -52,6 +53,22 @@ import { ToolOptions } from './ToolOptions';
 import { TEMPLATE_DND_TYPE } from '../panels/TemplatesPanel';
 
 export const SYMBOL_DND_TYPE = 'application/x-overleagger-symbol';
+
+/**
+ * What a finger touches: the element right under it, or else the nearest one within about
+ * 5 mm (a finger is wide, and a wire or a thin symbol is not).
+ */
+function underFinger(x: number, y: number): EventTarget | null {
+  const at = document.elementFromPoint(x, y);
+  if (at?.closest('[data-id], [data-handle]')) return at;
+  for (const r of [8, 16, 24])
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const el = document.elementFromPoint(x + r * Math.cos(a), y + r * Math.sin(a));
+      if (el?.closest('[data-id], [data-handle]') && el.closest('.canvas')) return el;
+    }
+  return at;
+}
 
 function closestAttr(t: EventTarget | null, attr: string): string | null {
   const el = (t as HTMLElement | null)?.closest?.(`[${attr}]`);
@@ -180,6 +197,8 @@ export function Canvas() {
       pointerType?: string;
     }): PointerInfo => {
       const { screen, world } = toWorld(e.clientX, e.clientY);
+      // A finger's event names the canvas itself as its target: look at what is under it.
+      const target = e.pointerType === 'touch' ? underFinger(e.clientX, e.clientY) : e.target;
       return {
         screen,
         world,
@@ -187,16 +206,109 @@ export function Canvas() {
         shift: e.shiftKey,
         alt: e.altKey,
         mod: e.ctrlKey || e.metaKey,
-        targetId: closestAttr(e.target, 'data-id'),
-        handle: closestAttr(e.target, 'data-handle'),
+        targetId: closestAttr(target, 'data-id'),
+        handle: closestAttr(target, 'data-handle'),
         pressure: e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5,
         hitTest: () => closestAttr(document.elementFromPoint(e.clientX, e.clientY), 'data-id'),
+        touch: e.pointerType === 'touch',
       };
     },
     [toWorld],
   );
 
+  // Fingers. One finger acts like the mouse, but only once it is clear that no second finger
+  // follows (a pinch must not first place a part or add a wire bend). Two fingers pinch to zoom
+  // and move the view; the gesture ends when every finger is lifted.
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pending = useRef<{ p: PointerInfo; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const pinch = useRef<{
+    d0: number;
+    mid0: Pt;
+    vp0: { x: number; y: number; zoom: number };
+  } | null>(null);
+  const gesture = useRef(false);
+  const flushPending = () => {
+    const pend = pending.current;
+    if (!pend) return;
+    clearTimeout(pend.timer);
+    pending.current = null;
+    if (useUI.getState().tool === 'pan') setPanning(true);
+    tools.down(pend.p);
+  };
+  const twoFingers = () => {
+    const [a, b] = [...touches.current.values()];
+    const r = svgRef.current!.getBoundingClientRect();
+    return {
+      d: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
+      mid: { x: (a!.x + b!.x) / 2 - r.left, y: (a!.y + b!.y) / 2 - r.top },
+    };
+  };
+  const touchDown = (e: RPointerEvent<SVGSVGElement>) => {
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    svgRef.current?.setPointerCapture(e.pointerId);
+    if (touches.current.size >= 2) {
+      if (pending.current) {
+        clearTimeout(pending.current.timer);
+        pending.current = null;
+      } else if (!gesture.current) tools.abort();
+      setPanning(false);
+      gesture.current = true;
+      const { d, mid } = twoFingers();
+      pinch.current = { d0: d, mid0: mid, vp0: ed.viewport() };
+      return;
+    }
+    if (gesture.current) return;
+    if (useUI.getState().inlineEdit) useUI.getState().set({ inlineEdit: null });
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    pending.current = { p: info(e), timer: setTimeout(flushPending, 90) };
+  };
+  /** True when the event was a finger and has been handled here. */
+  const touchMove = (e: RPointerEvent<SVGSVGElement>) => {
+    if (!touches.current.has(e.pointerId)) return false;
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pz = pinch.current;
+    if (pz && touches.current.size >= 2) {
+      const { d, mid } = twoFingers();
+      const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (pz.vp0.zoom * d) / pz.d0));
+      const wx = (pz.mid0.x - pz.vp0.x) / pz.vp0.zoom;
+      const wy = (pz.mid0.y - pz.vp0.y) / pz.vp0.zoom;
+      ed.setViewport({ x: mid.x - wx * zoom, y: mid.y - wy * zoom, zoom });
+      return true;
+    }
+    if (gesture.current) return true;
+    const pend = pending.current;
+    if (pend) {
+      const r = svgRef.current!.getBoundingClientRect();
+      const moved = Math.hypot(
+        e.clientX - r.left - pend.p.screen.x,
+        e.clientY - r.top - pend.p.screen.y,
+      );
+      if (moved < 6) return true;
+      flushPending();
+    }
+    return false;
+  };
+  /** True when the event was a finger and has been handled here. */
+  const touchUp = (e: RPointerEvent<SVGSVGElement>, cancelled = false) => {
+    if (!touches.current.delete(e.pointerId)) return false;
+    if (gesture.current) {
+      if (touches.current.size < 2) pinch.current = null;
+      if (touches.current.size === 0) gesture.current = false;
+      return true;
+    }
+    if (cancelled) {
+      if (pending.current) clearTimeout(pending.current.timer);
+      pending.current = null;
+      tools.abort();
+      setPanning(false);
+      return true;
+    }
+    flushPending();
+    return false;
+  };
+
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'touch') return touchDown(e);
     if (useUI.getState().inlineEdit) useUI.getState().set({ inlineEdit: null });
     (document.activeElement as HTMLElement | null)?.blur?.();
     svgRef.current?.setPointerCapture(e.pointerId);
@@ -206,6 +318,7 @@ export function Canvas() {
     tools.down(p);
   };
   const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'touch' && touchMove(e)) return;
     // Pens and fast mice: use coalesced events for smooth freehand strokes.
     const native = e.nativeEvent;
     const list =
@@ -231,6 +344,7 @@ export function Canvas() {
     } else tools.move(info(e));
   };
   const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'touch' && touchUp(e)) return;
     svgRef.current?.releasePointerCapture(e.pointerId);
     setPanning(false);
     tools.up(info(e));
@@ -365,6 +479,7 @@ export function Canvas() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={(e) => (e.pointerType === 'touch' ? touchUp(e, true) : onPointerUp(e))}
         onPointerLeave={onPointerLeave}
         onContextMenu={(e) => e.preventDefault()}
       >
