@@ -347,3 +347,29 @@ test('hide things from the presentation or the export, export only the selection
   await page.getByTestId('present').click();
   await expect(page.getByTestId('present-count')).toHaveText('0 / 0');
 });
+
+test('undo shows the sheet where the change was made', async ({ page }) => {
+  await page.goto('/app/#/example');
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type W = { __overleagger: { ed: any } };
+  await page.evaluate(() => {
+    const { ed } = (window as unknown as W).__overleagger;
+    const blk = ed.elements().find((e: { type: string }) => e.type === 'block');
+    ed.openSheet(blk.childSheetId);
+    ed.commit(() =>
+      ed.addElement({ type: 'text', x: 0, y: 300, text: 'child edit', size: 16, align: 'start' }),
+    );
+    ed.openSheet(ed.project.rootSheetId);
+  });
+  await page.keyboard.press('Control+z');
+  const after = await page.evaluate(() => {
+    const { ed } = (window as unknown as W).__overleagger;
+    return {
+      onChild: ed.sheetId !== ed.project.rootSheetId,
+      text: ed.elements().some((e: { text?: string }) => e.text === 'child edit'),
+    };
+  });
+  expect(after).toEqual({ onChild: true, text: false });
+  await expect(page.getByTestId('breadcrumbs')).toContainText('Voltage controller');
+});

@@ -64,6 +64,10 @@ export class EditorController {
     this.project = project;
     this.session = session;
     this.undo = createUndoManager(project);
+    // Remember on which sheet each change was made, so undo / redo can show it there.
+    this.undo.on('stack-item-added', (e: { stackItem: { meta: Map<string, unknown> } }) => {
+      if (!e.stackItem.meta.has('sheet')) e.stackItem.meta.set('sheet', this.sheetId);
+    });
     const base = makeContext(project);
     // Symbols of the personal library are usable in every project (they are copied into the
     // project when placed, so the project file stays self-contained).
@@ -468,13 +472,22 @@ export class EditorController {
   }
 
   doUndo() {
+    this.showSheetOf(this.undo.undoStack);
     this.undo.undo();
     this.cleanSelection();
   }
 
   doRedo() {
+    this.showSheetOf(this.undo.redoStack);
     this.undo.redo();
     this.cleanSelection();
+  }
+
+  /** Undoing a change made on another sheet goes there first, so the change is not invisible. */
+  private showSheetOf(stack: { meta: Map<string, unknown> }[]) {
+    const sheet = stack[stack.length - 1]?.meta.get('sheet');
+    if (typeof sheet === 'string' && sheet !== this.sheetId && this.project.hasSheet(sheet))
+      this.openSheet(sheet);
   }
 
   private cleanSelection() {
