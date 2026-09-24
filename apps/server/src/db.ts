@@ -353,6 +353,49 @@ export class Store {
     this.db.prepare('DELETE FROM projects WHERE id = ?').run(id);
   }
 
+  /**
+   * Remove an account and everything that is only theirs: their projects (for everyone they
+   * shared them with, too), teams, friends, sessions and library. Their name stays only where
+   * it is part of other people's work (comments inside a project). Returns the projects whose
+   * open connections must be refreshed.
+   */
+  deleteUser(userId: string): string[] {
+    const ids = (sql: string) =>
+      (this.db.prepare(sql).all(userId) as { id: string }[]).map((r) => r.id);
+    const touched = new Set([
+      ...ids('SELECT id FROM projects WHERE owner_id = ?'),
+      ...ids('SELECT project_id AS id FROM members WHERE user_id = ?'),
+      ...ids(
+        `SELECT project_teams.project_id AS id FROM project_teams
+         JOIN teams ON teams.id = project_teams.team_id WHERE teams.owner_id = ?`,
+      ),
+      ...ids(
+        `SELECT project_teams.project_id AS id FROM project_teams
+         JOIN team_members ON team_members.team_id = project_teams.team_id
+         WHERE team_members.user_id = ?`,
+      ),
+    ]);
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM projects WHERE owner_id = ?').run(userId);
+      this.db.prepare('DELETE FROM invites WHERE created_by = ?').run(userId);
+      this.db.prepare('UPDATE versions SET author_id = NULL WHERE author_id = ?').run(userId);
+      this.db.prepare('UPDATE messages SET user_id = NULL WHERE user_id = ?').run(userId);
+      this.db
+        .prepare(
+          `DELETE FROM sheet_rules WHERE (principal = 'user' AND principal_id = ?1)
+             OR (principal = 'team' AND principal_id IN (SELECT id FROM teams WHERE owner_id = ?1))`,
+        )
+        .run(userId);
+      this.db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+    return [...touched];
+  }
+
   /** Projects a person can open: as a member, or through one of their teams (best role wins). */
   projectsOf(userId: string) {
     const rows = this.db
@@ -831,6 +874,11 @@ export class Store {
 
   deleteMessage(id: string) {
     this.db.prepare('DELETE FROM messages WHERE id = ?').run(id);
+  }
+
+  /** Remove the contact messages received before `time`; returns how many. */
+  pruneMessages(time: number): number {
+    return Number(this.db.prepare('DELETE FROM messages WHERE created_at < ?').run(time).changes);
   }
 
   // Quotas & statistics ---------------------------------------------------------

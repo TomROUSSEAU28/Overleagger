@@ -7,6 +7,7 @@ import {
   LogIn,
   LogOut,
   Server,
+  Trash2,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -222,7 +223,7 @@ export function SignInDialog({
 /** Server + account button (dashboard and editor). */
 export function AccountMenu() {
   const cloud = useCloud();
-  const [dialog, setDialog] = useState<'server' | 'signin' | null>(null);
+  const [dialog, setDialog] = useState<'server' | 'signin' | 'delete' | null>(null);
   const [open, setOpen] = useState(false);
   const requests = useSocial((s) => s.incoming.length);
   useEffect(() => {
@@ -326,11 +327,114 @@ export function AccountMenu() {
           >
             <LogOut size={14} /> Sign out
           </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => (setOpen(false), setDialog('delete'))}
+            data-testid="delete-account"
+          >
+            <Trash2 size={14} /> Delete my account…
+          </button>
         </div>
       )}
+      {dialog === 'delete' && <DeleteAccountDialog onClose={() => setDialog(null)} />}
       {dialog === 'server' && <ServerDialog onClose={() => setDialog(null)} />}
       {dialog === 'signin' && <SignInDialog onClose={() => setDialog(null)} />}
     </div>
+  );
+}
+
+/** Delete the account: says what goes away, and asks for the password (or the e-mail). */
+function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
+  const cloud = useCloud();
+  // Kept as it was when the dialog opened: the account is gone once deleted.
+  const [user] = useState(cloud.user!);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const owned = user.quota?.projects ?? 0;
+  const submit = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await cloud.deleteAccount(
+        user.hasPassword === false ? { email: value } : { password: value },
+      );
+      onClose();
+      navigate('/');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="Delete my account" onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <p>This removes from the server, for good:</p>
+        <ul className="small">
+          <li>
+            your account (<b>{user.email}</b>), your friends, teams and library;
+          </li>
+          <li>
+            {owned === 0 ? (
+              'no project: you own none on the server;'
+            ) : (
+              <>
+                <b>
+                  the {owned} project{owned > 1 ? 's' : ''} you own
+                </b>
+                , also for the people you shared {owned > 1 ? 'them' : 'it'} with;
+              </>
+            )}
+          </li>
+          <li>your access to the projects others shared with you.</li>
+        </ul>
+        {owned > 0 && (
+          <p className="muted small">
+            To keep a project, first choose <i>Move to this computer</i> in its menu (⋯) on the
+            dashboard.
+          </p>
+        )}
+        <p className="muted small">Projects saved on this computer are not touched.</p>
+        <Field
+          label={
+            user.hasPassword === false
+              ? `Type your e-mail address (${user.email}) to confirm`
+              : 'Your password, to confirm'
+          }
+        >
+          <input
+            type={user.hasPassword === false ? 'email' : 'password'}
+            autoFocus
+            autoComplete={user.hasPassword === false ? 'off' : 'current-password'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            data-testid="delete-confirm"
+          />
+        </Field>
+        {error && <p className="warning small">{error}</p>}
+        <div className="modal-foot">
+          <span style={{ flex: 1 }} />
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn danger-solid"
+            disabled={busy || !value}
+            data-testid="delete-submit"
+          >
+            Delete my account
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

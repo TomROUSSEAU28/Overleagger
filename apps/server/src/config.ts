@@ -31,6 +31,8 @@ export interface Config {
   backupKeepDays: number;
   /** Where the messages of the contact form are sent (and shown on the site). */
   contactEmail?: string;
+  /** Days a contact message is kept (the privacy policy promises one year at most). */
+  messageKeepDays: number;
   /** Outgoing e-mail (optional): without it, messages are only in the admin page. */
   smtp?: { host: string; port: number; user?: string; pass?: string; from: string };
 }
@@ -60,6 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     ...(env.BACKUP_DIR ? { backupDir: env.BACKUP_DIR } : {}),
     backupKeepDays: Number(env.BACKUP_KEEP_DAYS ?? 7),
+    messageKeepDays: Number(env.MESSAGE_KEEP_DAYS ?? 365),
     ...(env.CONTACT_EMAIL ? { contactEmail: env.CONTACT_EMAIL.trim() } : {}),
     ...(env.SMTP_HOST
       ? {

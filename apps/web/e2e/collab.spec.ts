@@ -351,3 +351,21 @@ test('beta limits: a few projects on the server, the rest in this browser; admin
   await ida.goto('/app/#/admin');
   await expect(ida.getByText('This page is for the administrators')).toBeVisible();
 });
+
+test('delete my account: says what goes away, asks for the password', async ({ browser }) => {
+  const zoe = await person(browser, 'Zoe');
+  await zoe.getByTestId('account-menu').click();
+  await zoe.getByTestId('delete-account').click();
+  await expect(zoe.getByRole('dialog')).toContainText('you own none on the server');
+  await zoe.getByTestId('delete-confirm').fill('not my password');
+  await zoe.getByTestId('delete-submit').click();
+  await expect(zoe.getByRole('dialog')).toContainText('Wrong password');
+  await zoe.getByTestId('delete-confirm').fill('correct horse battery');
+  await zoe.getByTestId('delete-submit').click();
+  // Signed out, and the account no longer exists.
+  await expect(zoe.getByTestId('sign-in')).toBeVisible();
+  const login = await zoe.request.post(`${SERVER}/api/auth/login`, {
+    data: { email: `zoe.${stamp}@lab.test`, password: 'correct horse battery' },
+  });
+  expect(login.status()).toBe(401);
+});

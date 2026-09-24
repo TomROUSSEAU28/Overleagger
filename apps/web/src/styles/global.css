@@ -200,6 +200,14 @@ input[type='color'] {
 .btn.primary:hover {
   filter: brightness(1.08);
 }
+.btn.danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn.danger-solid:hover {
+  filter: brightness(1.08);
+}
 .btn:disabled {
   opacity: 0.5;
   cursor: default;

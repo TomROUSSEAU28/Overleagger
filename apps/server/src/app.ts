@@ -58,6 +58,12 @@ export async function createApp(
   const mailer = createMailer(config, options.mailTransport);
   const collab = createCollab(store, config);
   const backups = startBackups(store.db, config);
+  // Contact messages are kept one year at most (privacy policy): checked at start, then daily.
+  const pruneMessages = () =>
+    store.pruneMessages(Date.now() - config.messageKeepDays * 24 * 3600 * 1000);
+  pruneMessages();
+  const pruneTimer = setInterval(pruneMessages, 24 * 3600 * 1000);
+  pruneTimer.unref();
   const app = Fastify({
     logger: false,
     bodyLimit: 8 * 1024 * 1024,
@@ -117,6 +123,8 @@ export async function createApp(
     return {
       ...publicUser(u),
       admin: isAdmin(u),
+      /** GitHub-only accounts confirm with their e-mail instead. */
+      hasPassword: Boolean(u.password_hash),
       quota: {
         projects: used.projects,
         maxProjects: Number.isFinite(max) ? max : null,
@@ -242,6 +250,27 @@ export async function createApp(
     }
     failures.delete(key);
     return { token: newSession(user.id), user: account(user) };
+  });
+
+  /** Delete my account: the password (or, for a GitHub account, the e-mail) confirms it. */
+  app.delete('/api/auth/me', async (req) => {
+    const user = requireUser(req);
+    const b = (req.body ?? {}) as { password?: string; email?: string };
+    const key = `${req.ip}|delete|${user.id}`;
+    checkThrottle(key);
+    const ok = user.password_hash
+      ? await verifyPassword(b.password ?? '', user.password_hash)
+      : (b.email ?? '').trim().toLowerCase() === user.email;
+    if (!ok) {
+      fail(key);
+      throw new HttpError(
+        403,
+        user.password_hash ? 'Wrong password.' : 'Type the e-mail address of your account.',
+      );
+    }
+    failures.delete(key);
+    for (const id of store.deleteUser(user.id)) collab.refreshAccess(id);
+    return { ok: true };
   });
 
   app.post('/api/auth/logout', async (req) => {
@@ -944,6 +973,7 @@ export async function createApp(
 
   async function close() {
     backups.stop();
+    clearInterval(pruneTimer);
     await app.close();
     await collab.hocuspocus.flushPendingStores?.();
     store.close();

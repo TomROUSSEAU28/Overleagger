@@ -75,6 +75,8 @@ test('the privacy policy is one click away from the homepage', async ({ page }) 
   await expect(page.getByTestId('privacy')).toContainText('contact@circuitnotebook.com');
   // Styled like the homepage, and the way back works.
   await expect(page.locator('.legal-summary')).toBeVisible();
+  await page.locator('footer').getByRole('link', { name: 'Legal notice' }).click();
+  await expect(page.getByTestId('legal')).toContainText('Hetzner Online GmbH');
   await page.locator('header').getByRole('link', { name: 'Home', exact: true }).click();
   await expect(page.locator('.beta-pill')).toBeVisible();
 });

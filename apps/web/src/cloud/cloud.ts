@@ -17,6 +17,8 @@ export interface CloudUser {
   handle: string;
   /** Sees the admin page. */
   admin?: boolean;
+  /** False for GitHub-only accounts (they confirm with their e-mail). */
+  hasPassword?: boolean;
   /** Room on the server during the beta (projects you own). */
   quota?: Quota;
 }
@@ -107,6 +109,8 @@ interface CloudState {
   acceptToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateMe: (patch: { name?: string; color?: string; handle?: string }) => Promise<void>;
+  /** Delete the account on the server (confirmed by the password, or the e-mail). */
+  deleteAccount: (confirm: { password?: string; email?: string }) => Promise<void>;
   /** Read the account again (its room on the server changed). */
   refreshUser: () => Promise<void>;
 }
@@ -210,6 +214,12 @@ export const useCloud = create<CloudState>((set, get) => ({
   updateMe: async (patch) => {
     const r = await api<{ user: CloudUser }>('PATCH', '/api/auth/me', patch);
     set({ user: r.user });
+  },
+
+  deleteAccount: async (confirm) => {
+    await api('DELETE', '/api/auth/me', confirm);
+    write(TOKEN_KEY, null);
+    set({ token: null, user: null });
   },
 
   refreshUser: () => loadUser(),

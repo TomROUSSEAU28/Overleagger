@@ -201,11 +201,13 @@ Open projects reconnect by themselves; unsynced edits stay in the browsers and s
 - [x] **Privacy policy** (GDPR): `apps/web/privacy/index.html`, served at `/privacy/`, linked
       from the footer, the contact form and the sign-up dialog. Keep it true: if you add a
       service (analytics, another e-mail provider…) or change how long data is kept, update it
-      and its date. Promise made there: contact messages are deleted after one year at most
-      (Administration → Messages), and account deletions asked by e-mail are done within a month.
-- [ ] **Mentions légales** (France): who publishes the site and the host's name and address
-      (Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Germany). No tracking cookies
-      → no cookie banner needed.
+      and its date. Promises made there: contact messages are gone after one year at most (the
+      server deletes them by itself, `MESSAGE_KEEP_DAYS`, default 365), and requests sent by
+      e-mail (a copy of one's data…) are answered within a month. People delete their account
+      themselves (menu of their name → _Delete my account_).
+- [x] **Mentions légales** (France): `apps/web/legal/index.html`, at `/legal/`: publisher, host
+      (Hetzner), Cloudflare. If you become a business (premium plan), add its legal details
+      there (SIRET…). No tracking cookies → no cookie banner needed.
 - [x] Homepage: absolute `og:image` / `twitter:image`, `<link rel="canonical">`, `robots.txt` and
       `sitemap.xml` point to `https://circuitnotebook.com/`.
 - [ ] Cloudflare _Rules → Redirect rules_: `www.circuitnotebook.com/*` →

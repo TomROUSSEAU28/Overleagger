@@ -203,6 +203,9 @@ export function AdminPage() {
               <Mail size={18} /> Messages
               {unread > 0 && <span className="count-badge">{unread}</span>}
             </h2>
+            <p className="muted small">
+              Answer within a month; the server deletes messages after one year (privacy policy).
+            </p>
             {messages.length ? (
               <ul className="admin-messages">
                 {messages.map((m) => (

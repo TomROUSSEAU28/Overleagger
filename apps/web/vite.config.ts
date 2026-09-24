@@ -10,12 +10,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 2500,
-    // The homepage and the privacy policy (plain HTML, readable by search engines), and the app.
+    // The homepage, the privacy policy and the legal notice (plain HTML, readable by search engines), and the app.
     rollupOptions: {
       input: {
         home: page('./index.html'),
         app: page('./app/index.html'),
         privacy: page('./privacy/index.html'),
+        legal: page('./legal/index.html'),
       },
     },
   },
