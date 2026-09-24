@@ -106,8 +106,29 @@ export interface LabelLayout {
   lines: LabelLine[];
   x: number;
   y: number;
-  anchor: 'start' | 'middle';
+  anchor: 'start' | 'middle' | 'end';
   lineHeight: number;
+}
+
+const SIDES_CW: Side[] = ['t', 'r', 'b', 'l'];
+const turn = (s: Side, n: number) => SIDES_CW[(SIDES_CW.indexOf(s) + n + 8) % 4]!;
+const OPPOSITE: Record<Side, Side> = { t: 'b', b: 't', l: 'r', r: 'l' };
+
+/**
+ * Side of the reference / value labels, attached to the symbol like in LTspice: turning a part
+ * by 180° (or mirroring it) moves its label to the opposite side.
+ *
+ * Tall symbols (sources, MOSFETs…) have their label on the right; turned a quarter it goes on
+ * top, then left, then below. Wide symbols (resistors…) have it on top; a quarter turn puts it on
+ * the right, then below, then left. So the first rotation always gives the usual place.
+ */
+export function labelSide(
+  el: Pick<ComponentElement, 'rot' | 'mirror'>,
+  local: { w: number; h: number },
+): Side {
+  const tall = local.h > local.w * 1.15;
+  if (tall) return turn(el.mirror ? 'l' : 'r', -el.rot);
+  return turn('t', el.rot);
 }
 
 export const LABEL_SIZE = 12;
@@ -134,7 +155,7 @@ export function componentLabels(el: ComponentElement, ctx: SheetContext): LabelL
       if (side === 't') return p.y <= b.y + 0.5 && p.x > x0 - 4 && p.x < x1 + 4;
       return p.y >= b.y + b.h - 0.5 && p.x > x0 - 4 && p.x < x1 + 4;
     });
-  const side = (anchorX: number, yTop: number, anchor: 'start' | 'middle'): LabelLayout => ({
+  const side = (anchorX: number, yTop: number, anchor: LabelLayout['anchor']): LabelLayout => ({
     lines,
     x: anchorX,
     y: yTop + lineHeight / 2,
@@ -142,42 +163,57 @@ export function componentLabels(el: ComponentElement, ctx: SheetContext): LabelL
     lineHeight,
   });
   const cy = b.y + b.h / 2;
-  const tall = b.h > b.w * 1.15;
-  const candidates: {
-    s: 'r' | 'l' | 't' | 'b';
+  type Candidate = {
+    s: Side;
     layout: LabelLayout;
     y0: number;
     y1: number;
     x0: number;
     x1: number;
-  }[] = [];
-  const right = (yTop: number) => ({
-    s: 'r' as const,
+  };
+  const right = (yTop: number): Candidate => ({
+    s: 'r',
     layout: side(b.x + b.w + 6, yTop, 'start'),
     y0: yTop,
     y1: yTop + textH,
     x0: 0,
     x1: 0,
   });
-  const top = () => ({
-    s: 't' as const,
+  const left = (yTop: number): Candidate => ({
+    s: 'l',
+    layout: side(b.x - 6, yTop, 'end'),
+    y0: yTop,
+    y1: yTop + textH,
+    x0: 0,
+    x1: 0,
+  });
+  const top = (): Candidate => ({
+    s: 't',
     layout: side(b.x + b.w / 2, b.y - 6 - textH, 'middle'),
     y0: 0,
     y1: 0,
     x0: b.x + b.w / 2 - textW / 2,
     x1: b.x + b.w / 2 + textW / 2,
   });
-  const bottom = () => ({
-    s: 'b' as const,
+  const bottom = (): Candidate => ({
+    s: 'b',
     layout: side(b.x + b.w / 2, b.y + b.h + 6, 'middle'),
     y0: 0,
     y1: 0,
     x0: b.x + b.w / 2 - textW / 2,
     x1: b.x + b.w / 2 + textW / 2,
   });
-  if (tall)
-    candidates.push(right(cy - textH / 2), right(b.y), right(b.y + b.h - textH), top(), bottom());
-  else candidates.push(top(), bottom(), right(cy - textH / 2));
+  const onSide = (s: Side): Candidate[] =>
+    s === 't'
+      ? [top()]
+      : s === 'b'
+        ? [bottom()]
+        : [cy - textH / 2, b.y, b.y + b.h - textH].map((y) => (s === 'r' ? right(y) : left(y)));
+  const r = resolveComponent(el, ctx);
+  const pref = labelSide(el, r ? r.bbox : { w: b.w, h: b.h });
+  // Preferred side, else the opposite one (keeps the 180° symmetry), else the other two.
+  const others = SIDES_CW.filter((s) => s !== pref && s !== OPPOSITE[pref]);
+  const candidates = [pref, OPPOSITE[pref], ...others].flatMap(onSide);
   const ok = candidates.find((c) => !blocked(c.s, c.y0, c.y1, c.x0, c.x1));
   return (ok ?? candidates[0]!).layout;
 }
@@ -332,7 +368,7 @@ export function elementBBox(el: Element, ctx: SheetContext, all?: Element[]): Re
       if (!l) return b;
       const w = Math.max(...l.lines.map((x) => textWidth(x.text, LABEL_SIZE))) + 4;
       const top = l.y - l.lineHeight / 2;
-      const left = l.anchor === 'middle' ? l.x - w / 2 : l.x;
+      const left = l.anchor === 'middle' ? l.x - w / 2 : l.anchor === 'end' ? l.x - w : l.x;
       return rectUnion([b, { x: left, y: top, w, h: l.lines.length * l.lineHeight }])!;
     }
     case 'wire':

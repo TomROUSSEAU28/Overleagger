@@ -33,6 +33,8 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
     probes, generic IC, regulator, ADC/DAC, logic gates;
   - **control blocks** with LaTeX: sum junction, gain, transfer functions, PI, PID, state space,
     integrators, delay, ZOH, saturation, relay, rate limiter, PWM, Clarke/Park, PLL, mux/demux…
+- **Reference labels follow the rotation** (like LTspice): a half turn or a mirror moves R1 / V1
+  to the opposite side; if a pin is in the way the label goes to the other side.
 - **Every part has a size option** (×1.5, ×2, ×3 when the pins stay on the grid).
 - **Wires**: orthogonal routing, `/` flips the bend, drag a pin to start a wire, drag a segment to
   move it, wires stretch when parts move **or rotate**. **Junction dots appear automatically**

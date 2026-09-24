@@ -32,9 +32,12 @@ import {
   ungroupElements,
   validateHierarchy,
   buildSlides,
+  componentBBox,
+  componentLabels,
   framesInReadingOrder,
   type ComponentElement,
   type FrameElement,
+  type Rot,
   type Element,
   type LabelElement,
   type PortElement,
@@ -406,5 +409,25 @@ describe('slides', () => {
     const slides = buildSlides(p, ctx());
     expect(slides.map((s) => s.title)).toEqual(['a', 'b', 'c', 'Sub']);
     expect(slides[3]!.depth).toBe(1);
+  });
+});
+
+describe('designator placement (LTspice-like)', () => {
+  const sideOf = (symbolId: string, rot: Rot, mirror = false) => {
+    const { p, sheet, ctx } = setup();
+    const el = addComponent(p, sheet, symbolId, 0, 0, ctx(), { rot, mirror });
+    const l = componentLabels(el, ctx())!;
+    const b = componentBBox(el, ctx());
+    if (l.anchor === 'start') return 'r';
+    if (l.anchor === 'end') return 'l';
+    return l.y < b.y ? 't' : 'b';
+  };
+  it('turns with the part: a half turn puts the label on the other side', () => {
+    expect([0, 1, 2, 3].map((r) => sideOf('isource-dc', r as Rot))).toEqual(['r', 't', 'l', 'b']);
+    expect([0, 1, 2, 3].map((r) => sideOf('resistor', r as Rot))).toEqual(['t', 'r', 'b', 'l']);
+  });
+  it('follows mirroring', () => {
+    expect(sideOf('isource-dc', 0, true)).toBe('l');
+    expect(sideOf('resistor', 0, true)).toBe('t');
   });
 });

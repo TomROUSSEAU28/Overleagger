@@ -238,11 +238,11 @@ function labels(w: Writer, el: ComponentElement, ctx: SheetContext) {
   const text = lay.lines
     .map((l) => (l.kind === 'ref' ? refTex(l.text) : texText(l.text)))
     .join('\\\\ ');
-  const anchor = lay.anchor === 'start' ? 'west' : 'center';
+  const anchor = lay.anchor === 'start' ? 'west' : lay.anchor === 'end' ? 'east' : 'center';
   // `lay.y` is the middle of the first line: move to the middle of the block.
   const midY = lay.y + ((lay.lines.length - 1) * lay.lineHeight) / 2;
   w.emit(
-    `\\node[font=\\small, align=${lay.anchor === 'start' ? 'left' : 'center'}, anchor=${anchor}, inner sep=1pt] at ${w.p(lay.x, midY)} {${text}};`,
+    `\\node[font=\\small, align=${lay.anchor === 'start' ? 'left' : lay.anchor === 'end' ? 'right' : 'center'}, anchor=${anchor}, inner sep=1pt] at ${w.p(lay.x, midY)} {${text}};`,
   );
 }
 
