@@ -8,6 +8,7 @@ import {
   Keyboard,
   PanelLeft,
   PanelRight,
+  Presentation,
   Redo2,
   Sparkles,
   Undo2,
@@ -53,7 +54,7 @@ export function TopBar() {
     <header className="topbar">
       <a className="brand" href="#/" title="All projects">
         <ArrowLeft size={16} />
-        <span className="logo">Overleagger</span>
+        <span className="logo">SchemaBoard</span>
       </a>
       <input
         className="project-name"
@@ -136,6 +137,15 @@ export function TopBar() {
       <IconButton title="Help (?)" onClick={() => ui().set({ modal: 'help' })}>
         <CircleQuestionMark size={17} />
       </IconButton>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => ui().set({ presenting: true })}
+        title="Present: frames and sheets become slides (F5)"
+        data-testid="present"
+      >
+        <Presentation size={15} /> Present
+      </button>
       <button
         type="button"
         className="btn primary"

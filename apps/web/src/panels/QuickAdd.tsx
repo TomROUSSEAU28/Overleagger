@@ -1,4 +1,4 @@
-import { builtinSymbols, resolveSymbol, searchSymbols, defaultParams } from '@overleagger/symbols';
+import { librarySymbols, resolveSymbol, searchSymbols, defaultParams } from '@overleagger/symbols';
 import { useMemo, useState } from 'react';
 import { SymbolPreview } from '../canvas/render/SymbolGraphic';
 import { useEditor, useMeta } from '../editor/context';
@@ -13,7 +13,7 @@ export function QuickAdd() {
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
   const results = useMemo(
-    () => searchSymbols(q, [...builtinSymbols, ...ed.project.getProjectSymbols()]).slice(0, 40),
+    () => searchSymbols(q, [...librarySymbols, ...ed.project.getProjectSymbols()]).slice(0, 40),
     [q, ed],
   );
   const close = () => useUI.getState().set({ modal: null });

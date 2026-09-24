@@ -77,7 +77,7 @@ export function TemplatesPanel() {
     const f = useUserLib.getState().exportFile();
     download(
       new Blob([JSON.stringify(f, null, 1)], { type: 'application/json' }),
-      'my-overleagger-library.olglib',
+      'my-schemaboard-library.olglib',
     );
   };
   const importLib = async (file: File) => {

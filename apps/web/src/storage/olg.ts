@@ -34,11 +34,11 @@ export function decodeOlg(data: Uint8Array): { manifest: OlgManifest; update: Ui
   try {
     files = unzipSync(data);
   } catch {
-    throw new Error('Not an Overleagger file (.olg).');
+    throw new Error('Not a SchemaBoard project file (.olg).');
   }
   const m = files['manifest.json'];
   const doc = files['document.yjs'];
-  if (!m || !doc) throw new Error('Not an Overleagger file (.olg).');
+  if (!m || !doc) throw new Error('Not a SchemaBoard project file (.olg).');
   const manifest = JSON.parse(strFromU8(m)) as OlgManifest;
   if (manifest.format !== OLG_FORMAT) throw new Error('Unknown file format.');
   return { manifest, update: doc };

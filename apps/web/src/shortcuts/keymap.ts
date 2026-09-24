@@ -56,6 +56,7 @@ export type ActionId =
   | 'view.leftPanel'
   | 'view.rightPanel'
   | 'file.export'
+  | 'view.present'
   | 'help.shortcuts'
   | 'wire.flipBend';
 
@@ -137,6 +138,12 @@ export const ACTIONS: ActionDef[] = [
     label: 'Toggle properties panel',
     category: 'View',
     keys: ['mod+shift+\\'],
+  },
+  {
+    id: 'view.present',
+    label: 'Present (slides from frames and sheets)',
+    category: 'View',
+    keys: ['f5', 'mod+enter'],
   },
   { id: 'file.export', label: 'Export…', category: 'File', keys: ['mod+e'] },
   { id: 'help.shortcuts', label: 'Keyboard shortcuts', category: 'Help', keys: ['?'] },

@@ -223,13 +223,22 @@ export class EditorController {
     if (id) this.select([id]);
   }
 
-  /** Follow the link of a button (URL in a new tab, or a sheet of the project). */
+  /** Follow the link of an element (URL in a new tab, or a sheet of the project). */
   followLink(id: Id) {
     const el = this.project.getElement(this.sheetId, id);
-    if (el?.type !== 'button') return false;
-    if (el.link.kind === 'url') {
-      if (/^(https?:|mailto:)/i.test(el.link.url)) window.open(el.link.url, '_blank', 'noopener');
-    } else this.openSheet(el.link.sheetId);
+    // A sheet port leads to its pin on the block, one level up.
+    if (el?.type === 'port') {
+      const sheet = this.project.getSheet(this.sheetId);
+      if (!sheet?.parentSheetId) return false;
+      this.openSheet(sheet.parentSheetId);
+      if (sheet.blockId) this.select([sheet.blockId]);
+      return true;
+    }
+    const link = el?.link;
+    if (!link) return false;
+    if (link.kind === 'url') {
+      if (/^(https?:|mailto:)/i.test(link.url)) window.open(link.url, '_blank', 'noopener');
+    } else this.openSheet(link.sheetId);
     return true;
   }
 

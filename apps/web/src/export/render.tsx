@@ -2,7 +2,6 @@ import {
   elementBBox,
   rectUnion,
   type BlockElement,
-  type ButtonElement,
   type Id,
   type Project,
   type Rect,
@@ -31,6 +30,8 @@ export interface SheetSvg {
   blocks: { id: Id; childSheetId: Id; rect: Rect; title: string }[];
   /** Link buttons (clickable in the PDF). */
   links: { rect: Rect; url?: string; sheetId?: Id }[];
+  /** Sticky notes (PDF comments). */
+  notes: { rect: Rect; text: string }[];
 }
 
 let fontCss: Promise<string> | null = null;
@@ -113,14 +114,19 @@ export async function renderSheetSvg(
       rect: elementBBox(e, ctx, elements),
       title: e.title,
     }));
-  const links = elements
-    .filter((e) => e.type === 'button')
-    .map((e) => {
-      const b = e as ButtonElement;
-      const rect = { x: b.x, y: b.y, w: b.w, h: b.h };
-      return b.link.kind === 'url' ? { rect, url: b.link.url } : { rect, sheetId: b.link.sheetId };
-    });
-  return { svg: `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`, view, blocks, links };
+  const parentSheetId = project.getSheet(sheetId)?.parentSheetId;
+  const links = elements.flatMap((e) => {
+    // Sheet ports jump back to the parent sheet (where their block is).
+    if (e.type === 'port' && parentSheetId)
+      return [{ rect: elementBBox(e, ctx, elements), sheetId: parentSheetId }];
+    if (!e.link || e.type === 'group') return [];
+    const rect = elementBBox(e, ctx, elements);
+    return [e.link.kind === 'url' ? { rect, url: e.link.url } : { rect, sheetId: e.link.sheetId }];
+  });
+  const notes = elements.flatMap((e) =>
+    e.type === 'note' ? [{ rect: { x: e.x, y: e.y, w: e.w, h: e.h }, text: e.text }] : [],
+  );
+  return { svg: `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`, view, blocks, links, notes };
 }
 
 export async function svgToPngBlob(

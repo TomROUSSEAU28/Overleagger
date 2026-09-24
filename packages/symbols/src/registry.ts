@@ -62,6 +62,9 @@ export const CATEGORY_ORDER = [
   'Annotations',
 ];
 
+/** Symbols offered in the library (legacy ones stay resolvable for old projects). */
+export const librarySymbols: SymbolDef[] = builtinSymbols.filter((s) => !s.hidden);
+
 const byId = new Map(builtinSymbols.map((s) => [s.id, s]));
 
 export type AnySymbol = SymbolDef | StaticSymbolDef;
@@ -128,7 +131,7 @@ function withBBox(g: SymbolGraphics): ResolvedSymbol {
 }
 
 /** Case-insensitive search over name, id, category and keywords. */
-export function searchSymbols(query: string, symbols: AnySymbol[] = builtinSymbols): AnySymbol[] {
+export function searchSymbols(query: string, symbols: AnySymbol[] = librarySymbols): AnySymbol[] {
   const q = query.trim().toLowerCase();
   if (!q) return symbols;
   const words = q.split(/\s+/);

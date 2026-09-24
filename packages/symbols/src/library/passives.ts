@@ -1,5 +1,12 @@
 import { A, L, P, PC, R, T, arrow, dot, pin, sine, plus } from '../prims';
-import type { Primitive, SymbolDef } from '../types';
+import type {
+  OptionDef,
+  OptionValue,
+  PinDef,
+  Primitive,
+  SymbolDef,
+  SymbolGraphics,
+} from '../types';
 
 const CAT = 'Passives';
 
@@ -56,6 +63,164 @@ function vCoil(x: number, yTop: number, n: number, r: number, dir: 1 | -1): Prim
     out.push(dir === 1 ? A(x, cy, r, -90, 90) : A(x, cy, r, 90, 270));
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Transformers: one primary on the left, 1 to 4 secondaries stacked on the right.
+// Each winding is plain or center-tapped, with its polarity dot at the top, bottom or none.
+// ---------------------------------------------------------------------------
+
+const COIL_R = 0.375;
+const SEC_PITCH = 6;
+const MAX_SECONDARIES = 4;
+/** Pin ids per winding: primary, then secondaries (s1/s2/ct keep the ids of the old symbols). */
+const WINDING_IDS = [
+  { a: 'p1', b: 'p2', ct: 'pct' },
+  { a: 's1', b: 's2', ct: 'ct' },
+  { a: 't1', b: 't2', ct: 'tct' },
+  { a: 'u1', b: 'u2', ct: 'uct' },
+  { a: 'v1', b: 'v2', ct: 'vct' },
+];
+
+interface WindingSpec {
+  /** -1 = primary (left), 1 = secondary (right). */
+  side: -1 | 1;
+  /** Centre of the coil (integer grid units). */
+  c: number;
+  /** Number of half-turns (even, so a center tap falls between two of them). */
+  arcs: number;
+  ct: boolean;
+  dot: string;
+  ids: { a: string; b: string; ct: string };
+  name: string;
+}
+
+function windingGraphics(w: WindingSpec): SymbolGraphics {
+  const x = w.side;
+  const px = 3 * w.side;
+  const half = w.arcs * COIL_R;
+  const top = w.c - half;
+  const bot = w.c + half;
+  const ya = Math.floor(top - 0.5);
+  const yb = Math.ceil(bot + 0.5);
+  const prims: Primitive[] = [
+    P([px, ya, x, ya, x, top]),
+    P([px, yb, x, yb, x, bot]),
+    ...vCoil(x, top, w.arcs, COIL_R, w.side === -1 ? 1 : -1),
+  ];
+  const pins = [pin(w.ids.a, px, ya, `${w.name} (1)`), pin(w.ids.b, px, yb, `${w.name} (2)`)];
+  if (w.ct) {
+    prims.push(L(x, w.c, px, w.c));
+    pins.splice(1, 0, pin(w.ids.ct, px, w.c, `${w.name} center tap`));
+  }
+  if (w.dot === 'top') prims.push(dot(1.7 * w.side, top + 0.3, 0.18));
+  if (w.dot === 'bottom') prims.push(dot(1.7 * w.side, bot - 0.3, 0.18));
+  return { prims, pins };
+}
+
+const windingOptions = (key: string, label: string, show?: OptionDef['show']): OptionDef[] => [
+  {
+    key,
+    label,
+    type: 'enum',
+    default: 'normal',
+    choices: [
+      { value: 'normal', label: 'Plain' },
+      { value: 'ct', label: 'Center tap' },
+    ],
+    row: key,
+    ...(show ? { show } : {}),
+  },
+  {
+    key: `${key}Dot`,
+    label: 'Polarity dot',
+    type: 'enum',
+    default: 'top',
+    choices: [
+      { value: 'top', label: 'Top' },
+      { value: 'bottom', label: 'Bottom (inverted)' },
+      { value: 'none', label: 'None' },
+    ],
+    row: key,
+    ...(show ? { show } : {}),
+  },
+];
+
+function transformerDef(
+  id: string,
+  name: string,
+  keywords: string[],
+  defaults: Record<string, OptionValue>,
+): SymbolDef {
+  const options: OptionDef[] = [
+    { ...coreOption, default: 'iron' },
+    {
+      key: 'secondaries',
+      label: 'Secondary windings',
+      type: 'number',
+      default: 1,
+      min: 1,
+      max: MAX_SECONDARIES,
+      step: 1,
+    },
+    ...windingOptions('p', 'Primary'),
+  ];
+  for (let i = 1; i <= MAX_SECONDARIES; i++)
+    options.push(
+      ...windingOptions(
+        `s${i}`,
+        `Secondary ${i}`,
+        i > 1 ? (o) => Number(o.secondaries) >= i : undefined,
+      ),
+    );
+  return {
+    id,
+    name,
+    category: CAT,
+    keywords,
+    refPrefix: 'T',
+    options: options.map((o) =>
+      o.key in defaults ? ({ ...o, default: defaults[o.key] } as OptionDef) : o,
+    ),
+    build: ({ opts }) => {
+      const n = Math.max(1, Math.min(MAX_SECONDARIES, Math.round(Number(opts.secondaries) || 1)));
+      // Projects made before the polarity choice had a single "dots" switch.
+      const dotOf = (k: string) =>
+        opts.dots === false ? 'none' : String(opts[`${k}Dot`] ?? 'top');
+      const specs: WindingSpec[] = [
+        {
+          side: -1,
+          c: 0,
+          // The primary spans the whole stack of secondaries.
+          arcs: 8 * (n - 1) + 4,
+          ct: opts.p === 'ct',
+          dot: dotOf('p'),
+          ids: WINDING_IDS[0]!,
+          name: 'Primary',
+        },
+      ];
+      for (let i = 1; i <= n; i++)
+        specs.push({
+          side: 1,
+          c: (i - 1 - (n - 1) / 2) * SEC_PITCH,
+          arcs: 4,
+          ct: opts[`s${i}`] === 'ct',
+          dot: dotOf(`s${i}`),
+          ids: WINDING_IDS[i]!,
+          name: n > 1 ? `Secondary ${i}` : 'Secondary',
+        });
+      const prims: Primitive[] = [];
+      const pins: PinDef[] = [];
+      for (const w of specs) {
+        const g = windingGraphics(w);
+        prims.push(...g.prims);
+        pins.push(...g.pins);
+      }
+      const extent = specs[0]!.arcs * COIL_R;
+      prims.push(...coreLines(String(opts.core), -extent - 0.1, extent + 0.1, 0, true));
+      return { prims, pins };
+    },
+  };
 }
 
 export const passives: SymbolDef[] = [
@@ -204,103 +369,22 @@ export const passives: SymbolDef[] = [
       pins: twoPins(3),
     }),
   },
+  transformerDef(
+    'transformer',
+    'Transformer',
+    ['coupled inductors', 'transfo', 'isolation', 'magnetic', 'secondary', 'flyback', 'forward'],
+    {},
+  ),
+  transformerDef(
+    'transformer-ct',
+    'Transformer, center tap',
+    ['centre tap', 'push-pull', 'magnetic', 'secondary'],
+    { s1: 'ct' },
+  ),
+  // Old three-winding model: same drawing as a transformer with two secondaries.
   {
-    id: 'transformer',
-    name: 'Transformer',
-    category: CAT,
-    keywords: ['coupled inductors', 'transfo', 'isolation', 'magnetic'],
-    refPrefix: 'T',
-    options: [
-      { ...coreOption, default: 'iron' },
-      { key: 'dots', label: 'Dot convention', type: 'bool', default: true },
-    ],
-    build: ({ opts }) => {
-      const prims: Primitive[] = [
-        P([-3, -2, -1, -2, -1, -1.5]),
-        P([-3, 2, -1, 2, -1, 1.5]),
-        P([3, -2, 1, -2, 1, -1.5]),
-        P([3, 2, 1, 2, 1, 1.5]),
-        ...vCoil(-1, -1.5, 4, 0.375, 1),
-        ...vCoil(1, -1.5, 4, 0.375, -1),
-        ...coreLines(String(opts.core), -1.6, 1.6, 0, true),
-      ];
-      if (opts.dots) prims.push(dot(-1.7, -1.2, 0.18), dot(1.7, -1.2, 0.18));
-      return {
-        prims,
-        pins: [pin('p1', -3, -2), pin('p2', -3, 2), pin('s1', 3, -2), pin('s2', 3, 2)],
-      };
-    },
-  },
-  {
-    id: 'transformer-ct',
-    name: 'Transformer, center tap',
-    category: CAT,
-    keywords: ['centre tap', 'push-pull', 'magnetic'],
-    refPrefix: 'T',
-    options: [
-      { ...coreOption, default: 'iron' },
-      { key: 'dots', label: 'Dot convention', type: 'bool', default: true },
-    ],
-    build: ({ opts }) => {
-      const prims: Primitive[] = [
-        P([-3, -2, -1, -2, -1, -1.5]),
-        P([-3, 2, -1, 2, -1, 1.5]),
-        P([3, -2, 1, -2, 1, -1.5]),
-        P([3, 2, 1, 2, 1, 1.5]),
-        L(1, 0, 3, 0),
-        ...vCoil(-1, -1.5, 4, 0.375, 1),
-        ...vCoil(1, -1.5, 4, 0.375, -1),
-        ...coreLines(String(opts.core), -1.6, 1.6, 0, true),
-      ];
-      if (opts.dots) prims.push(dot(-1.7, -1.2, 0.18), dot(1.7, -1.2, 0.18));
-      return {
-        prims,
-        pins: [
-          pin('p1', -3, -2),
-          pin('p2', -3, 2),
-          pin('s1', 3, -2),
-          pin('ct', 3, 0, 'Center tap'),
-          pin('s2', 3, 2),
-        ],
-      };
-    },
-  },
-  {
-    id: 'transformer-3w',
-    name: 'Transformer, 3 windings',
-    category: CAT,
-    keywords: ['three winding', 'flyback', 'forward', 'magnetic'],
-    refPrefix: 'T',
-    options: [
-      { ...coreOption, default: 'iron' },
-      { key: 'dots', label: 'Dot convention', type: 'bool', default: true },
-    ],
-    build: ({ opts }) => {
-      const prims: Primitive[] = [
-        P([-3, -2, -1, -2, -1, -1.5]),
-        P([-3, 2, -1, 2, -1, 1.5]),
-        ...vCoil(-1, -1.5, 4, 0.375, 1),
-        P([3, -4, 1, -4, 1, -3.2]),
-        P([3, -1, 1, -1, 1, -0.8]),
-        ...vCoil(1, -3.2, 3, 0.4, -1),
-        P([3, 1, 1, 1, 1, 0.8]),
-        P([3, 4, 1, 4, 1, 3.2]),
-        ...vCoil(1, 0.8, 3, 0.4, -1),
-        ...coreLines(String(opts.core), -3.4, 3.4, 0, true),
-      ];
-      if (opts.dots) prims.push(dot(-1.7, -1.2, 0.18), dot(1.7, -2.9, 0.18), dot(1.7, 1.1, 0.18));
-      return {
-        prims,
-        pins: [
-          pin('p1', -3, -2),
-          pin('p2', -3, 2),
-          pin('s1', 3, -4),
-          pin('s2', 3, -1),
-          pin('t1', 3, 1),
-          pin('t2', 3, 4),
-        ],
-      };
-    },
+    ...transformerDef('transformer-3w', 'Transformer, 3 windings', [], { secondaries: 2 }),
+    hidden: true,
   },
   {
     id: 'transformer-1line',

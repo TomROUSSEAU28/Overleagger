@@ -12,7 +12,13 @@ import {
   type TextElement,
   type WireElement,
 } from '@overleagger/core';
-import { isStatic, type OptionDef, type Standard } from '@overleagger/symbols';
+import {
+  defaultOptions,
+  isStatic,
+  type OptionDef,
+  type OptionValue,
+  type Standard,
+} from '@overleagger/symbols';
 import {
   ArrowLeftRight,
   ArrowUpDown,
@@ -43,6 +49,7 @@ import {
   ButtonProps,
   FrameProps,
   ImageProps,
+  LinkSection,
   LineProps,
   NoteProps,
   ShapeProps,
@@ -357,6 +364,17 @@ function AlignButtons({ count }: { count: number }) {
   );
 }
 
+/** Elements that can carry a hyperlink (buttons always have one, blocks open their sheet). */
+const LINKABLE: Element['type'][] = [
+  'shape',
+  'image',
+  'text',
+  'note',
+  'component',
+  'waveform',
+  'line',
+];
+
 function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
   const ed = useEditor();
   const members =
@@ -379,6 +397,7 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
       {el.type === 'button' && <ButtonProps el={el} />}
       {el.type === 'waveform' && <WaveformProps el={el} />}
       {el.type === 'frame' && <FrameProps el={el} />}
+      {LINKABLE.includes(el.type) && <LinkSection el={el} />}
       {el.type === 'group' && (
         <>
           <h3>Group</h3>
@@ -436,6 +455,18 @@ function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) 
 }
 
 // ---------------------------------------------------------------------------
+
+/** Visible options, grouped by their `row` key (consecutive options side by side). */
+function optionRows(options: OptionDef[], opts: Record<string, OptionValue>): OptionDef[][] {
+  const rows: OptionDef[][] = [];
+  for (const o of options) {
+    if (o.show && !o.show(opts)) continue;
+    const last = rows[rows.length - 1];
+    if (o.row && last?.[0]?.row === o.row) last.push(o);
+    else rows.push([o]);
+  }
+  return rows;
+}
 
 function OptionInput({
   o,
@@ -544,14 +575,23 @@ function ComponentProps({ el }: { el: ComponentElement }) {
           />
         </Field>
       ))}
-      {options.map((o) => (
-        <OptionInput
-          key={o.key}
-          o={o}
-          value={el.opts[o.key]}
-          onChange={(v) => ed.patchWithFollow(el.id, { opts: { ...el.opts, [o.key]: v } })}
-        />
-      ))}
+      {optionRows(options, { ...defaultOptions(sym!), ...el.opts }).map((row) => {
+        const inputs = row.map((o) => (
+          <OptionInput
+            key={o.key}
+            o={o}
+            value={el.opts[o.key]}
+            onChange={(v) => ed.patchWithFollow(el.id, { opts: { ...el.opts, [o.key]: v } })}
+          />
+        ));
+        return row.length > 1 ? (
+          <div key={row[0]!.key} className="row">
+            {inputs}
+          </div>
+        ) : (
+          inputs[0]
+        );
+      })}
       {resolved && allowedScales(resolved).length > 1 && (
         <Field label="Size">
           <select
@@ -713,9 +753,18 @@ function BlockProps({ el }: { el: BlockElement }) {
   );
 }
 
+/** `$v_{out}$` → `v_out`: readable text for help sentences. */
+const plainText = (s: string) => s.replace(/\$/g, '').replace(/\\(\w+)|[{}]/g, '$1');
+
 function PortProps({ el }: { el: PortElement }) {
   const ed = useEditor();
   const upd = (patch: Partial<PortElement>) => ed.updateElement(el.id, patch);
+  const sheet = ed.project.getSheet(ed.sheetId);
+  const block =
+    sheet?.parentSheetId && sheet.blockId
+      ? ed.project.getElement(sheet.parentSheetId, sheet.blockId)
+      : undefined;
+  const parentBlock = block?.type === 'block' ? block : undefined;
   return (
     <>
       <h3>Sheet port</h3>
@@ -733,18 +782,34 @@ function PortProps({ el }: { el: PortElement }) {
           <option value="io">Bidirectional</option>
         </select>
       </Field>
-      <Field label="Pin side on parent block">
+      <Field label="Pin position on the block (one level up)">
         <select
           value={el.side ?? ''}
           onChange={(e) => upd({ side: (e.target.value || undefined) as PortElement['side'] })}
+          data-testid="prop-port-side"
         >
-          <option value="">Automatic</option>
-          <option value="l">Left</option>
-          <option value="r">Right</option>
-          <option value="t">Top</option>
-          <option value="b">Bottom</option>
+          <option value="">Automatic (inputs left, outputs right)</option>
+          <option value="l">Left edge</option>
+          <option value="r">Right edge</option>
+          <option value="t">Top edge</option>
+          <option value="b">Bottom edge</option>
         </select>
       </Field>
+      <p className="muted small">
+        {parentBlock ? (
+          <>
+            This port is the pin <i>{plainText(el.name)}</i> of the block “
+            {plainText(parentBlock.title)}” in the sheet above; choose on which edge of that block
+            the pin appears.{' '}
+            <button type="button" className="link accent" onClick={() => ed.followLink(el.id)}>
+              Show the block
+            </button>{' '}
+            (or Ctrl+click the port).
+          </>
+        ) : (
+          'Ports connect a sub-sheet to the pins of its block. This sheet is not inside a block yet.'
+        )}
+      </p>
       <label className="check">
         <input
           type="checkbox"

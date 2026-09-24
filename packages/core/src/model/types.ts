@@ -28,6 +28,8 @@ interface BaseElement {
   groupId?: Id;
   locked?: boolean;
   style?: ElementStyle;
+  /** Hyperlink (web page / online PDF, or a sheet): Ctrl+click on the canvas, click in the PDF. */
+  link?: LinkTarget;
 }
 
 export interface ComponentElement extends BaseElement {

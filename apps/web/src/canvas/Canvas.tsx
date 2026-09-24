@@ -448,6 +448,44 @@ function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; l
   );
 }
 
+/** Small "↗" tag on the corner of elements that carry a link (Ctrl+click follows it). */
+function LinkBadges({
+  elements,
+  o,
+  zoom,
+}: {
+  elements: Element[];
+  o: RenderOptions;
+  zoom: number;
+}) {
+  const k = 1 / zoom;
+  return (
+    <>
+      {elements
+        .filter((e) => e.link && e.type !== 'button' && e.type !== 'group')
+        .map((e) => {
+          const b = elementBBox(e, o.ctx, elements);
+          const x = b.x + b.w;
+          const y = b.y;
+          const r = 6.5 * k;
+          return (
+            <g key={e.id} className="link-badge" transform={`translate(${x} ${y})`}>
+              <title>{e.link!.kind === 'url' ? e.link!.url : 'Link to a sheet'}</title>
+              <circle r={r} fill={o.theme.paper} stroke={o.theme.select} strokeWidth={1.2 * k} />
+              <path
+                d={`M ${-2.4 * k} ${2.4 * k} L ${2.4 * k} ${-2.4 * k} M ${-0.6 * k} ${-2.4 * k} H ${2.4 * k} V ${0.6 * k}`}
+                fill="none"
+                stroke={o.theme.select}
+                strokeWidth={1.3 * k}
+                strokeLinecap="round"
+              />
+            </g>
+          );
+        })}
+    </>
+  );
+}
+
 function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions; zoom: number }) {
   const ed = useEditor();
   const selection = useUI((s) => s.selection);
@@ -513,6 +551,7 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   return (
     <g className="overlay">
       <g pointerEvents="none">
+        <LinkBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (
             <polyline

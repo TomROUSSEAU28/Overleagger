@@ -1,10 +1,12 @@
 import {
+  flattenSheetTree,
+  framesInReadingOrder,
   sheetPath,
   sheetTree,
+  type FrameElement,
   type Id,
   type Project,
   type SheetContext,
-  type SheetNode,
 } from '@overleagger/core';
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
@@ -41,12 +43,6 @@ async function registerFonts(doc: jsPDF): Promise<string> {
   return 'CMU Serif';
 }
 
-function flatten(node: SheetNode, out: SheetNode[] = []): SheetNode[] {
-  out.push(node);
-  for (const c of node.children) flatten(c, out);
-  return out;
-}
-
 export interface PdfResult {
   blob: Blob;
   pages: number;
@@ -54,7 +50,8 @@ export interface PdfResult {
 
 /**
  * Interactive PDF: one page per sheet (hierarchy order), a bookmark tree mirroring the
- * hierarchy, clickable blocks that jump to their sub-sheet and a link back to the parent sheet.
+ * hierarchy (with frames), clickable blocks that jump to their sub-sheet, sheet ports and a header
+ * link back to the parent sheet, clickable links, and sticky notes as PDF comments.
  */
 export async function exportPdf(
   project: Project,
@@ -63,14 +60,14 @@ export async function exportPdf(
 ): Promise<PdfResult> {
   const tree = sheetTree(project);
   if (!tree) throw new Error('Empty project');
-  const nodes = flatten(tree);
+  const nodes = flattenSheetTree(tree);
   const pageOf = new Map<Id, number>(nodes.map((n, i) => [n.sheet.id, i + 1]));
   const meta = project.getMeta();
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
   doc.setProperties({
     title: meta.name,
-    creator: 'Overleagger',
+    creator: 'SchemaBoard',
     subject: 'Hierarchical schematic',
   });
   const font = await registerFonts(doc);
@@ -84,7 +81,7 @@ export async function exportPdf(
       const node = nodes[i]!;
       const sheet = node.sheet;
       if (i > 0) doc.addPage('a4', 'landscape');
-      const { svg, view, blocks, links } = await renderSheetSvg(project, ctx, sheet.id, {
+      const { svg, view, blocks, links, notes } = await renderSheetSvg(project, ctx, sheet.id, {
         ...o,
         embedFonts: false,
       });
@@ -129,7 +126,7 @@ export async function exportPdf(
       doc.text(`Page ${i + 1} / ${nodes.length}`, PAGE.w - MARGIN, PAGE.h - MARGIN + 6, {
         align: 'right',
       });
-      doc.text('Made with Overleagger', MARGIN, PAGE.h - MARGIN + 6);
+      doc.text('Made with SchemaBoard', MARGIN, PAGE.h - MARGIN + 6);
 
       // Clickable blocks → sub-sheet pages.
       for (const b of blocks) {
@@ -144,7 +141,7 @@ export async function exportPdf(
         );
       }
 
-      // Link buttons: web pages / online PDFs, or other sheets of the document.
+      // Links (buttons, linked shapes/images/text…, sheet ports → parent sheet).
       for (const l of links) {
         const x = x0 + (l.rect.x - view.x) * s;
         const y = y0 + (l.rect.y - view.y) * s;
@@ -154,10 +151,32 @@ export async function exportPdf(
           doc.link(x, y, l.rect.w * s, l.rect.h * s, { pageNumber: pageOf.get(l.sheetId)! });
       }
 
-      // Bookmarks mirroring the hierarchy.
+      // Sticky notes become PDF comments (the yellow bubbles of PDF readers).
+      for (const n of notes) {
+        if (!n.text.trim()) continue;
+        doc.createAnnotation({
+          type: 'text',
+          title: 'Note',
+          bounds: {
+            x: x0 + (n.rect.x + n.rect.w - view.x) * s - 10,
+            y: y0 + (n.rect.y - view.y) * s - 10,
+            w: 20,
+            h: 20,
+          },
+          contents: n.text,
+          open: false,
+        });
+      }
+
+      // Bookmarks mirroring the hierarchy, with the frames of each sheet below it.
       const parent = sheet.parentSheetId ? outlineOf.get(sheet.parentSheetId) : null;
       const item = doc.outline.add(parent ?? null, sheet.name || 'Untitled', { pageNumber: i + 1 });
       outlineOf.set(sheet.id, item);
+      const frames = project
+        .getElements(sheet.id)
+        .filter((e): e is FrameElement => e.type === 'frame');
+      for (const f of framesInReadingOrder(frames))
+        doc.outline.add(item, f.name || 'Frame', { pageNumber: i + 1 });
     }
   } finally {
     host.remove();

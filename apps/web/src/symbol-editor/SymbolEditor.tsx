@@ -2,6 +2,7 @@ import { newId } from '@overleagger/core';
 import {
   CATEGORY_ORDER,
   builtinSymbols,
+  librarySymbols,
   defaultOptions,
   isStatic,
   primsBBox,
@@ -427,7 +428,7 @@ export function SymbolEditor() {
               data-testid="symed-from"
             >
               <option value="">—</option>
-              {builtinSymbols.map((s) => (
+              {librarySymbols.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.category} · {s.name}
                 </option>

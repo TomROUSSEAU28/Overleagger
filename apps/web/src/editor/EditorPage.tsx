@@ -8,6 +8,7 @@ import { QuickAdd } from '../panels/QuickAdd';
 import { SheetsPanel } from '../panels/SheetsPanel';
 import { SaveTemplateDialog } from '../panels/SaveTemplateDialog';
 import { TemplatesPanel } from '../panels/TemplatesPanel';
+import { Presentation } from '../present/Presentation';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
 import { ToolRail } from '../panels/ToolRail';
@@ -23,6 +24,7 @@ function EditorLayout() {
   const ed = useEditor();
   useShortcuts(ed);
   const modal = useUI((s) => s.modal);
+  const presenting = useUI((s) => s.presenting);
   const left = useUI((s) => s.leftPanel);
   const right = useUI((s) => s.rightPanel);
   const tab = useUI((s) => s.leftTab);
@@ -90,6 +92,7 @@ function EditorLayout() {
       {modal === 'export' && <ExportDialog />}
       {modal === 'symbol-editor' && <SymbolEditor />}
       {modal === 'save-template' && <SaveTemplateDialog />}
+      {presenting && <Presentation />}
     </div>
   );
 }

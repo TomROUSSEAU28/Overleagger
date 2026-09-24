@@ -1,4 +1,4 @@
-/* Overleagger — "graphite on lab paper" look, with a "chalk on blackboard" dark theme. */
+/* SchemaBoard — "graphite on lab paper" look, with a "chalk on blackboard" dark theme. */
 
 @font-face {
   font-family: 'CMU Serif';
@@ -240,6 +240,11 @@ input[type='color'] {
   padding: 0;
   cursor: pointer;
   color: inherit;
+}
+.link.accent {
+  color: var(--accent);
+  text-decoration: underline;
+  font: inherit;
 }
 
 .kbd {
@@ -1396,4 +1401,127 @@ html[data-anim='off'] *::after {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Presentation mode
+   --------------------------------------------------------------------------- */
+.presentation {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+  animation: olg-fade-in 220ms ease-out;
+}
+.presentation.mode-laser {
+  cursor: none;
+}
+.presentation.mode-pen {
+  cursor: crosshair;
+}
+.present-stage {
+  position: absolute;
+  inset: 0;
+  transition: opacity 140ms ease;
+}
+.present-stage .el.block,
+.present-stage .el.button {
+  cursor: pointer;
+}
+.present-stage .hit {
+  fill: transparent;
+  stroke: transparent;
+}
+.present-ink {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.present-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 20px;
+}
+.present-hud {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(24, 24, 22, 0.78);
+  color: #f3f0e8;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  font-size: 13.5px;
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+}
+.present-hud.hidden {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
+}
+.present-hud button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.present-hud button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+.present-hud button.on {
+  background: #d62828;
+}
+.present-hud button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.present-hud .sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.present-count {
+  display: inline-flex;
+  gap: 8px;
+  min-width: 90px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+.present-count b {
+  font-weight: 600;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tikz-box {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.tikz-code {
+  width: 100%;
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: pre;
+  resize: vertical;
 }

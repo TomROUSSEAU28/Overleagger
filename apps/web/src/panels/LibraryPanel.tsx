@@ -1,5 +1,5 @@
 import {
-  builtinSymbols,
+  librarySymbols,
   defaultParams,
   groupByCategory,
   isStatic,
@@ -70,7 +70,7 @@ export function LibraryPanel() {
   const all = useMemo(() => {
     const own = ed.project.getProjectSymbols();
     const ids = new Set(own.map((s) => s.id));
-    return [...own, ...libSymbols.filter((s) => !ids.has(s.id)), ...builtinSymbols];
+    return [...own, ...libSymbols.filter((s) => !ids.has(s.id)), ...librarySymbols];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ed, symbolsVersion, libSymbols]);
   const groups = useMemo(() => groupByCategory(searchSymbols(query, all)), [query, all]);

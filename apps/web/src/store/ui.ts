@@ -130,6 +130,8 @@ export interface UIState extends Settings {
   modal: Modal;
   inlineEdit: InlineEdit | null;
   leftTab: 'library' | 'sheets' | 'templates';
+  /** Presentation mode (full screen slides). */
+  presenting: boolean;
   spaceDown: boolean;
 
   set: (patch: Partial<UIState>) => void;
@@ -189,6 +191,7 @@ const transient = {
   cursor: null,
   modal: null as Modal,
   inlineEdit: null,
+  presenting: false,
 };
 
 export const useUI = create<UIState>((set, get) => ({

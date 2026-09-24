@@ -108,9 +108,10 @@ export function Dashboard() {
     <div className="dashboard" data-theme={theme}>
       <header className="dash-head">
         <div>
-          <h1 className="logo big">Overleagger</h1>
+          <h1 className="logo big">SchemaBoard</h1>
           <p className="tagline">
-            Hierarchical whiteboard for electronics, power electronics &amp; control diagrams.
+            Power electronics &amp; control diagram editor — schematics, block diagrams and
+            whiteboards, with sheets you can open like blocks.
           </p>
         </div>
         <ThemePicker />
@@ -160,7 +161,7 @@ export function Dashboard() {
           <div className="empty">
             <p>No project yet.</p>
             <p className="muted">
-              Create a new one, or open the example to see what Overleagger can do.
+              Create a new one, or open the example to see what SchemaBoard can do.
             </p>
           </div>
         )}

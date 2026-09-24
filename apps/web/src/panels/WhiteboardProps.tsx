@@ -3,6 +3,7 @@ import type {
   Element,
   FrameElement,
   ImageElement,
+  LinkTarget,
   LineElement,
   NoteElement,
   ShapeElement,
@@ -199,10 +200,91 @@ export function NoteProps({ el }: { el: NoteElement }) {
   );
 }
 
+/** Link target editor (web page / online PDF, or a sheet), optional unless `required`. */
+export function LinkFields({
+  link,
+  onChange,
+  required = false,
+}: {
+  link: LinkTarget | undefined;
+  onChange: (link: LinkTarget | undefined) => void;
+  required?: boolean;
+}) {
+  const ed = useEditor();
+  const sheets = useSheets();
+  const kind = link?.kind ?? 'none';
+  return (
+    <>
+      <Field label={required ? 'Opens' : 'Link'}>
+        <select
+          value={kind}
+          onChange={(e) =>
+            onChange(
+              e.target.value === 'url'
+                ? { kind: 'url', url: 'https://' }
+                : e.target.value === 'sheet'
+                  ? { kind: 'sheet', sheetId: ed.project.rootSheetId }
+                  : undefined,
+            )
+          }
+          data-testid="prop-link-kind"
+        >
+          {!required && <option value="none">No link</option>}
+          <option value="url">A web page / online PDF</option>
+          <option value="sheet">A sheet of this project</option>
+        </select>
+      </Field>
+      {link?.kind === 'url' && (
+        <Field label="URL">
+          <input
+            className="mono"
+            value={link.url}
+            onChange={(e) => onChange({ kind: 'url', url: e.target.value })}
+            data-testid="prop-link-url"
+          />
+        </Field>
+      )}
+      {link?.kind === 'sheet' && (
+        <Field label="Sheet">
+          <select
+            value={link.sheetId}
+            onChange={(e) => onChange({ kind: 'sheet', sheetId: e.target.value })}
+            data-testid="prop-link-sheet"
+          >
+            {sheets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name || 'Untitled'}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+    </>
+  );
+}
+
+/** Optional link of any element, with a "follow" button. */
+export function LinkSection({ el }: { el: Element }) {
+  const ed = useEditor();
+  return (
+    <>
+      <h3>Link</h3>
+      <LinkFields link={el.link} onChange={(link) => ed.updateElement(el.id, { link })} />
+      {el.link && (
+        <>
+          <button type="button" className="btn" onClick={() => ed.followLink(el.id)}>
+            <ExternalLink size={15} /> Follow the link
+          </button>
+          <p className="muted small">Ctrl+click it on the canvas. It stays clickable in the PDF.</p>
+        </>
+      )}
+    </>
+  );
+}
+
 export function ButtonProps({ el }: { el: ButtonElement }) {
   const ed = useEditor();
   const upd = useUpd(el);
-  const sheets = useSheets();
   return (
     <>
       <h3>Link button</h3>
@@ -213,45 +295,7 @@ export function ButtonProps({ el }: { el: ButtonElement }) {
           data-testid="prop-button-label"
         />
       </Field>
-      <Field label="Opens">
-        <select
-          value={el.link.kind}
-          onChange={(e) =>
-            upd({
-              link:
-                e.target.value === 'url'
-                  ? { kind: 'url', url: 'https://' }
-                  : { kind: 'sheet', sheetId: ed.project.rootSheetId },
-            })
-          }
-        >
-          <option value="url">A web page / online PDF</option>
-          <option value="sheet">A sheet of this project</option>
-        </select>
-      </Field>
-      {el.link.kind === 'url' ? (
-        <Field label="URL">
-          <input
-            className="mono"
-            value={el.link.url}
-            onChange={(e) => upd({ link: { kind: 'url', url: e.target.value } })}
-            data-testid="prop-button-url"
-          />
-        </Field>
-      ) : (
-        <Field label="Sheet">
-          <select
-            value={el.link.sheetId}
-            onChange={(e) => upd({ link: { kind: 'sheet', sheetId: e.target.value } })}
-          >
-            {sheets.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name || 'Untitled'}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
+      <LinkFields required link={el.link} onChange={(link) => link && upd({ link })} />
       <button type="button" className="btn" onClick={() => ed.followLink(el.id)}>
         <ExternalLink size={15} /> Follow the link
       </button>

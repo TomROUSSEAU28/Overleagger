@@ -90,7 +90,7 @@ test('whiteboard tools: shapes, arrows, notes, pencil, waveforms, images and lin
   await page.mouse.click(p.x, p.y);
   await page.getByTestId('inline-editor').fill('Datasheet');
   await page.getByTestId('inline-editor').press('Enter');
-  await page.getByTestId('prop-button-url').fill('https://example.com/datasheet.pdf');
+  await page.getByTestId('prop-link-url').fill('https://example.com/datasheet.pdf');
 
   // Image through the image tool.
   await page.keyboard.press('Escape');
@@ -206,4 +206,46 @@ test('bridge spacing and part size options', async ({ page }) => {
         .find((e) => e.symbolId === 'resistor')?.scale,
   );
   expect(scale).toBe(2);
+});
+
+test('presentation mode: slides, drill into a block, laser and pen', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('open-example').click();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await page.getByTestId('present').click();
+  const show = page.getByTestId('presentation');
+  await expect(show).toBeVisible();
+  const count = page.getByTestId('present-count');
+  await expect(count).toContainText('1 / 2');
+  // Clicking the block zooms into its sub-sheet.
+  await page.locator('.present-stage .el.block').first().click();
+  await expect(count).toContainText('2 / 2');
+  await page.keyboard.press('Backspace');
+  await expect(count).toContainText('1 / 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('2 / 2');
+  await page.keyboard.press('p');
+  await page.mouse.move(400, 300);
+  await page.mouse.down();
+  await page.mouse.move(500, 360, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator('.present-ink path')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(show).toBeHidden();
+});
+
+test('links on images/shapes and CircuiTikZ export', async ({ page }) => {
+  await newProject(page, 'Links');
+  await page.keyboard.press('s');
+  await dragWorld(page, [0, 0], [120, 80]);
+  await page.getByTestId('prop-link-kind').selectOption('url');
+  await page.getByTestId('prop-link-url').fill('https://example.com/datasheet.pdf');
+  await expect(page.locator('.link-badge')).toHaveCount(1);
+  await page.getByTestId('open-export').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-pdf').click();
+  const pdf = readFileSync((await (await download).path())!).toString('latin1');
+  expect(pdf).toContain('https://example.com/datasheet.pdf');
+  await page.getByTestId('export-tikz').click();
+  await expect(page.getByTestId('tikz-code')).toHaveValue(/\\begin\{circuitikz\}/);
 });

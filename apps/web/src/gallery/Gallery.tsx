@@ -1,5 +1,5 @@
 import {
-  builtinSymbols,
+  librarySymbols,
   defaultParams,
   groupByCategory,
   resolveSymbol,
@@ -70,12 +70,12 @@ export function Gallery() {
         <div>
           <h1 className="logo big">Symbol gallery</h1>
           <p className="tagline">
-            {builtinSymbols.length} symbols · IEC 60617 (EU) and IEEE 315 / ANSI (US) ·{' '}
+            {librarySymbols.length} symbols · IEC 60617 (EU) and IEEE 315 / ANSI (US) ·{' '}
             <a href="#/">back to projects</a>
           </p>
         </div>
       </header>
-      {groupByCategory(builtinSymbols).map(([cat, syms]) => (
+      {groupByCategory(librarySymbols).map(([cat, syms]) => (
         <section key={cat}>
           <h2>{cat}</h2>
           <div className="gallery-grid">

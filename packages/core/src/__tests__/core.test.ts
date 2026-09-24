@@ -31,7 +31,10 @@ import {
   topLevelUnit,
   ungroupElements,
   validateHierarchy,
+  buildSlides,
+  framesInReadingOrder,
   type ComponentElement,
+  type FrameElement,
   type Element,
   type LabelElement,
   type PortElement,
@@ -388,5 +391,20 @@ describe('phase 2 helpers', () => {
   it('translates strokes and lines', () => {
     const s = { id: 's', type: 'stroke', z: 0, size: 2, pts: [0, 0, 0.5, 10, 10, 0.5] } as Element;
     expect((translated(s, 5, 5) as { pts: number[] }).pts).toEqual([5, 5, 0.5, 15, 15, 0.5]);
+  });
+});
+
+describe('slides', () => {
+  it('orders frames like text (rows, then left to right) and uses whole sheets without frames', () => {
+    const { p, sheet, ctx } = setup();
+    const f = (name: string, x: number, y: number) =>
+      p.addElement(sheet, { type: 'frame', name, x, y, w: 100, h: 80 }) as FrameElement;
+    const frames = [f('c', 0, 200), f('b', 150, 10), f('a', 0, 0)];
+    expect(framesInReadingOrder(frames).map((x) => x.name)).toEqual(['a', 'b', 'c']);
+    const child = createBlock(p, sheet, { x: 300, y: 0, w: 80, h: 60 }, 'Sub');
+    addComponent(p, child.childSheetId, 'resistor', 0, 0, ctx());
+    const slides = buildSlides(p, ctx());
+    expect(slides.map((s) => s.title)).toEqual(['a', 'b', 'c', 'Sub']);
+    expect(slides[3]!.depth).toBe(1);
   });
 });

@@ -1,4 +1,4 @@
-import { FileCode, FileDown, FileImage, FileText } from 'lucide-react';
+import { Copy, FileCode, FileDown, FileImage, FileText, Sigma } from 'lucide-react';
 import { useState } from 'react';
 import { useEditor } from '../editor/context';
 import type { Background } from '../export/render';
@@ -15,6 +15,9 @@ export function ExportDialog() {
   const [background, setBackground] = useState<Background>('white');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tikz, setTikz] = useState<string | null>(null);
+  const [standalone, setStandalone] = useState(true);
+  const [copied, setCopied] = useState(false);
   const close = () => useUI.getState().set({ modal: null });
   const meta = ed.project.getMeta();
   const sheet = ed.project.getSheet(ed.sheetId);
@@ -52,6 +55,12 @@ export function ExportDialog() {
       const { exportPdf } = await import('../export/pdf');
       const r = await exportPdf(ed.project, ed.ctx, opts);
       download(r.blob, `${safeFileName(meta.name)}.pdf`);
+    });
+  const makeTikz = (full = standalone) =>
+    run('CircuiTikZ', async () => {
+      const { sheetToCircuitikz } = await import('../export/circuitikz');
+      setTikz(sheetToCircuitikz(ed.project, ed.ctx, ed.sheetId, { standalone: full }));
+      setCopied(false);
     });
   const olg = () =>
     run('OLG', async () => {
@@ -127,7 +136,64 @@ export function ExportDialog() {
           <b>Project file (.olg)</b>
           <span>Full project, to back up or share</span>
         </button>
+        <button
+          type="button"
+          className="export-btn"
+          onClick={() => makeTikz()}
+          disabled={!!busy}
+          data-testid="export-tikz"
+        >
+          <Sigma size={22} />
+          <b>CircuiTikZ (LaTeX)</b>
+          <span>Current sheet as LaTeX code for your report</span>
+        </button>
       </div>
+      {tikz !== null && (
+        <div className="tikz-box">
+          <div className="row">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={standalone}
+                onChange={(e) => {
+                  setStandalone(e.target.checked);
+                  makeTikz(e.target.checked);
+                }}
+              />
+              Complete document (compiles on its own)
+            </label>
+            <span style={{ flex: 1 }} />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void navigator.clipboard?.writeText(tikz).then(() => setCopied(true))}
+            >
+              <Copy size={14} /> {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                download(new Blob([tikz], { type: 'application/x-tex' }), `${base}.tex`)
+              }
+              data-testid="download-tikz"
+            >
+              <FileDown size={14} /> .tex
+            </button>
+          </div>
+          <textarea
+            className="mono tikz-code"
+            readOnly
+            value={tikz}
+            rows={12}
+            data-testid="tikz-code"
+          />
+          <p className="muted small">
+            Needs <code>\usepackage{'{circuitikz}'}</code>. Resistors, capacitors, inductors and
+            diodes use native CircuiTikZ symbols; other parts are drawn exactly as on screen.
+          </p>
+        </div>
+      )}
       {busy && <p className="muted small">Exporting {busy}…</p>}
       {error && <p className="warning small">Export failed: {error}</p>}
     </Modal>

@@ -59,24 +59,29 @@ export interface SymbolGraphics {
 
 export type OptionValue = string | number | boolean;
 
+interface OptionCommon {
+  key: string;
+  label: string;
+  /** Show the option only when this returns true (e.g. settings of the 3rd secondary). */
+  show?: (opts: Record<string, OptionValue>) => boolean;
+  /** Options sharing a row key are laid out side by side. */
+  row?: string;
+}
+
 export type OptionDef =
-  | { key: string; label: string; type: 'bool'; default: boolean }
-  | {
-      key: string;
-      label: string;
+  | (OptionCommon & { type: 'bool'; default: boolean })
+  | (OptionCommon & {
       type: 'enum';
       default: string;
       choices: { value: string; label: string }[];
-    }
-  | {
-      key: string;
-      label: string;
+    })
+  | (OptionCommon & {
       type: 'number';
       default: number;
       min: number;
       max: number;
       step: number;
-    };
+    });
 
 export interface ParamDef {
   key: string;
@@ -108,6 +113,8 @@ export interface SymbolDef {
   options?: OptionDef[];
   /** The value is drawn inside the symbol by a text primitive, so no external value label. */
   hideValueLabel?: boolean;
+  /** Kept for old projects only: not listed in the library. */
+  hidden?: boolean;
   build: (ctx: BuildContext) => SymbolGraphics;
 }
 

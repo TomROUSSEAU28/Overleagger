@@ -190,6 +190,9 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
     case 'view.rightPanel':
       ui.setSetting('rightPanel', !ui.rightPanel);
       return true;
+    case 'view.present':
+      ui.set({ presenting: true, modal: null });
+      return true;
     case 'file.export':
       ui.set({ modal: 'export' });
       return true;

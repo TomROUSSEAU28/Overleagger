@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   builtinSymbols,
   defaultOptions,
+  librarySymbols,
   resolveSymbol,
   searchSymbols,
   type OptionValue,
@@ -22,7 +23,11 @@ function optionCombos(sym: SymbolDef): Record<string, OptionValue>[] {
           : [o.default, o.max];
     combos = combos.flatMap((c) => values.map((v) => ({ ...c, [o.key]: v })));
   }
-  return combos;
+  // Very configurable symbols (transformers): an even sample keeps the test fast.
+  const max = 800;
+  if (combos.length <= max) return combos;
+  const step = combos.length / max;
+  return Array.from({ length: max }, (_, i) => combos[Math.floor(i * step)]!);
 }
 
 function numbersOf(p: Primitive): number[] {
@@ -54,6 +59,37 @@ describe('symbol library', () => {
 
   it('has a large library', () => {
     expect(builtinSymbols.length).toBeGreaterThan(90);
+  });
+
+  it('transformers take 1 to 4 secondaries, center taps and inverted dots', () => {
+    const t = builtinSymbols.find((s) => s.id === 'transformer')!;
+    const one = resolveSymbol(t, 'IEC', {});
+    expect(one.pins.map((p) => p.id)).toEqual(['p1', 'p2', 's1', 's2']);
+    const four = resolveSymbol(t, 'IEC', { secondaries: 4, p: 'ct', s3: 'ct', s2Dot: 'bottom' });
+    expect(four.pins.map((p) => p.id)).toEqual([
+      'p1',
+      'pct',
+      'p2',
+      's1',
+      's2',
+      't1',
+      't2',
+      'u1',
+      'uct',
+      'u2',
+      'v1',
+      'v2',
+    ]);
+    // The primary spans the whole stack of secondaries.
+    const ys = (ids: string[]) => four.pins.filter((p) => ids.includes(p.id)).map((p) => p.y);
+    expect(Math.min(...ys(['p1']))).toBeLessThanOrEqual(Math.min(...ys(['s1'])) + 1);
+    const ct = resolveSymbol(
+      builtinSymbols.find((s) => s.id === 'transformer-ct')!,
+      'IEC',
+      {},
+    );
+    expect(ct.pins.map((p) => p.id)).toContain('ct');
+    expect(librarySymbols.some((s) => s.id === 'transformer-3w')).toBe(false);
   });
 
   for (const sym of builtinSymbols) {

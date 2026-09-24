@@ -10,3 +10,4 @@ export * from './commands/layout';
 export * from './hierarchy';
 export * from './clipboard';
 export * from './refdes';
+export * from './slides';

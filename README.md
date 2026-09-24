@@ -1,11 +1,16 @@
-# Overleagger
+# SchemaBoard
+
+> Power electronics & control diagram editor — schematics, block diagrams and whiteboards in one place.
+
+_Formerly “Overleagger”. The internal identifiers (package names, `.olg` files, browser storage)
+keep the old name so existing projects and files still open._
 
 **A hierarchical whiteboard for electronics, power electronics and control diagrams** — like
 draw.io or CircuitPaint, but made for engineers: symbols that follow the **IEC (EU)** and
 **ANSI (US)** standards, wires that snap to a grid with **automatic junction dots**, **blocks you
 can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
-![Status](<https://img.shields.io/badge/status-phase%201%20(core%20editor)-2f5d9e>)
+![Status](<https://img.shields.io/badge/status-phase%203%20(presentation%20%26%20smart%20PDF)-2f5d9e>)
 
 ## Features
 
@@ -13,7 +18,8 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
 - **Grid canvas**: pan (Space / middle mouse / wheel), zoom (Ctrl + wheel, pinch), fit (`F`).
 - **About 150 symbols**, each in IEC and ANSI style:
-  - passives, coupled inductors, transformers (2/3 windings, centre tap, single-line, 3-phase Y/Δ),
+  - passives, coupled inductors, **transformers with 1 to 4 secondaries** (each winding plain or
+    centre-tapped, polarity dot at the top, bottom or none), single-line and 3-phase Y/Δ,
     shunt, LDR, ferrite bead;
   - sources (DC, AC, pulse, controlled, 3-phase, PV), grounds and rails;
   - diodes (Schottky, Zener, LED, TVS, varicap…), BJT, JFET, phototransistor, **GaN HEMT
@@ -65,11 +71,28 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
   smooth zoom-to-fit. Toggle them with the ✦ button (they are off automatically when the system
   asks for reduced motion).
 
+- **Links on anything** (shapes, images, text, notes, parts, lines): a web page / online PDF or
+  a sheet of the project. Ctrl+click follows it; a small ↗ tag marks linked elements.
+
+### Presentation (phase 3)
+
+- **Present** (`F5`): the frames of every sheet become slides (reading order), sheets without
+  frames are shown whole. Smooth zoom between slides.
+- **Click a block to dive into its sub-sheet** (zoom transition), `Backspace` to come back up;
+  links and sheet ports are clickable too.
+- **Laser pointer** (`L`), **pen** (`P`, nothing is saved, `C` clears), **blank screen** (`B`),
+  `←/→`, `Space`, `Home/End`, `Esc` to leave.
+
 ### Files and export
 
 - Projects saved automatically in the browser (IndexedDB), `.olg` project files to back up/share.
-- **SVG, PNG and smart PDF**: one page per sheet, bookmarks that mirror the hierarchy, clickable
-  blocks, link buttons and a link back to the parent sheet.
+- **Smart PDF**: one page per sheet, bookmarks that mirror the hierarchy (with frames), clickable
+  blocks → sub-sheet, **sheet ports → parent sheet**, links on any element, a header link back to
+  the parent sheet, and **sticky notes as PDF comments**.
+- **SVG and PNG** of the current sheet.
+- **CircuiTikZ / LaTeX**: the current sheet as `circuitikz` code (complete document or just the
+  environment). R, C, L and diodes use native CircuiTikZ symbols; every other part is drawn
+  exactly as on screen, with `$…$` math kept as LaTeX.
 - **Keyboard shortcuts** for everything, re-bindable (`?` shows them all).
 
 ## Getting started
@@ -116,8 +139,7 @@ apps/web           React + Vite editor: SVG canvas, tools, panels, shortcuts, La
 
 - ~~Phase 1 — Core editor~~ ✔
 - ~~Phase 2 — Whiteboard~~ ✔
-- **Phase 3 — Presentation & smart PDF**: presentation mode (frames/sheets as slides, laser
-  pointer, pen overlay, zoom transitions), PDF comments, **CircuiTikZ export**.
+- ~~Phase 3 — Presentation & smart PDF, CircuiTikZ export~~ ✔
 - **Phase 4 — Collaboration**: self-hosted server (Hocuspocus + SQLite, Docker), invitations,
   roles (owner / editor / commenter / viewer), live cursors, comments, version history.
 - **Phase 5 — Extras**: SPICE netlist, BOM.
