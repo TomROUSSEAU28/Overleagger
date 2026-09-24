@@ -620,17 +620,6 @@ main > section {
   color: var(--muted);
 }
 
-/* Self-hosting */
-.selfhost {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 64px;
-  align-items: center;
-  background: var(--paper-2);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
 /* FAQ: the title on the left, like a heading in the margin; the questions on the right. */
 .faq {
   display: grid;
@@ -891,7 +880,6 @@ main > section {
 @media (max-width: 960px) {
   .story,
   .story.reverse,
-  .selfhost,
   .beta,
   .contact {
     grid-template-columns: 1fr;

@@ -19,7 +19,7 @@ if (!reduce && 'IntersectionObserver' in window) {
     { rootMargin: '0px 0px -10% 0px' },
   );
   for (const el of document.querySelectorAll(
-    '.story, .promises > div, .cards article, .selfhost, .beta, .contact, .faq',
+    '.story, .promises > div, .cards article, .beta, .contact, .faq',
   )) {
     el.classList.add('reveal');
     io.observe(el);
