@@ -15,6 +15,7 @@ import { Presentation } from '../present/Presentation';
 import { Loading } from '../brand/Logo';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
+import { Toast } from '../panels/Toast';
 import { ToolRail } from '../panels/ToolRail';
 import { TopBar } from '../panels/TopBar';
 import { useShortcuts } from '../shortcuts/useShortcuts';
@@ -103,10 +104,8 @@ function EditorLayout() {
       {modal === 'symbol-editor' && <SymbolEditor />}
       {modal === 'save-template' && <SaveTemplateDialog />}
       {presenting && <Presentation />}
-      <p className="small-screen-note">
-        Circuit Notebook is made for a computer screen: on a phone you can look at projects, but
-        drawing is much easier with a mouse.
-      </p>
+      <Toast />
+      <SmallScreenNote />
     </div>
   );
 }
@@ -236,5 +235,39 @@ export function EditorPage({ source }: { source: ProjectSource }) {
     <EditorContext.Provider value={state.ed}>
       <EditorLayout />
     </EditorContext.Provider>
+  );
+}
+
+/** On a phone: a word that the editor is made for a computer screen (can be closed). */
+function SmallScreenNote() {
+  const key = 'sb.smallScreenNote';
+  const [closed, setClosed] = useState(() => {
+    try {
+      return sessionStorage.getItem(key) === 'closed';
+    } catch {
+      return false;
+    }
+  });
+  if (closed) return null;
+  return (
+    <p className="small-screen-note">
+      Circuit Notebook is made for a computer screen: on a phone you can look at projects, but
+      drawing is much easier with a mouse.
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="Close"
+        onClick={() => {
+          setClosed(true);
+          try {
+            sessionStorage.setItem(key, 'closed');
+          } catch {
+            // private mode: it simply comes back next time
+          }
+        }}
+      >
+        ×
+      </button>
+    </p>
   );
 }

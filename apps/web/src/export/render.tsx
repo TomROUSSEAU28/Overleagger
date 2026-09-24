@@ -1,5 +1,6 @@
 import {
   elementBBox,
+  exportedElements,
   rectUnion,
   type BlockElement,
   type Id,
@@ -22,6 +23,8 @@ export interface SvgExportOptions {
   margin?: number;
   /** Embed the CMU Serif font (needed for PNG and portable SVG files). */
   embedFonts?: boolean;
+  /** Export only these elements (and the members of these groups). */
+  only?: Id[];
 }
 
 export interface SheetSvg {
@@ -71,7 +74,9 @@ export async function renderSheetSvg(
   o: SvgExportOptions,
 ): Promise<SheetSvg> {
   await loadTex();
-  const elements = project.getElements(sheetId);
+  const elements = exportedElements(project.getElements(sheetId), o.only);
+  if (o.only && !elements.length)
+    throw new Error('Nothing to export: the selection is hidden from the export.');
   const m = o.margin ?? 24;
   const b = rectUnion(
     elements.filter((e) => e.type !== 'group').map((e) => elementBBox(e, ctx, elements)),

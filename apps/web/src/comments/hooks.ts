@@ -15,9 +15,16 @@ export function useMe(): Person {
   );
 }
 
+/**
+ * Comment threads of the project. Threads of a deleted sheet are left out (they come back if the
+ * deletion is undone).
+ */
 export function useComments(): CommentThread[] {
   const ed = useEditor();
   const v = useDocVersion();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => ed.project.getComments(), [ed, v]);
+  return useMemo(
+    () => ed.project.getComments().filter((t) => ed.project.hasSheet(t.sheetId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ed, v],
+  );
 }

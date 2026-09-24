@@ -155,6 +155,8 @@ export class Project {
     s.set('name', info.name);
     if (info.parentSheetId) s.set('parentSheetId', info.parentSheetId);
     if (info.blockId) s.set('blockId', info.blockId);
+    if (info.noPresent) s.set('noPresent', true);
+    if (info.noExport) s.set('noExport', true);
     s.set('elements', new Y.Map());
     this.sheets.set(info.id, s);
     return info.id;
@@ -172,6 +174,8 @@ export class Project {
     const block = s.get('blockId') as Id | undefined;
     if (parent) info.parentSheetId = parent;
     if (block) info.blockId = block;
+    if (s.get('noPresent')) info.noPresent = true;
+    if (s.get('noExport')) info.noExport = true;
     return info;
   }
 
@@ -189,7 +193,7 @@ export class Project {
     if (!s || !this.canWrite(id)) return;
     this.transact(() => {
       for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined) s.delete(k);
+        if (v === undefined || v === false) s.delete(k);
         else s.set(k, v);
       }
     });

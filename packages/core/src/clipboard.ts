@@ -85,6 +85,19 @@ export function pasteClip(
     }
     if (out.type === 'block' && e.type === 'block')
       out.childSheetId = sheetMap.get(e.childSheetId) ?? newId();
+    // Connectors stay attached to the copies of their shapes, or become free lines.
+    if (out.type === 'line') {
+      for (const end of ['from', 'to'] as const) {
+        const b = out[end];
+        if (!b) continue;
+        const id = idMap.get(b.id);
+        if (id) out[end] = { ...b, id };
+        else delete out[end];
+      }
+    }
+    // A link to a sheet that was copied too points to the copy.
+    if (e.link?.kind === 'sheet' && sheetMap.has(e.link.sheetId))
+      out.link = { kind: 'sheet', sheetId: sheetMap.get(e.link.sheetId)! };
     if (out.type === 'component' && out.ref) {
       if (used.has(out.ref)) {
         const prefix = splitRef(out.ref)?.[0] ?? out.ref;
@@ -108,6 +121,8 @@ export function pasteClip(
       };
       const block = s.info.blockId && idMap.get(s.info.blockId);
       if (block) info.blockId = block;
+      if (s.info.noPresent) info.noPresent = true;
+      if (s.info.noExport) info.noExport = true;
       project.createSheetRaw(info);
     }
     let z = project.maxZ(sheetId) + 1;

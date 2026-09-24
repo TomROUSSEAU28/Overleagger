@@ -30,6 +30,10 @@ interface BaseElement {
   style?: ElementStyle;
   /** Hyperlink (web page / online PDF, or a sheet): Ctrl+click on the canvas, click in the PDF. */
   link?: LinkTarget;
+  /** Left out of the presentation (a hidden frame is not a slide). */
+  noPresent?: boolean;
+  /** Left out of the exports (PDF, SVG, PNG, CircuiTikZ). */
+  noExport?: boolean;
 }
 
 export interface ComponentElement extends BaseElement {
@@ -330,6 +334,10 @@ export interface SheetInfo {
   parentSheetId?: Id;
   /** Block (in the parent sheet) that opens this sheet. */
   blockId?: Id;
+  /** Sheet left out of the presentation. */
+  noPresent?: boolean;
+  /** Sheet left out of the PDF export. */
+  noExport?: boolean;
 }
 
 export interface ProjectMeta {

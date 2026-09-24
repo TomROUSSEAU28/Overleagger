@@ -125,7 +125,9 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
   const openId = useUI((s) => s.openThread);
   const draft = useUI((s) => s.commentDraft);
   const [text, setText] = useState('');
-  const thread = openId ? threads.find((t) => t.id === openId) : undefined;
+  const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
+  // Only the threads of the sheet on screen (the popup does not follow you to another sheet).
+  const thread = openId ? threads.find((t) => t.id === openId && t.sheetId === sheetId) : undefined;
   const canWrite = ed.project.canWrite(undefined, 'comments');
   const isOwner = (ed.session?.role ?? 'owner') === 'owner';
   const textRef = useRef<HTMLTextAreaElement>(null);

@@ -57,6 +57,7 @@ export type ActionId =
   | 'view.leftPanel'
   | 'view.rightPanel'
   | 'file.export'
+  | 'file.copyImage'
   | 'view.present'
   | 'help.shortcuts'
   | 'wire.flipBend';
@@ -148,6 +149,12 @@ export const ACTIONS: ActionDef[] = [
     keys: ['f5', 'mod+enter'],
   },
   { id: 'file.export', label: 'Export…', category: 'File', keys: ['mod+e'] },
+  {
+    id: 'file.copyImage',
+    label: 'Copy the selection (or the sheet) as an image',
+    category: 'File',
+    keys: ['shift+c'],
+  },
   { id: 'help.shortcuts', label: 'Keyboard shortcuts', category: 'Help', keys: ['?'] },
   { id: 'wire.flipBend', label: 'Flip wire bend (while drawing)', category: 'Tools', keys: ['/'] },
 ];

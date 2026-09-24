@@ -1,4 +1,5 @@
 import {
+  exportedElements,
   flattenSheetTree,
   framesInReadingOrder,
   sheetPath,
@@ -60,7 +61,8 @@ export async function exportPdf(
 ): Promise<PdfResult> {
   const tree = sheetTree(project);
   if (!tree) throw new Error('Empty project');
-  const nodes = flattenSheetTree(tree);
+  const nodes = flattenSheetTree(tree).filter((n) => !n.sheet.noExport);
+  if (!nodes.length) throw new Error('Every sheet is hidden from the export.');
   const pageOf = new Map<Id, number>(nodes.map((n, i) => [n.sheet.id, i + 1]));
   const meta = project.getMeta();
 
@@ -172,9 +174,9 @@ export async function exportPdf(
       const parent = sheet.parentSheetId ? outlineOf.get(sheet.parentSheetId) : null;
       const item = doc.outline.add(parent ?? null, sheet.name || 'Untitled', { pageNumber: i + 1 });
       outlineOf.set(sheet.id, item);
-      const frames = project
-        .getElements(sheet.id)
-        .filter((e): e is FrameElement => e.type === 'frame');
+      const frames = exportedElements(project.getElements(sheet.id)).filter(
+        (e): e is FrameElement => e.type === 'frame',
+      );
       for (const f of framesInReadingOrder(frames))
         doc.outline.add(item, f.name || 'Frame', { pageNumber: i + 1 });
     }

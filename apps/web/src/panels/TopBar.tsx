@@ -148,7 +148,7 @@ export function TopBar() {
         title="Present: frames and sheets become slides (F5)"
         data-testid="present"
       >
-        <Presentation size={15} /> Present
+        <Presentation size={15} /> <span className="btn-label">Present</span>
       </button>
       <button
         type="button"
@@ -156,7 +156,7 @@ export function TopBar() {
         onClick={() => ui().set({ modal: 'export' })}
         data-testid="open-export"
       >
-        <Download size={15} /> Export
+        <Download size={15} /> <span className="btn-label">Export</span>
       </button>
     </header>
   );

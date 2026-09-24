@@ -505,6 +505,7 @@ export class EditorController {
 
   openSheet(sheetId: Id) {
     if (!this.project.hasSheet(sheetId)) return;
+    const changed = sheetId !== this.sheetId;
     this.ui.set({
       sheetId,
       selection: [],
@@ -512,6 +513,8 @@ export class EditorController {
       drag: null,
       marquee: null,
       inlineEdit: null,
+      // A comment being written or opened belongs to the sheet we leave.
+      ...(changed ? { commentDraft: null, openThread: null } : {}),
     });
   }
 

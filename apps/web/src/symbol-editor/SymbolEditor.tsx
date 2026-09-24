@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEven
 import { SymbolPreview, SymbolShapes, SymbolText } from '../canvas/render/SymbolGraphic';
 import { useEditor, useMeta } from '../editor/context';
 import { Field, IconButton, Modal } from '../panels/common';
+import { typedNumber } from '../panels/typedNumber';
 import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { DEFAULT_STROKE, THEMES } from '../theme';
@@ -486,7 +487,10 @@ export function SymbolEditor() {
                     max={4}
                     step={0.1}
                     value={selPrim.sw ?? 1}
-                    onChange={(e) => updPrim({ sw: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const n = typedNumber(e.target.value, 0, 4);
+                      if (n !== undefined) updPrim({ sw: n });
+                    }}
                   />
                 </Field>
                 <Field label="Fill">
@@ -542,7 +546,10 @@ export function SymbolEditor() {
                     max={4}
                     step={0.1}
                     value={selPrim.size ?? 1.2}
-                    onChange={(e) => updPrim({ size: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const n = typedNumber(e.target.value, 0.4, 4);
+                      if (n !== undefined) updPrim({ size: n });
+                    }}
                   />
                 </Field>
                 <label className="check">

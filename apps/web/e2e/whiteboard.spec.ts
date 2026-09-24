@@ -281,3 +281,69 @@ test('flowchart: connectors attach to shapes and follow them', async ({ page }) 
   await dragWorld(page, [60, 200], [160, 240]);
   await expect.poll(async () => (await line()).pts![2]).toBe(160);
 });
+
+test('hide things from the presentation or the export, export only the selection', async ({
+  page,
+  context,
+}) => {
+  await newProject(page, 'Visibility');
+  const ids = await page.evaluate(() => {
+    const { ed } = (window as unknown as { __overleagger: { ed: any } }).__overleagger; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const S = (x: number, text: string) =>
+      ed.addElement({ type: 'shape', kind: 'rect', x, y: 0, w: 120, h: 60, text }).id as string;
+    return { a: S(0, 'Alpha'), b: S(200, 'Bravo'), d: S(400, 'Draft') };
+  });
+  const select = (id: string) =>
+    page.evaluate(
+      (i) => (window as unknown as { __overleagger: { ed: any } }).__overleagger.ed.select([i]), // eslint-disable-line @typescript-eslint/no-explicit-any
+      id,
+    );
+
+  // "Draft" out of the export, "Bravo" out of the presentation.
+  await select(ids.d);
+  await page.getByTestId('show-in-export').uncheck();
+  await select(ids.b);
+  await page.getByTestId('show-in-present').uncheck();
+  await expect(page.getByTestId('hidden-badge')).toHaveCount(2);
+
+  // CircuiTikZ of the sheet: no Draft. Only the selection: Alpha alone.
+  await select(ids.a);
+  await page.getByTestId('open-export').click();
+  await expect(page.getByTestId('export-hidden-note')).toContainText('1 element');
+  await page.getByTestId('export-tikz').click();
+  let tex = await page.getByTestId('tikz-code').inputValue();
+  expect(tex).toContain('Alpha');
+  expect(tex).toContain('Bravo');
+  expect(tex).not.toContain('Draft');
+  await page.getByTestId('export-selection').check();
+  await page.getByTestId('export-tikz').click();
+  tex = await page.getByTestId('tikz-code').inputValue();
+  expect(tex).toContain('Alpha');
+  expect(tex).not.toContain('Bravo');
+
+  // Copy as image puts a PNG on the clipboard.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByTestId('export-copy-image').click();
+  await expect(page.getByTestId('export-copy-image')).toContainText('Copied');
+  const types = await page.evaluate(async () =>
+    (await navigator.clipboard.read()).flatMap((i) => [...i.types]),
+  );
+  expect(types).toContain('image/png');
+  await page.keyboard.press('Escape');
+
+  // The presentation shows Alpha and Draft, not Bravo.
+  await page.getByTestId('present').click();
+  const show = page.getByTestId('presentation');
+  await expect(show).toContainText('Alpha');
+  await expect(show).toContainText('Draft');
+  await expect(show).not.toContainText('Bravo');
+  await page.getByTestId('present-close').click();
+
+  // A whole sheet can be left out too.
+  await page.evaluate(
+    () => (window as unknown as { __overleagger: { ed: any } }).__overleagger.ed.select([]), // eslint-disable-line @typescript-eslint/no-explicit-any
+  );
+  await page.getByTestId('sheet-in-present').uncheck();
+  await page.getByTestId('present').click();
+  await expect(page.getByTestId('present-count')).toHaveText('0 / 0');
+});

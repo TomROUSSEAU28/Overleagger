@@ -518,6 +518,55 @@ function LinkBadges({
   );
 }
 
+/** Crossed eye above the corner of elements left out of the presentation and/or the export. */
+function HiddenBadges({
+  elements,
+  o,
+  zoom,
+}: {
+  elements: Element[];
+  o: RenderOptions;
+  zoom: number;
+}) {
+  const k = 1 / zoom;
+  return (
+    <>
+      {elements
+        .filter((e) => e.noPresent || e.noExport)
+        .map((e) => {
+          const members =
+            e.type === 'group'
+              ? elements.filter(
+                  (m) => expandSelection(elements, [e.id]).has(m.id) && m.type !== 'group',
+                )
+              : [e];
+          const b = rectUnion(members.map((m) => elementBBox(m, o.ctx, elements)));
+          if (!b) return null;
+          const c = o.theme.select;
+          return (
+            <g
+              key={e.id}
+              className="hidden-badge"
+              // Just outside the top-left corner, clear of the selection handles.
+              transform={`translate(${b.x + 14 * k} ${b.y - 12 * k}) scale(${k})`}
+              data-testid="hidden-badge"
+            >
+              <circle r={7} fill={o.theme.paper} stroke={c} strokeWidth={1.1} />
+              <path
+                d="M-4.2 0 Q0 -4 4.2 0 Q0 4 -4.2 0 Z M-3.6 3.6 L3.6 -3.6"
+                fill="none"
+                stroke={c}
+                strokeWidth={1.1}
+                strokeLinecap="round"
+              />
+              <circle r={1.3} fill={c} />
+            </g>
+          );
+        })}
+    </>
+  );
+}
+
 function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions; zoom: number }) {
   const ed = useEditor();
   const selection = useUI((s) => s.selection);
@@ -587,6 +636,7 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
     <g className="overlay">
       <g pointerEvents="none">
         <LinkBadges elements={elements} o={o} zoom={zoom} />
+        <HiddenBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (
             <polyline

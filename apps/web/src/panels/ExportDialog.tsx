@@ -1,6 +1,7 @@
-import { Copy, FileCode, FileDown, FileImage, FileText, Sigma } from 'lucide-react';
+import { ClipboardCopy, Copy, FileCode, FileDown, FileImage, FileText, Sigma } from 'lucide-react';
 import { useState } from 'react';
 import { useEditor } from '../editor/context';
+import { copySheetImage } from '../export/copyImage';
 import type { Background } from '../export/render';
 import { download, encodeProjectOlg, safeFileName } from '../storage/olg';
 import { useUI } from '../store/ui';
@@ -18,13 +19,21 @@ export function ExportDialog() {
   const [tikz, setTikz] = useState<string | null>(null);
   const [standalone, setStandalone] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [imageCopied, setImageCopied] = useState(false);
+  const selection = useUI((s) => s.selection);
+  const [onlySel, setOnlySel] = useState(false);
+  const useSel = onlySel && selection.length > 0;
   const close = () => useUI.getState().set({ modal: null });
   const meta = ed.project.getMeta();
   const sheet = ed.project.getSheet(ed.sheetId);
   const base = safeFileName(
-    `${meta.name}${sheet && sheet.id !== ed.project.rootSheetId ? `-${sheet.name}` : ''}`,
+    `${meta.name}${sheet && sheet.id !== ed.project.rootSheetId ? `-${sheet.name}` : ''}${useSel ? '-selection' : ''}`,
   );
   const opts = { theme: THEMES[themeName], background, latexRefs };
+  const only = useSel ? selection : undefined;
+  const what = useSel ? 'The selection' : 'Current sheet';
+  const hiddenHere = ed.elements().filter((e) => e.noExport).length;
+  const hiddenSheets = ed.project.listSheets().filter((s) => s.noExport).length;
 
   const run = async (label: string, fn: () => Promise<void>) => {
     setBusy(label);
@@ -41,14 +50,28 @@ export function ExportDialog() {
   const svg = () =>
     run('SVG', async () => {
       const { renderSheetSvg } = await import('../export/render');
-      const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, { ...opts, embedFonts: true });
+      const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, {
+        ...opts,
+        embedFonts: true,
+        ...(only ? { only } : {}),
+      });
       download(new Blob([r.svg], { type: 'image/svg+xml' }), `${base}.svg`);
     });
   const png = () =>
     run('PNG', async () => {
       const { renderSheetSvg, svgToPngBlob } = await import('../export/render');
-      const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, { ...opts, embedFonts: true });
+      const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, {
+        ...opts,
+        embedFonts: true,
+        ...(only ? { only } : {}),
+      });
       download(await svgToPngBlob(r.svg, r.view.w, r.view.h, 3), `${base}.png`);
+    });
+  // An image on the clipboard, to paste straight into a report, a slide or a chat.
+  const copyImage = () =>
+    run('image', async () => {
+      await copySheetImage(ed, { theme: themeName, background, ...(only ? { only } : {}) });
+      setImageCopied(true);
     });
   const pdf = () =>
     run('PDF', async () => {
@@ -59,7 +82,12 @@ export function ExportDialog() {
   const makeTikz = (full = standalone) =>
     run('CircuiTikZ', async () => {
       const { sheetToCircuitikz } = await import('../export/circuitikz');
-      setTikz(sheetToCircuitikz(ed.project, ed.ctx, ed.sheetId, { standalone: full }));
+      setTikz(
+        sheetToCircuitikz(ed.project, ed.ctx, ed.sheetId, {
+          standalone: full,
+          ...(only ? { only } : {}),
+        }),
+      );
       setCopied(false);
     });
   const olg = () =>
@@ -88,6 +116,33 @@ export function ExportDialog() {
           </select>
         </Field>
       </div>
+      {selection.length > 0 && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={onlySel}
+            onChange={(e) => {
+              setOnlySel(e.target.checked);
+              setTikz(null);
+            }}
+            data-testid="export-selection"
+          />
+          Only the selection ({selection.length} element{selection.length > 1 ? 's' : ''}) — SVG,
+          PNG, image and CircuiTikZ
+        </label>
+      )}
+      {(hiddenHere > 0 || hiddenSheets > 0) && (
+        <p className="muted small" data-testid="export-hidden-note">
+          Left out, as you asked:{' '}
+          {[
+            hiddenHere && `${hiddenHere} element${hiddenHere > 1 ? 's' : ''} of this sheet`,
+            hiddenSheets && `${hiddenSheets} sheet${hiddenSheets > 1 ? 's' : ''} (PDF)`,
+          ]
+            .filter(Boolean)
+            .join(' and ')}
+          . Change it under “Show in”.
+        </p>
+      )}
       {uiTheme === 'blackboard' && themeName === 'paper' && (
         <p className="muted small">The export uses light colours, ready for printing.</p>
       )}
@@ -112,7 +167,7 @@ export function ExportDialog() {
         >
           <FileCode size={22} />
           <b>SVG</b>
-          <span>Current sheet, vector (for LaTeX / Inkscape)</span>
+          <span>{what}, vector (for LaTeX / Inkscape)</span>
         </button>
         <button
           type="button"
@@ -123,7 +178,18 @@ export function ExportDialog() {
         >
           <FileImage size={22} />
           <b>PNG</b>
-          <span>Current sheet, 3× resolution</span>
+          <span>{what}, 3× resolution</span>
+        </button>
+        <button
+          type="button"
+          className="export-btn"
+          onClick={copyImage}
+          disabled={!!busy}
+          data-testid="export-copy-image"
+        >
+          <ClipboardCopy size={22} />
+          <b>{imageCopied ? 'Copied!' : 'Copy as image'}</b>
+          <span>{what}, to paste in a report, a slide or a chat</span>
         </button>
         <button
           type="button"
@@ -145,7 +211,7 @@ export function ExportDialog() {
         >
           <Sigma size={22} />
           <b>CircuiTikZ (LaTeX)</b>
-          <span>Current sheet as LaTeX code for your report</span>
+          <span>{what} as LaTeX code for your report</span>
         </button>
       </div>
       {tikz !== null && (

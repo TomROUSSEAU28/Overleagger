@@ -46,6 +46,7 @@ import { useCanEdit } from '../cloud/hooks';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 import { Field, IconButton } from './common';
+import { typedNumber } from './typedNumber';
 import {
   ButtonProps,
   FrameProps,
@@ -90,21 +91,50 @@ function SheetProps() {
   useSheets();
   const sheet = ed.project.getSheet(ed.sheetId);
   const elements = ed.elements();
-  const count = (t: Element['type']) => elements.filter((e) => e.type === t).length;
+  const count = (t: Element['type'], word: string) => {
+    const n = elements.filter((e) => e.type === t).length;
+    return `${n} ${word}${n === 1 ? '' : 's'}`;
+  };
   return (
     <>
       <h3>Sheet</h3>
       <Field label="Sheet name">
         <input
           value={sheet?.name ?? ''}
-          onChange={(e) => {
-            ed.project.updateSheet(ed.sheetId, { name: e.target.value });
-            const s = ed.project.getSheet(ed.sheetId);
-            if (s?.blockId && s.parentSheetId)
-              ed.project.updateElement(s.parentSheetId, s.blockId, { title: e.target.value });
-          }}
+          onChange={(e) =>
+            // One change: the sheet and its block keep the same name (typing merges for undo).
+            ed.project.transact(() => {
+              ed.project.updateSheet(ed.sheetId, { name: e.target.value });
+              const s = ed.project.getSheet(ed.sheetId);
+              if (s?.blockId && s.parentSheetId)
+                ed.project.updateElement(s.parentSheetId, s.blockId, { title: e.target.value });
+            })
+          }
         />
       </Field>
+      {sheet && (
+        <div className="show-in">
+          <span className="muted small">This sheet in</span>
+          <label className="check compact">
+            <input
+              type="checkbox"
+              checked={!sheet.noPresent}
+              onChange={(e) => ed.project.updateSheet(sheet.id, { noPresent: !e.target.checked })}
+              data-testid="sheet-in-present"
+            />
+            Presentation
+          </label>
+          <label className="check compact">
+            <input
+              type="checkbox"
+              checked={!sheet.noExport}
+              onChange={(e) => ed.project.updateSheet(sheet.id, { noExport: !e.target.checked })}
+              data-testid="sheet-in-export"
+            />
+            PDF export
+          </label>
+        </div>
+      )}
       <h3>Project</h3>
       <Field label="Drawing standard">
         <select
@@ -117,8 +147,8 @@ function SheetProps() {
         </select>
       </Field>
       <p className="muted small">
-        {count('component')} parts · {count('wire')} wires · {count('block')} blocks ·{' '}
-        {count('port')} ports
+        {count('component', 'part')} · {count('wire', 'wire')} · {count('block', 'block')} ·{' '}
+        {count('port', 'port')}
       </p>
       <p className="muted small">
         Tip: select an element to edit it. Press <kbd className="kbd">A</kbd> to quickly add a part.
@@ -426,7 +456,43 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
         />
         Lock position
       </label>
+      <ShowIn els={[el]} />
     </>
+  );
+}
+
+/**
+ * "Show in": leave elements out of the presentation and/or the exports (draft notes, hints for
+ * the audience only…). Several elements: a box is ticked when every one of them is shown.
+ */
+function ShowIn({ els }: { els: Element[] }) {
+  const ed = useEditor();
+  const set = (key: 'noPresent' | 'noExport', shown: boolean) =>
+    ed.commit(() => {
+      for (const e of els) ed.updateElement(e.id, { [key]: shown ? undefined : true });
+    });
+  return (
+    <div className="show-in">
+      <span className="muted small">Show in</span>
+      <label className="check compact">
+        <input
+          type="checkbox"
+          checked={els.every((e) => !e.noPresent)}
+          onChange={(e) => set('noPresent', e.target.checked)}
+          data-testid="show-in-present"
+        />
+        Presentation
+      </label>
+      <label className="check compact">
+        <input
+          type="checkbox"
+          checked={els.every((e) => !e.noExport)}
+          onChange={(e) => set('noExport', e.target.checked)}
+          data-testid="show-in-export"
+        />
+        Export
+      </label>
+    </div>
   );
 }
 
@@ -455,6 +521,7 @@ function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) 
       <ArrangeButtons />
       <AlignButtons count={sel.length} />
       <StyleEditor els={all} />
+      <ShowIn els={sel} />
     </>
   );
 }
@@ -515,7 +582,10 @@ function OptionInput({
         max={o.max}
         step={o.step}
         value={Number(value ?? o.default)}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          const n = typedNumber(e.target.value, o.min, o.max);
+          if (n !== undefined) onChange(n);
+        }}
       />
     </Field>
   );
@@ -718,7 +788,11 @@ function BlockProps({ el }: { el: BlockElement }) {
             step={2}
             min={4}
             value={el.w / GRID}
-            onChange={(e) => upd({ w: Math.max(40, Number(e.target.value) * GRID) })}
+            onChange={(e) => {
+              // Even grid units keep the pins of the block on the grid.
+              const n = typedNumber(e.target.value, 4, 400);
+              if (n !== undefined) upd({ w: Math.round(n / 2) * 2 * GRID });
+            }}
           />
         </Field>
         <Field label="Height">
@@ -727,7 +801,10 @@ function BlockProps({ el }: { el: BlockElement }) {
             step={2}
             min={4}
             value={el.h / GRID}
-            onChange={(e) => upd({ h: Math.max(40, Number(e.target.value) * GRID) })}
+            onChange={(e) => {
+              const n = typedNumber(e.target.value, 4, 400);
+              if (n !== undefined) upd({ h: Math.round(n / 2) * 2 * GRID });
+            }}
           />
         </Field>
       </div>

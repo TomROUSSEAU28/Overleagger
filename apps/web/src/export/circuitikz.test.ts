@@ -87,6 +87,32 @@ describe('CircuiTikZ export', () => {
     if (process.env.TIKZ_OUT) writeFileSync(`${process.env.TIKZ_OUT}/Flow.tex`, tex);
   });
 
+  it('leaves out hidden elements, and exports only the selection when asked', () => {
+    const p = Project.create('t');
+    const ctx = makeContext(p);
+    const s = p.rootSheetId;
+    const r = addComponent(p, s, 'resistor', 0, 0, ctx);
+    const c = addComponent(p, s, 'capacitor', 100, 0, ctx);
+    const n = p.addElement(s, {
+      type: 'text',
+      x: 0,
+      y: 80,
+      text: 'Draft note',
+      size: 16,
+      align: 'start',
+      noExport: true,
+    });
+    const all = sheetToCircuitikz(p, ctx, s, { standalone: false });
+    expect(all).toContain('to[R');
+    expect(all).toContain('to[C');
+    expect(all).not.toContain('Draft note');
+    const only = sheetToCircuitikz(p, ctx, s, { standalone: false, only: [c.id, n.id] });
+    expect(only).toContain('to[C');
+    expect(only).not.toContain('to[R');
+    expect(only).not.toContain('Draft note');
+    void r;
+  });
+
   it('escapes text but keeps math', () => {
     expect(texText('10 kΩ & 50% at $V_{in}$')).toBe('10 k$\\Omega$ \\& 50\\% at $V_{in}$');
   });

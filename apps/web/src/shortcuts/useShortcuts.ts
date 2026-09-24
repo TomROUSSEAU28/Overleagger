@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { activeTools } from '../canvas/tools';
 import type { EditorController } from '../editor/controller';
+import { copySheetImage } from '../export/copyImage';
+import { toast } from '../store/toast';
 import { useUI } from '../store/ui';
 import { eventToCombo, type ActionId } from './keymap';
 import { useKeymap } from './useKeymap';
@@ -29,6 +31,7 @@ const READ_ONLY_ACTIONS = new Set<ActionId>([
   'view.rightPanel',
   'view.present',
   'file.export',
+  'file.copyImage',
   'help.shortcuts',
 ]);
 
@@ -222,6 +225,15 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
     case 'file.export':
       ui.set({ modal: 'export' });
       return true;
+    case 'file.copyImage': {
+      const sel = ed.selection();
+      // Called at once (not after a lazy import): the clipboard needs the key press "gesture".
+      copySheetImage(ed, { only: sel }).then(
+        () => toast(sel.length ? 'Selection copied as an image' : 'Sheet copied as an image'),
+        (e: unknown) => toast(`Could not copy: ${e instanceof Error ? e.message : String(e)}`),
+      );
+      return true;
+    }
     case 'help.shortcuts':
       ui.set({ modal: 'help' });
       return true;

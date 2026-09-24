@@ -141,6 +141,8 @@ export interface UIState extends Settings {
   lineDraftEnds: { from?: Anchor; to?: Anchor } | null;
   /** Comment thread shown in its popup. */
   openThread: string | null;
+  /** Short message shown at the bottom of the editor. */
+  toast: { text: string; at: number } | null;
   /** Comment bubble being dragged, and where it is now (saved when released). */
   commentDrag: { id: string; x: number; y: number } | null;
   showResolved: boolean;
@@ -212,6 +214,7 @@ const transient = {
   commentDraft: null,
   openThread: null,
   commentDrag: null,
+  toast: null,
   anchorHover: null,
   lineDraftEnds: null,
 };

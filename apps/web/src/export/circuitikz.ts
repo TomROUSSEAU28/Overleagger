@@ -17,6 +17,7 @@ import {
   componentLabels,
   componentPoint,
   elementPins,
+  exportedElements,
   lineControlPoint,
   linePoints,
   polylineMiddle,
@@ -40,6 +41,8 @@ export interface TikzOptions {
   standalone: boolean;
   /** Centimetres per grid unit. */
   unit?: number;
+  /** Export only these elements (and the members of these groups). */
+  only?: Id[];
 }
 
 /** Native CircuiTikZ bipoles: symbol → [bipole, start pin, end pin]. */
@@ -510,7 +513,7 @@ export function sheetToCircuitikz(
 ): string {
   const unit = o.unit ?? 0.25;
   const w = new Writer(unit);
-  const all = project.getElements(sheetId);
+  const all = exportedElements(project.getElements(sheetId), o.only);
   const layer = (e: Element) => (e.type === 'frame' ? 0 : e.type === 'block' ? 1 : 2);
   const ordered = [...all].sort((a, b) => layer(a) - layer(b) || a.z - b.z);
   for (const el of ordered) element(w, el, all, ctx, sheetId);

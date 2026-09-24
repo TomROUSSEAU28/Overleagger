@@ -3,10 +3,12 @@ import {
   Project,
   anchorPoints,
   computeMove,
+  copyElements,
   elbowRoute,
   followConnectors,
   makeContext,
   nearestAnchor,
+  pasteClip,
   shapeGeometry,
   type LineElement,
   type ShapeElement,
@@ -86,5 +88,34 @@ describe('flowchart connectors', () => {
     const alone = computeMove(els, new Set([line.id]), 10, 0, makeContext(p))[0] as LineElement;
     expect(alone.from).toBeUndefined();
     expect(alone.to).toBeUndefined();
+  });
+});
+
+describe('copying connectors', () => {
+  it('keeps pasted connectors attached to the pasted shapes, or frees them', () => {
+    const p = Project.create('t');
+    const s = p.rootSheetId;
+    const box = (x: number) =>
+      p.addElement(s, { type: 'shape', kind: 'rect', x, y: 0, w: 80, h: 40, text: '' });
+    const a = box(0);
+    const b = box(200);
+    const line = p.addElement(s, {
+      type: 'line',
+      pts: [80, 20, 200, 20],
+      arrowEnd: true,
+      from: { id: a.id, anchor: 'e' },
+      to: { id: b.id, anchor: 'w' },
+    });
+    // Both shapes and the connector: the copy links the copies.
+    const ids = pasteClip(p, s, copyElements(p, s, [a.id, b.id, line.id]), 0, 100);
+    const els = p.getElements(s);
+    const copy = els.find((e) => ids.includes(e.id) && e.type === 'line');
+    if (copy?.type !== 'line') throw new Error('no pasted line');
+    expect(ids).toContain(copy.from!.id);
+    expect(ids).toContain(copy.to!.id);
+    // The connector alone: it becomes a free line (not tied to the original shapes).
+    const [alone] = pasteClip(p, s, copyElements(p, s, [line.id]), 0, 200);
+    const l = p.getElement(s, alone!);
+    expect(l?.type === 'line' && (l.from || l.to)).toBeFalsy();
   });
 });

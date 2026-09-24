@@ -1,4 +1,11 @@
-import { buildSlides, type Element, type Id, type Rect, type Slide } from '@overleagger/core';
+import {
+  buildSlides,
+  visibleFor,
+  type Element,
+  type Id,
+  type Rect,
+  type Slide,
+} from '@overleagger/core';
 import {
   ChevronLeft,
   ChevronRight,
@@ -254,7 +261,9 @@ export function Presentation() {
     return () => window.clearTimeout(t);
   }, [laser, mode]);
 
-  const elements = useSheetElements(sheetId ?? ed.project.rootSheetId);
+  const sheetElements = useSheetElements(sheetId ?? ed.project.rootSheetId);
+  // Elements hidden from the presentation are neither drawn nor clickable.
+  const elements = useMemo(() => visibleFor(sheetElements, 'present'), [sheetElements]);
   const drawing = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -317,6 +326,11 @@ export function Presentation() {
     [theme, ed.ctx, latexRefs],
   );
 
+  // Frames only define the slides: their dashed outline and name tab are not shown.
+  const drawn = useMemo(() => elements.filter((e) => e.type !== 'frame'), [elements]);
+  // On a frame slide, what lies outside the frame is covered, so the slide is just the frame.
+  const spot = slide?.frameId && slide.sheetId === sheetId ? slide.rect : null;
+
   const head = laser[laser.length - 1];
   const inkColor = theme.name === 'blackboard' ? '#ffd166' : '#d62828';
 
@@ -345,7 +359,15 @@ export function Presentation() {
           viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
           style={{ opacity: fade }}
         >
-          <SheetRenderer elements={elements} o={o} />
+          <SheetRenderer elements={drawn} o={o} />
+          {spot && (
+            <path
+              className="present-spot"
+              d={`M ${box.x - box.w} ${box.y - box.h} h ${box.w * 3} v ${box.h * 3} h ${-box.w * 3} Z M ${spot.x} ${spot.y} v ${spot.h} h ${spot.w} v ${-spot.h} Z`}
+              fill={theme.paper}
+              fillRule="evenodd"
+            />
+          )}
         </svg>
       )}
       <svg className="present-ink" width={screen.w} height={screen.h}>
