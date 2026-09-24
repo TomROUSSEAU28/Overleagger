@@ -108,8 +108,8 @@ see _Self-hosting_) to share projects:
   the role, not only the interface.
 - **Real time**: live edits, **cursors with names**, others' selections, avatars in the top bar
   — click one to **follow their view**; “X is presenting — Join” follows their slides.
-- **Comments** (tool `C`): threads pinned on the drawing, replies, resolve, a list of all threads
-  in the _Comments_ tab. They also work in local projects, as notes to yourself.
+- **Comments** (tool `C`): threads pinned on the drawing (drag a bubble to move it), replies,
+  resolve, a list of all threads in the _Comments_ tab. They also work in local projects, as notes to yourself.
 - **Sheet locks**: the owner locks a sheet (Sheets tab) so only they can change it.
 - **Version history**: a version is kept automatically every few minutes; name one with _Save_;
   preview and **restore** (the current state is saved first, so nothing is lost).
@@ -208,7 +208,10 @@ apps/server        Collaboration server: Fastify API, Hocuspocus sync, SQLite, a
 - ~~Phase 2 — Whiteboard~~ ✔
 - ~~Phase 3 — Presentation & smart PDF, CircuiTikZ export~~ ✔
 - ~~Phase 4 — Collaboration~~ ✔
-- **Phase 5 — Extras**: SPICE netlist, BOM.
+- **Next**: polish, more templates, a bill of materials.
+
+Circuit Notebook is a **diagram and collaboration** tool: it does not simulate circuits, on
+purpose. Keep your simulator for the numbers and bring the waveforms here to explain them.
 
 ## Licences
 

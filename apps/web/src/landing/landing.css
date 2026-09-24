@@ -72,7 +72,7 @@ body {
   color: var(--ink);
   font-family: var(--serif);
   font-size: 18px;
-  line-height: 1.55;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 img {
@@ -210,14 +210,15 @@ kbd {
 }
 
 main > section {
-  padding: 72px max(16px, calc((100vw - 1180px) / 2));
+  padding: 120px max(20px, calc((100vw - 1180px) / 2));
 }
 
 /* Hero */
 .hero {
   display: grid;
-  gap: 48px;
-  padding-top: 64px !important;
+  gap: 72px;
+  padding-top: 88px !important;
+  padding-bottom: 136px !important;
 }
 .hero h1 {
   font-size: clamp(38px, 5.6vw, 66px);
@@ -230,8 +231,8 @@ main > section {
 .cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 26px 0 10px;
+  gap: 14px;
+  margin: 34px 0 14px;
 }
 
 /* Screenshots taped on the page */
@@ -309,7 +310,9 @@ main > section {
 .promises {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 36px;
+  gap: 56px;
+  padding-top: 88px !important;
+  padding-bottom: 88px !important;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: var(--paper-2);
@@ -328,8 +331,14 @@ main > section {
 .story {
   display: grid;
   grid-template-columns: 5fr 7fr;
-  gap: 56px;
+  gap: 88px;
   align-items: center;
+}
+.story + .story {
+  padding-top: 40px;
+}
+.story-text > p {
+  max-width: 34em;
 }
 .story.reverse {
   grid-template-columns: 7fr 5fr;
@@ -345,7 +354,7 @@ main > section {
 .ticks li {
   position: relative;
   padding-left: 30px;
-  margin: 6px 0;
+  margin: 10px 0;
 }
 .ticks li::before {
   /* A small graphite check mark. */
@@ -373,25 +382,34 @@ main > section {
 /* Cards */
 .grid-section h2 {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 56px;
 }
 .cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
+  gap: 26px;
 }
 .cards article {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px 18px 10px;
+  padding: 22px 22px 14px;
   transition:
-    transform 0.15s,
-    box-shadow 0.15s;
+    transform 0.2s cubic-bezier(0.3, 1.4, 0.6, 1),
+    box-shadow 0.2s;
 }
+/* Index cards: they tilt a little when you pick them up. */
 .cards article:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px) rotate(-0.8deg);
   box-shadow: var(--shadow);
+}
+.cards article:nth-child(even):hover {
+  transform: translateY(-4px) rotate(0.8deg);
+}
+.cards article.reveal:not(.settled) {
+  transition:
+    opacity 0.6s ease var(--delay, 0s),
+    transform 0.6s ease var(--delay, 0s);
 }
 .cards h3 {
   margin-bottom: 6px;
@@ -406,41 +424,76 @@ main > section {
 .selfhost {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 40px;
+  gap: 64px;
   align-items: center;
   background: var(--paper-2);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
-/* FAQ */
+/* FAQ: the title on the left, like a heading in the margin; the questions on the right. */
 .faq {
-  max-width: 860px;
-  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 4fr 8fr;
+  gap: 64px;
+  align-items: start;
+}
+.faq-head {
+  position: sticky;
+  top: 96px;
+}
+.faq-head p {
+  margin: 0;
+  max-width: 22em;
+}
+.faq-list {
+  border-top: 1px solid var(--line);
 }
 .faq details {
   border-bottom: 1px solid var(--line);
-  padding: 12px 0;
 }
 .faq summary {
   cursor: pointer;
   font-size: 20px;
   list-style: none;
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  padding: 18px 4px;
+  transition: color 0.15s;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary:hover {
+  color: var(--accent);
 }
 .faq summary::after {
   content: '+';
+  flex: none;
   color: var(--margin);
-  transition: transform 0.2s;
+  font-size: 24px;
+  line-height: 1;
+  transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.6, 1);
 }
 .faq details[open] summary::after {
   transform: rotate(45deg);
 }
 .faq details p {
-  margin: 8px 0 4px;
+  margin: 0;
+  padding: 0 4px 20px;
   color: var(--muted);
+  max-width: 40em;
+}
+.faq details[open] p {
+  animation: faq-open 0.3s ease-out;
+}
+@keyframes faq-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 
 /* Last call */
@@ -451,7 +504,24 @@ main > section {
 }
 .final h2 {
   font-size: clamp(32px, 4.4vw, 52px);
-  margin-bottom: 26px;
+  margin-bottom: 34px;
+}
+.final-cta {
+  position: relative;
+  display: inline-block;
+}
+/* A pencil arrow that draws itself towards the button. */
+.final-arrow {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 30%;
+  width: 110px;
+  height: 56px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Footer */
@@ -472,6 +542,127 @@ main > section {
 }
 .foot p {
   margin: 0 0 0 auto;
+}
+
+/* ---- A little life, in pencil ---------------------------------------------------------- */
+
+/* The logo: some current runs through the resistor when you point at it. */
+.logo-live .spark {
+  fill: var(--margin);
+  opacity: 0;
+  offset-path: path('M17 32H23L25.5 25.5L30.5 38.5L35.5 25.5L40.5 38.5L43 32H48');
+}
+.brand:hover .logo-live .spark {
+  animation: spark 0.9s ease-in-out;
+}
+@keyframes spark {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* "circuits." underlined twice in red pencil, drawn after the page opens. */
+.underlined {
+  position: relative;
+  white-space: nowrap;
+}
+.underlined svg {
+  position: absolute;
+  left: -2%;
+  bottom: -0.14em;
+  width: 104%;
+  height: 0.3em;
+  overflow: visible;
+  fill: none;
+  stroke: var(--margin);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.underlined path {
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: draw 1.1s 0.5s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Margin notes: the arrow is drawn, then the words are written. */
+.margin-note path {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: draw 0.7s 1.3s ease-out forwards;
+}
+.margin-note {
+  clip-path: inset(0 100% 0 0);
+  animation: write 0.9s 1.6s steps(24, end) forwards;
+}
+.note-1 {
+  clip-path: inset(0 0 0 100%);
+}
+@keyframes write {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Screenshots are taped a little crooked; they straighten up when you look at them. */
+.shot {
+  transition:
+    transform 0.35s cubic-bezier(0.3, 1.3, 0.6, 1),
+    box-shadow 0.35s;
+}
+.story .shot {
+  transform: rotate(0.5deg);
+}
+.story.reverse .shot {
+  transform: rotate(-0.5deg);
+}
+.story .shot:hover,
+.hero-shot:hover {
+  transform: translateY(-4px) rotate(0deg);
+  box-shadow:
+    0 2px 4px rgba(40, 32, 20, 0.08),
+    0 22px 48px rgba(40, 32, 20, 0.18);
+}
+
+/* Check marks are ticked one after the other when the section comes into view. */
+.reveal .ticks li::before {
+  transform: rotate(-45deg) scale(0);
+  transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.6, 1);
+}
+.reveal.seen .ticks li::before {
+  transform: rotate(-45deg) scale(1);
+}
+.reveal.seen .ticks li:nth-child(1)::before {
+  transition-delay: 0.45s;
+}
+.reveal.seen .ticks li:nth-child(2)::before {
+  transition-delay: 0.65s;
+}
+.reveal.seen .ticks li:nth-child(3)::before {
+  transition-delay: 0.85s;
+}
+
+.final-arrow path {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+}
+.final.seen .final-arrow path,
+.final:not(.reveal-watch) .final-arrow path {
+  animation: draw 0.8s 0.2s ease-out forwards;
 }
 
 /* Sections appear gently as you scroll */
@@ -497,6 +688,19 @@ main > section {
   }
   .story.reverse .story-text {
     order: 0;
+  }
+  .story {
+    gap: 40px;
+  }
+  .faq {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .faq-head {
+    position: static;
+  }
+  .final-arrow {
+    display: none;
   }
   .promises {
     grid-template-columns: 1fr;
@@ -537,8 +741,16 @@ main > section {
     );
   }
   main > section {
-    padding-top: 48px;
-    padding-bottom: 48px;
+    padding-top: 72px;
+    padding-bottom: 72px;
+  }
+  .hero {
+    padding-top: 56px !important;
+    padding-bottom: 88px !important;
+  }
+  .promises {
+    padding-top: 64px !important;
+    padding-bottom: 64px !important;
   }
   .cards {
     grid-template-columns: 1fr;
@@ -554,5 +766,22 @@ main > section {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+  .underlined path,
+  .margin-note path,
+  .final-arrow path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .margin-note {
+    animation: none;
+    clip-path: none;
+  }
+  .reveal .ticks li::before {
+    transform: rotate(-45deg);
+  }
+  .shot,
+  .cards article {
+    transition: none;
   }
 }

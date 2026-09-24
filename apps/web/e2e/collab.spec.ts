@@ -69,10 +69,28 @@ test('two people edit, comment and follow each other in real time', async ({ bro
   await alice.getByTestId('comment-text').fill('Is 22 µH enough?');
   await alice.getByTestId('comment-post').click();
   await expect(bob.getByTestId('comment-pin')).toHaveCount(1);
-  await bob.getByTestId('comment-pin').dispatchEvent('pointerdown');
+  await bob.getByTestId('comment-pin').click();
   await bob.getByTestId('comment-text').fill('Yes, ripple is 18 %.');
   await bob.getByTestId('comment-post').click();
   await expect(alice.getByTestId('comment-popover')).toContainText('ripple is 18');
+
+  // Alice drags her bubble somewhere else: Bob sees it move.
+  const pinPos = (p: typeof alice) =>
+    p.evaluate(() => {
+      const w = window as unknown as {
+        __overleagger: { ed: { project: { getComments(): { x: number; y: number }[] } } };
+      };
+      const t = w.__overleagger.ed.project.getComments()[0]!;
+      return { x: Math.round(t.x), y: Math.round(t.y) };
+    });
+  const pinBefore = await pinPos(alice);
+  const pin = (await alice.getByTestId('comment-pin').boundingBox())!;
+  await alice.mouse.move(pin.x + pin.width / 2, pin.y + pin.height / 2);
+  await alice.mouse.down();
+  await alice.mouse.move(pin.x + pin.width / 2 + 60, pin.y + pin.height / 2 + 40, { steps: 5 });
+  await alice.mouse.up();
+  await expect.poll(() => pinPos(bob)).not.toEqual(pinBefore);
+  expect(await pinPos(bob)).toEqual(await pinPos(alice));
 
   // Follow mode.
   await alice.getByTestId('peer-avatar').click();

@@ -41,7 +41,33 @@
   <body>
     <header class="nav">
       <a class="brand" href="./" aria-label="Circuit Notebook, home">
-        <img src="/brand/logo.svg" alt="" width="30" height="30" />
+        <!-- The logo, inline so a little current can run through the resistor on hover. -->
+        <svg class="logo-live" viewBox="0 0 64 64" width="30" height="30" aria-hidden="true">
+          <rect x="5" y="5" width="54" height="54" rx="9" fill="#f7f3e8" />
+          <path d="M5 20.5H59M5 43.5H59" stroke="#9db5d6" stroke-width="1.4" />
+          <path d="M17 7V57" stroke="#d24b3e" stroke-width="2.2" />
+          <path
+            d="M17 32H23L25.5 25.5L30.5 38.5L35.5 25.5L40.5 38.5L43 32H48"
+            fill="none"
+            stroke="#262626"
+            stroke-width="3.1"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="51" cy="32" r="3" fill="#f7f3e8" stroke="#262626" stroke-width="2.4" />
+          <circle cx="17" cy="32" r="3.6" fill="#262626" />
+          <rect
+            x="5"
+            y="5"
+            width="54"
+            height="54"
+            rx="9"
+            fill="none"
+            stroke="#262626"
+            stroke-width="3"
+          />
+          <circle class="spark" r="2.6" />
+        </svg>
         <span>Circuit Notebook</span>
       </a>
       <nav aria-label="Sections">
@@ -58,7 +84,13 @@
       <section class="hero ruled">
         <div class="hero-text">
           <p class="kicker">Power electronics · control · process</p>
-          <h1>The engineering notebook<br />for circuits.</h1>
+          <h1>
+            The engineering notebook<br />for
+            <span class="underlined"
+              >circuits.<svg viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M3 13C70 7 170 5 297 9M40 17C110 12 190 12 262 14" /></svg
+            ></span>
+          </h1>
           <p class="lead">
             Draw converters, control loops and flowcharts on sheets that open like blocks, with
             <b>IEC or ANSI symbols</b>, <b>junction dots that place themselves</b> and
@@ -309,52 +341,73 @@
       </section>
 
       <section id="faq" class="faq">
-        <h2>Questions</h2>
-        <details>
-          <summary>Is it free?</summary>
-          <p>Yes. Drawing, exporting and presenting are free and need no account.</p>
-        </details>
-        <details>
-          <summary>Where are my projects saved?</summary>
-          <p>
-            In your browser, on your computer. Nothing is sent anywhere unless you share a project
-            with a collaboration server. You can also download a project file (.olg) to back it up
-            or move it.
+        <div class="faq-head">
+          <h2>Questions</h2>
+          <p class="muted">
+            The short answers. The long one: open the app and try — no account, nothing to install.
           </p>
-        </details>
-        <details>
-          <summary>Does it work offline?</summary>
-          <p>
-            Yes. Once opened, the editor works without a connection; shared projects sync again when
-            you are back online.
-          </p>
-        </details>
-        <details>
-          <summary>EU or US symbols?</summary>
-          <p>
-            Both: IEC&nbsp;60617 (Europe) and IEEE&nbsp;315 / ANSI (US). Switch the whole project in
-            one click, or override a single part.
-          </p>
-        </details>
-        <details>
-          <summary>Can I put the drawings in my LaTeX report?</summary>
-          <p>
-            Yes: export a vector PDF or SVG, or CircuiTikZ code that compiles with pdflatex. All the
-            labels can be LaTeX.
-          </p>
-        </details>
-        <details>
-          <summary>Does it simulate circuits?</summary>
-          <p>
-            Not yet — Circuit Notebook is for drawing, explaining and presenting. A SPICE netlist
-            export is on the roadmap.
-          </p>
-        </details>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Is it free?</summary>
+            <p>Yes. Drawing, exporting and presenting are free and need no account.</p>
+          </details>
+          <details>
+            <summary>Can I work on it with my team?</summary>
+            <p>
+              Yes: share a project with a link and give each person a role — edit, comment or view.
+              You see each other's cursors, comment on the drawing and keep a history of versions.
+              Sharing goes through a Circuit Notebook server, which you can also run yourself.
+            </p>
+          </details>
+          <details>
+            <summary>Where are my projects saved?</summary>
+            <p>
+              In your browser, on your computer. Nothing is sent anywhere unless you share a project
+              with a collaboration server. You can also download a project file (.olg) to back it up
+              or move it.
+            </p>
+          </details>
+          <details>
+            <summary>Does it work offline?</summary>
+            <p>
+              Yes. Once opened, the editor works without a connection; shared projects sync again
+              when you are back online.
+            </p>
+          </details>
+          <details>
+            <summary>EU or US symbols?</summary>
+            <p>
+              Both: IEC&nbsp;60617 (Europe) and IEEE&nbsp;315 / ANSI (US). Switch the whole project
+              in one click, or override a single part.
+            </p>
+          </details>
+          <details>
+            <summary>Can I put the drawings in my LaTeX report?</summary>
+            <p>
+              Yes: export a vector PDF or SVG, or CircuiTikZ code that compiles with pdflatex. All
+              the labels can be LaTeX.
+            </p>
+          </details>
+          <details>
+            <summary>Does it simulate circuits?</summary>
+            <p>
+              No, and that's on purpose. Circuit Notebook is for drawing, explaining, presenting and
+              working together. Keep your simulator for the numbers, and bring the waveforms back
+              here to tell the story.
+            </p>
+          </details>
+        </div>
       </section>
 
       <section class="final ruled">
         <h2>Open a new page.</h2>
-        <a class="btn primary big" href="app/">Start drawing</a>
+        <div class="final-cta">
+          <svg class="final-arrow" viewBox="0 0 120 60" aria-hidden="true">
+            <path d="M4 10C30 4 70 8 92 38M92 38l-2-13M92 38l-12-4" />
+          </svg>
+          <a class="btn primary big" href="app/">Start drawing</a>
+        </div>
       </section>
     </main>
 

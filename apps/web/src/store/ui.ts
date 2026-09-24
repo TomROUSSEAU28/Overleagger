@@ -141,6 +141,8 @@ export interface UIState extends Settings {
   lineDraftEnds: { from?: Anchor; to?: Anchor } | null;
   /** Comment thread shown in its popup. */
   openThread: string | null;
+  /** Comment bubble being dragged, and where it is now (saved when released). */
+  commentDrag: { id: string; x: number; y: number } | null;
   showResolved: boolean;
   /** Presentation mode (full screen slides). */
   presenting: boolean;
@@ -209,6 +211,7 @@ const transient = {
   presentFollow: null,
   commentDraft: null,
   openThread: null,
+  commentDrag: null,
   anchorHover: null,
   lineDraftEnds: null,
 };

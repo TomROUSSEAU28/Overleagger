@@ -5,7 +5,13 @@
  */
 import type { CommentThread, Id } from '@overleagger/core';
 import { Check, MessageSquare, RotateCcw, Trash, X } from 'lucide-react';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useEditor, useSheets } from '../editor/context';
 import { useComments, useMe } from './hooks';
 import { useUI, type Viewport } from '../store/ui';
@@ -21,30 +27,66 @@ const ago = (t: number) => {
 /** Bubbles on the canvas (world coordinates, constant size on screen). */
 export function CommentPins({ zoom }: { zoom: number }) {
   const ed = useEditor();
+  const me = useMe();
   const threads = useComments();
   const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
   const open = useUI((s) => s.openThread);
   const showResolved = useUI((s) => s.showResolved);
   const draft = useUI((s) => s.commentDraft);
+  const drag = useUI((s) => s.commentDrag);
   const k = 1 / zoom;
+  const isOwner = (ed.session?.role ?? 'owner') === 'owner';
+  const canWrite = ed.project.canWrite(undefined, 'comments');
   const here = threads.filter(
     (t) => t.sheetId === sheetId && (showResolved || !t.resolved || t.id === open),
   );
+  // Click opens the thread; dragging (the author's or the owner's bubble) moves it.
+  const press = (t: CommentThread, e: ReactPointerEvent<SVGGElement>) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const movable = canWrite && (isOwner || t.messages[0]?.author.id === me.id);
+    const start = { cx: e.clientX, cy: e.clientY, x: t.x, y: t.y };
+    const target = e.currentTarget;
+    target.setPointerCapture?.(e.pointerId);
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - start.cx;
+      const dy = ev.clientY - start.cy;
+      if (!movable || (!moved && Math.hypot(dx, dy) < 4)) return;
+      moved = true;
+      useUI.getState().set({
+        commentDrag: { id: t.id, x: start.x + dx / zoom, y: start.y + dy / zoom },
+      });
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      const ui = useUI.getState();
+      if (moved && ui.commentDrag) {
+        ed.project.updateComment(t.id, { x: ui.commentDrag.x, y: ui.commentDrag.y });
+        ui.set({ commentDrag: null });
+      } else ui.set({ openThread: t.id === ui.openThread ? null : t.id, commentDraft: null });
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
   return (
     <g className="comment-pins">
       {here.map((t) => {
         const color = t.messages[0]?.author.color ?? '#2f5d9e';
+        const at = drag?.id === t.id ? drag : t;
+        const movable = canWrite && (isOwner || t.messages[0]?.author.id === me.id);
         return (
           <g
             key={t.id}
-            className={`comment-pin${t.id === open ? ' open' : ''}${t.resolved ? ' resolved' : ''}`}
-            transform={`translate(${t.x} ${t.y}) scale(${k})`}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              useUI.getState().set({ openThread: t.id === open ? null : t.id, commentDraft: null });
-            }}
+            className={`comment-pin${t.id === open ? ' open' : ''}${t.resolved ? ' resolved' : ''}${movable ? ' movable' : ''}${drag?.id === t.id ? ' dragging' : ''}`}
+            transform={`translate(${at.x} ${at.y}) scale(${k})`}
+            onPointerDown={(e) => press(t, e)}
             data-testid="comment-pin"
           >
+            <title>{movable ? 'Click to open · drag to move' : 'Click to open'}</title>
             <path
               d="M0 0 L0 -6 A12 12 0 1 1 6 -2 Z"
               transform="translate(0 0)"
@@ -90,7 +132,8 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
   useEffect(() => setText(''), [openId, draft]);
   // Focus without scrolling the canvas (autoFocus would scroll it to show the popup).
   useEffect(() => textRef.current?.focus({ preventScroll: true }), [openId, draft]);
-  const at = thread ?? draft;
+  const drag = useUI((s) => s.commentDrag);
+  const at = thread && drag?.id === thread.id ? drag : (thread ?? draft);
   if (!at) return null;
   const close = () => useUI.getState().set({ openThread: null, commentDraft: null });
   // Keep the popup inside the canvas: on the right of the bubble, or on its left near the edge.
@@ -242,7 +285,8 @@ export function CommentsPanel() {
       {!visible.length && (
         <p className="muted small">
           No comment. Pick the comment tool (C) and click on the drawing to ask a question or leave
-          a remark{ed.session ? ' — everyone on the project sees it live' : ''}.
+          a remark{ed.session ? ' — everyone on the project sees it live' : ''}. Drag a bubble to
+          move it.
         </p>
       )}
       {[...bySheet.entries()].map(([sid, list]) => (
