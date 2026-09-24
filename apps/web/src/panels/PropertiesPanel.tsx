@@ -114,8 +114,8 @@ function SheetProps() {
       </Field>
       {sheet && (
         <div className="show-in">
-          <span className="muted small">This sheet in</span>
-          <label className="check compact">
+          <span className="field-label">Include this sheet in</span>
+          <label className="check">
             <input
               type="checkbox"
               checked={!sheet.noPresent}
@@ -124,7 +124,7 @@ function SheetProps() {
             />
             Presentation
           </label>
-          <label className="check compact">
+          <label className="check">
             <input
               type="checkbox"
               checked={!sheet.noExport}
@@ -473,8 +473,8 @@ function ShowIn({ els }: { els: Element[] }) {
     });
   return (
     <div className="show-in">
-      <span className="muted small">Show in</span>
-      <label className="check compact">
+      <span className="field-label">Show in</span>
+      <label className="check">
         <input
           type="checkbox"
           checked={els.every((e) => !e.noPresent)}
@@ -483,7 +483,7 @@ function ShowIn({ els }: { els: Element[] }) {
         />
         Presentation
       </label>
-      <label className="check compact">
+      <label className="check">
         <input
           type="checkbox"
           checked={els.every((e) => !e.noExport)}

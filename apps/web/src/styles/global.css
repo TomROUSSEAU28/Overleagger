@@ -31,6 +31,8 @@
 
 :root {
   --serif: 'CMU Serif', 'Latin Modern Roman', Georgia, serif;
+  /* Interface text (panels, fields, buttons): a technical sans that stays readable when small. */
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'CMU Typewriter Text', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   --bg: #efece4;
@@ -99,9 +101,9 @@ body,
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 15px;
-  line-height: 1.4;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -680,15 +682,21 @@ button.kbd {
   color: var(--muted);
   margin-bottom: 12px;
 }
+/* "Show in" / "This sheet in": a label line, then the options side by side, like a field. */
 .show-in {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  margin: 6px 0 4px;
+  align-items: center;
+  gap: 2px 16px;
+  margin: 4px 0 10px;
+}
+.show-in .field-label {
+  flex: 0 0 100%;
 }
 .show-in .check {
   margin: 0;
+  font-size: 13px;
+  color: var(--ink);
 }
 .button-row {
   display: flex;
@@ -2146,4 +2154,28 @@ fieldset.plain {
     opacity: 0;
     transform: translate(-50%, 6px);
   }
+}
+
+/* The notebook's own voice: the drawing, titles and everything in small caps keep the LaTeX
+   font (the interface text around them is in IBM Plex Sans). */
+h1,
+h2,
+h3,
+.logo,
+.tabs button,
+.segmented button,
+.lib-cat-head,
+.lib-cat-title,
+.tool-options .opt.text,
+.share-h,
+.card-title {
+  font-family: var(--serif);
+}
+/* Drawings (editor, presentation, symbol editor, library tiles) are always in the LaTeX font. */
+.canvas-wrap svg,
+.presentation svg,
+.symed-canvas svg,
+.symbol-tile svg,
+.inline-editor {
+  font-family: var(--serif);
 }

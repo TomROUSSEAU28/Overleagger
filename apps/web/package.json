@@ -11,6 +11,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-sans": "5.3.0",
     "@hocuspocus/provider": "^4.7.0",
     "@overleagger/core": "workspace:*",
     "@overleagger/symbols": "workspace:*",
