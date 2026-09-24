@@ -17,10 +17,17 @@ certificates and caches the static files close to visitors.
 
 ## 1. Name and domain
 
-- [ ] Check the name is free: `circuitnotebook.com` / `.app` / `.io`, the EUIPO trademark
-      register (TMview), GitHub, and a quick web search.
-- [ ] Buy the domain from **Cloudflare Registrar** (sold at cost, DNS already in the right place).
-      Otherwise buy it anywhere and move the DNS to Cloudflare.
+- [x] **`circuitnotebook.com`**, registered at **Hostinger** (renewal happens there: keep
+      auto-renew on, and confirm the ICANN verification email within 15 days).
+- [ ] Cloudflare → _Add a domain_ → `circuitnotebook.com` → **Free** plan. Delete the imported
+      records that point to Hostinger's parking page (A / AAAA / CNAME for `@` and `www`).
+- [ ] Hostinger (hPanel → _Domains_ → `circuitnotebook.com` → _DNS / Nameservers_): turn
+      **DNSSEC off** if it is on, then _Change nameservers_ → the two `*.ns.cloudflare.com`
+      names Cloudflare gives. The domain stays at Hostinger; only the DNS moves to Cloudflare.
+- [ ] Wait for Cloudflare's "your domain is now active" email (minutes to 24 h), then turn
+      DNSSEC on again **from Cloudflare** (it gives a DS record to paste at Hostinger).
+- [ ] Optional, later: transfer the registration to Cloudflare Registrar (at-cost renewals).
+      Possible 60 days after the purchase.
 
 ## 2. The server (Hetzner)
 
@@ -39,7 +46,7 @@ certificates and caches the static files close to visitors.
   ```
 
 - [ ] In `docker-compose.yml`:
-  - `PUBLIC_URL: https://<domain>`, `TRUST_PROXY: 'true'`;
+  - `PUBLIC_URL: https://circuitnotebook.com`, `TRUST_PROXY: 'true'`;
   - bind the port to the machine only: `'127.0.0.1:8787:8787'`.
 - [ ] `docker compose up -d --build`, then `curl localhost:8787/api/health`.
 
@@ -50,7 +57,7 @@ no web port is open to the internet and the IP address is never published.
 
 - [ ] Cloudflare dashboard → _Zero Trust → Networks → Tunnels_ → create a tunnel, run the
       `cloudflared` install command it shows on the server.
-- [ ] Public hostname: `<domain>` → `http://localhost:8787`. WebSockets (`/collab`) work through
+- [ ] Public hostname: `circuitnotebook.com` → `http://localhost:8787`. WebSockets (`/collab`) work through
       tunnels with no extra setting.
 - [ ] _SSL/TLS_: mode **Full (strict)**. Never **Flexible** (the second half of the trip would be
       plain HTTP).
@@ -105,13 +112,14 @@ Open projects reconnect by themselves; unsynced edits stay in the browsers and s
 - [ ] **Legal (France / EU)**: _mentions légales_ (who publishes the site, the host's address)
       and a **privacy policy** (GDPR: which data — email, name, projects —, why, how long, how to
       delete an account). No tracking cookies → no cookie banner needed.
-- [ ] Homepage (`apps/web/index.html`): once the domain is known, make `og:image` and
-      `twitter:image` **absolute URLs**, add `<link rel="canonical">`, a `robots.txt` and a
-      `sitemap.xml`.
+- [x] Homepage: absolute `og:image` / `twitter:image`, `<link rel="canonical">`, `robots.txt` and
+      `sitemap.xml` point to `https://circuitnotebook.com/`.
+- [ ] Cloudflare _Rules → Redirect rules_: `www.circuitnotebook.com/*` →
+      `https://circuitnotebook.com/$1` (301), so there is one address.
 - [ ] `ALLOW_SIGNUP`: keep `true` for a public beta, or `false` + invite links for a closed one.
 - [ ] Optional: GitHub sign-in (`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`, callback
-      `https://<domain>/api/auth/github/callback`).
-- [ ] Uptime monitor (UptimeRobot, free) on `https://<domain>/api/health`.
+      `https://circuitnotebook.com/api/auth/github/callback`).
+- [ ] Uptime monitor (UptimeRobot, free) on `https://circuitnotebook.com/api/health`.
 
 ## 7. Getting found
 

@@ -1,0 +1,4 @@
+# Circuit Notebook — everything public may be indexed, the API is not a page.
+User-agent: *
+Disallow: /api/
+Sitemap: https://circuitnotebook.com/sitemap.xml
