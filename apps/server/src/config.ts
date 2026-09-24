@@ -29,6 +29,10 @@ export interface Config {
   backupDir?: string;
   /** Days of nightly database copies kept. */
   backupKeepDays: number;
+  /** Where the messages of the contact form are sent (and shown on the site). */
+  contactEmail?: string;
+  /** Outgoing e-mail (optional): without it, messages are only in the admin page. */
+  smtp?: { host: string; port: number; user?: string; pass?: string; from: string };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -56,6 +60,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     ...(env.BACKUP_DIR ? { backupDir: env.BACKUP_DIR } : {}),
     backupKeepDays: Number(env.BACKUP_KEEP_DAYS ?? 7),
+    ...(env.CONTACT_EMAIL ? { contactEmail: env.CONTACT_EMAIL.trim() } : {}),
+    ...(env.SMTP_HOST
+      ? {
+          smtp: {
+            host: env.SMTP_HOST,
+            port: Number(env.SMTP_PORT ?? 587),
+            ...(env.SMTP_USER ? { user: env.SMTP_USER } : {}),
+            ...(env.SMTP_PASS ? { pass: env.SMTP_PASS } : {}),
+            from: env.SMTP_FROM ?? env.CONTACT_EMAIL ?? env.SMTP_USER ?? '',
+          },
+        }
+      : {}),
   };
 }
 

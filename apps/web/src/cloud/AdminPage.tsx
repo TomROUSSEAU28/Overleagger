@@ -2,7 +2,7 @@
  * `#/admin`: how the server is doing (accounts, projects, storage, disk, nightly copy of the
  * database) and each account's room on the server. Only for the e-mails in ADMIN_EMAILS.
  */
-import { ArrowLeft, DatabaseBackup, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Check, DatabaseBackup, Mail, RefreshCw, Reply, Trash } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Logo } from '../brand/Logo';
 import { ThemePicker } from '../panels/ThemePicker';
@@ -32,6 +32,15 @@ interface Stats {
     bytes: number;
     versions_bytes: number;
   }[];
+}
+
+interface Message {
+  id: string;
+  at: number;
+  name: string;
+  email: string;
+  body: string;
+  read: boolean;
 }
 
 interface AdminUser {
@@ -100,17 +109,20 @@ export function AdminPage() {
   const user = useCloud((s) => s.user);
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [def, setDef] = useState(5);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [s, u] = await Promise.all([
+      const [s, u, m] = await Promise.all([
         api<Stats>('GET', '/api/admin/stats'),
         api<{ users: AdminUser[]; defaultMaxProjects: number }>('GET', '/api/admin/users'),
+        api<{ messages: Message[] }>('GET', '/api/admin/messages'),
       ]);
       setStats(s);
+      setMessages(m.messages);
       setUsers(u.users);
       setDef(u.defaultMaxProjects);
       setError('');
@@ -135,6 +147,16 @@ export function AdminPage() {
   };
 
   const diskUsed = stats?.disk ? 1 - stats.disk.free / stats.disk.total : 0;
+  const unread = messages.filter((m) => !m.read).length;
+  const setRead = async (m: Message, read: boolean) => {
+    await api('PATCH', `/api/admin/messages/${m.id}`, { read }).catch(() => undefined);
+    setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, read } : x)));
+  };
+  const remove = async (m: Message) => {
+    if (!confirm(`Delete the message of ${m.name || m.email}?`)) return;
+    await api('DELETE', `/api/admin/messages/${m.id}`).catch(() => undefined);
+    setMessages((list) => list.filter((x) => x.id !== m.id));
+  };
   return (
     <div className="dashboard admin-page" data-theme={theme}>
       <header className="dash-top">
@@ -176,6 +198,57 @@ export function AdminPage() {
       ) : (
         <>
           {error && <p className="warning">{error}</p>}
+          <section className="people-card" data-testid="admin-messages">
+            <h2>
+              <Mail size={18} /> Messages
+              {unread > 0 && <span className="count-badge">{unread}</span>}
+            </h2>
+            {messages.length ? (
+              <ul className="admin-messages">
+                {messages.map((m) => (
+                  <li key={m.id} className={m.read ? 'read' : ''}>
+                    <div className="msg-head">
+                      <b>{m.name || m.email}</b>
+                      <span className="muted small">
+                        {m.name ? `${m.email} · ` : ''}
+                        {when(m.at)}
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      <a
+                        className="icon-btn"
+                        title="Answer by e-mail"
+                        href={`mailto:${m.email}?subject=${encodeURIComponent('Re: your message about Circuit Notebook')}`}
+                        onClick={() => void setRead(m, true)}
+                      >
+                        <Reply size={15} />
+                      </a>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title={m.read ? 'Mark as unread' : 'Mark as read'}
+                        onClick={() => void setRead(m, !m.read)}
+                      >
+                        <Check size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        title="Delete"
+                        onClick={() => void remove(m)}
+                      >
+                        <Trash size={15} />
+                      </button>
+                    </div>
+                    <p className="msg-body">{m.body}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted small">
+                No message yet. Visitors write to you from the form at the bottom of the homepage.
+              </p>
+            )}
+          </section>
           {stats && (
             <section className="admin-tiles" data-testid="admin-stats">
               <Tile

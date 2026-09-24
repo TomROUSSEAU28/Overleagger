@@ -26,6 +26,13 @@ services:
       # Beta limits: projects each account keeps on the server, and MB per project.
       # MAX_PROJECTS: '5'
       # MAX_PROJECT_MB: '5'
+      # Contact form of the homepage: messages are e-mailed there (needs SMTP, e.g. Brevo).
+      # CONTACT_EMAIL: contact@example.com
+      # SMTP_HOST: smtp-relay.brevo.com
+      # SMTP_PORT: '587'
+      # SMTP_USER: ...
+      # SMTP_PASS: ...
+      # SMTP_FROM: Circuit Notebook <contact@example.com>
 
 volumes:
   circuit-notebook-data:

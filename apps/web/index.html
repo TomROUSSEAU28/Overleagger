@@ -76,12 +76,14 @@
           <circle class="spark" r="2.6" />
         </svg>
         <span>Circuit Notebook</span>
+        <span class="beta-tag" title="Open beta: free while it grows">Beta</span>
       </a>
       <nav aria-label="Sections">
         <a href="#features">Features</a>
         <a href="#together">Collaboration</a>
-        <a href="#latex">LaTeX</a>
+        <a href="#beta">Beta</a>
         <a href="#faq">FAQ</a>
+        <a href="#contact">Contact</a>
       </nav>
       <a class="btn primary" href="app/">Open the app</a>
     </header>
@@ -90,7 +92,10 @@
       <!-- Hero: a page of the notebook -->
       <section class="hero ruled">
         <div class="hero-text">
-          <p class="kicker">Power electronics · control · process</p>
+          <p class="kicker">
+            <a class="beta-pill" href="#beta">Open beta · free</a>
+            Power electronics · control · process
+          </p>
           <h1>
             The engineering notebook<br />for
             <span class="underlined"
@@ -108,9 +113,7 @@
             <a class="btn primary big" href="app/">Start drawing — it's free</a>
             <a class="btn big" href="app/#/example">Open the buck converter example</a>
           </div>
-          <p class="small muted">
-            No account needed · works offline · your projects stay on your computer
-          </p>
+          <p class="small muted">No account needed · works offline · free during the open beta</p>
         </div>
         <figure class="shot hero-shot">
           <img
@@ -387,6 +390,49 @@
 # → http://localhost:8787</code></pre>
       </section>
 
+      <section id="beta" class="beta ruled" aria-labelledby="beta-title">
+        <div class="beta-text">
+          <p class="kicker">Open beta</p>
+          <h2 id="beta-title">Made by one student, free while it grows</h2>
+          <p>
+            Hi! I'm an engineering student, and I build Circuit Notebook on my own, in my free time.
+            It is an <b>open beta</b>: everything is free, and a few things may still change or
+            break. Tell me when they do — your feedback decides what comes next.
+          </p>
+          <ul class="ticks">
+            <li>Drawing in your browser: free, no account, as many projects as you like</li>
+            <li>With an account: 5 projects on the server to share, up to 5&nbsp;MB each</li>
+            <li>Your work stays yours: download it any time (project file, PDF, SVG, PNG)</li>
+          </ul>
+        </div>
+        <aside class="support-card" aria-labelledby="support-title">
+          <h3 id="support-title">What your support makes possible</h3>
+          <ul class="support-list">
+            <li>
+              <b>A bigger server</b>, so everyone can keep more projects online and work together.
+            </li>
+            <li><b>Making Circuit Notebook known</b> to more students, labs and schools.</li>
+            <li><b>New features</b> — first the ones you ask for.</li>
+            <li>
+              <b>Later, a Premium plan</b> with more projects on the server. Drawing in your browser
+              stays free.
+            </li>
+          </ul>
+          <div class="support-actions">
+            <a
+              class="btn kofi big"
+              href="https://ko-fi.com/circuitnotebook"
+              target="_blank"
+              rel="noopener"
+              data-testid="kofi"
+              >♥ Support on Ko-fi</a
+            >
+            <a class="btn big" href="#contact">Write to me</a>
+          </div>
+          <p class="small muted">Every coffee helps keep the server running. Thank you!</p>
+        </aside>
+      </section>
+
       <section id="faq" class="faq">
         <div class="faq-head">
           <h2>Questions</h2>
@@ -398,9 +444,10 @@
           <details>
             <summary>Is it free?</summary>
             <p>
-              Yes. Drawing, exporting and presenting are free and need no account, and projects in
-              your browser are unlimited. During the beta, each account can also keep 5 projects on
-              the server (up to 5&nbsp;MB each) to share them.
+              Yes — Circuit Notebook is in open beta and free. Drawing, exporting and presenting
+              need no account, and projects in your browser are unlimited. Each account can also
+              keep 5 projects on the server (up to 5&nbsp;MB each) to share them. Later, a Premium
+              plan will give more room on the server; drawing in your browser stays free.
             </p>
           </details>
           <details>
@@ -464,6 +511,41 @@
         </div>
       </section>
 
+      <section id="contact" class="contact" aria-labelledby="contact-title">
+        <div class="contact-text">
+          <h2 id="contact-title">Write to me</h2>
+          <p class="muted">
+            A bug, an idea, a symbol you miss, a question about your course? I read every message
+            and answer by e-mail.
+          </p>
+          <p class="small muted">
+            Or e-mail <a href="mailto:contact@circuitnotebook.com">contact@circuitnotebook.com</a>
+          </p>
+        </div>
+        <form class="contact-form" data-testid="contact-form" novalidate>
+          <label>
+            <span>Your name <i class="muted">(optional)</i></span>
+            <input name="name" autocomplete="name" maxlength="100" />
+          </label>
+          <label>
+            <span>Your e-mail, so I can answer</span>
+            <input name="email" type="email" autocomplete="email" required maxlength="200" />
+          </label>
+          <label class="hp" aria-hidden="true">
+            <span>Leave this empty</span>
+            <input name="website" tabindex="-1" autocomplete="off" />
+          </label>
+          <label>
+            <span>Message</span>
+            <textarea name="message" rows="6" required maxlength="4000"></textarea>
+          </label>
+          <div class="contact-send">
+            <button class="btn primary" type="submit">Send</button>
+            <p class="form-status small" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </section>
+
       <section class="final ruled">
         <h2>Open a new page.</h2>
         <div class="final-cta">
@@ -472,12 +554,6 @@
           </svg>
           <a class="btn primary big" href="app/">Start drawing</a>
         </div>
-        <p class="support-note">
-          Made by one student developer, free during the beta.
-          <a href="https://ko-fi.com/circuitnotebook" target="_blank" rel="noopener"
-            >♥ Support the project</a
-          >
-        </p>
       </section>
     </main>
 
@@ -490,6 +566,7 @@
         <a href="app/">Open the app</a>
         <a href="app/#/gallery">Symbol gallery</a>
         <a href="app/#/example">Example</a>
+        <a href="mailto:contact@circuitnotebook.com">Contact</a>
         <a href="https://ko-fi.com/circuitnotebook" target="_blank" rel="noopener">Support ♥</a>
       </nav>
       <p class="muted small">

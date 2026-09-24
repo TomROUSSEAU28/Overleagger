@@ -137,6 +137,39 @@ old database to `/data/backups/before-reset-<date>/` (nothing is deleted), and s
 version with an empty database. Projects saved in browsers are not touched. The end of its
 output shows how to undo.
 
+## 4b. The site's e-mail address and the contact form
+
+Messages written in the form at the bottom of the homepage are always saved in the server's
+database: read them on the **Administration** page (_Messages_). Two optional steps make them
+reach your mailbox and give the site its address, contact@circuitnotebook.com.
+
+1. **Receive e-mails at contact@** (free, Cloudflare Email Routing)
+   - Cloudflare → circuitnotebook.com → **Email** → **Email Routing** → _Get started_ /
+     _Enable_: Cloudflare adds the DNS records (MX, TXT) by itself.
+   - **Destination addresses** → add your Gmail → click the link Cloudflare sends you.
+   - **Routing rules** → _Create address_ → `contact` → action _Send to an email_ → your Gmail.
+   - Test: send an e-mail to contact@circuitnotebook.com from another address.
+2. **Let the server send the form to you** (free, Brevo: 300 e-mails a day)
+   - Create an account on brevo.com → **Senders, domains & dedicated IPs** → **Domains** → add
+     `circuitnotebook.com` → Brevo shows a few DNS records: add them in Cloudflare (DNS →
+     Records), then _Verify_. Add `contact@circuitnotebook.com` as a sender.
+   - **SMTP & API** → **SMTP** → _Generate a new SMTP key_: note the login and the key.
+   - In `docker-compose.override.yml` on the server, under `environment:`:
+
+     ```yaml
+     CONTACT_EMAIL: contact@circuitnotebook.com
+     SMTP_HOST: smtp-relay.brevo.com
+     SMTP_PORT: '587'
+     SMTP_USER: <the Brevo SMTP login>
+     SMTP_PASS: <the Brevo SMTP key>
+     SMTP_FROM: Circuit Notebook <contact@circuitnotebook.com>
+     ```
+
+   - `deploy/update.sh --force`, then send yourself a message from the homepage.
+3. **Answer as contact@ from Gmail** (optional): Gmail → Settings → _Accounts and Import_ →
+   _Send mail as_ → add `contact@circuitnotebook.com` with the Brevo SMTP server, login and key
+   (port 587). When you reply to a message of the form, choose it as the sender.
+
 ## 5. Updates
 
 ```bash

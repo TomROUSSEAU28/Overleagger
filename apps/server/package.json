@@ -17,6 +17,7 @@
     "@hocuspocus/server": "^4.7.0",
     "fastify": "^5.12.5",
     "lib0": "^0.2.117",
+    "nodemailer": "^8.0.11",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33"
   },
@@ -24,6 +25,7 @@
     "@hocuspocus/provider": "^4.7.0",
     "@overleagger/core": "workspace:*",
     "@overleagger/symbols": "workspace:*",
+    "@types/nodemailer": "^8.0.2",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",

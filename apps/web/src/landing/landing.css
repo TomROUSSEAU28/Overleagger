@@ -122,6 +122,14 @@ kbd {
     box-shadow 0.12s,
     background-color 0.12s;
 }
+button.btn {
+  font: inherit;
+  cursor: pointer;
+}
+button.btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 0 var(--ink);
@@ -349,17 +357,153 @@ main > section {
   }
 }
 
-.support-note {
-  margin: 34px 0 0;
-  text-align: center;
-  color: var(--muted);
-  font-style: italic;
+/* Beta: a small tag next to the logo, a pill in the hero */
+.beta-tag {
+  font-family: var(--serif);
+  font-size: 12px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--margin);
+  border: 1px solid color-mix(in srgb, var(--margin) 55%, transparent);
+  border-radius: 999px;
+  padding: 0 8px 1px;
+  margin-left: 2px;
+  transform: rotate(-4deg) translateY(-6px);
 }
-.support-note a {
-  margin-left: 8px;
-  font-style: normal;
-  color: #b3413a;
-  white-space: nowrap;
+.beta-pill {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 1px 10px 2px;
+  border-radius: 999px;
+  background: var(--margin);
+  color: #fff;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+.beta-pill:hover {
+  filter: brightness(1.08);
+}
+
+/* Beta and support: a note from the developer, and what donations pay for */
+.beta {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 64px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.beta-text > p {
+  max-width: 36em;
+}
+.support-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 26px 28px 22px;
+  box-shadow: var(--shadow);
+  transform: rotate(0.6deg);
+}
+.support-card::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: calc(50% - 50px);
+  width: 100px;
+  height: 24px;
+  background: rgba(237, 220, 160, 0.72);
+  border: 1px solid rgba(180, 160, 100, 0.25);
+  transform: rotate(-2deg);
+}
+.support-card h3 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+.support-list {
+  margin: 0 0 20px;
+  padding-left: 20px;
+}
+.support-list li {
+  margin: 8px 0;
+}
+.support-list li::marker {
+  content: '♥  ';
+  color: var(--margin);
+  font-size: 0.8em;
+}
+.support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.btn.kofi {
+  background: var(--margin);
+  border-color: var(--margin);
+  color: #fff;
+}
+.btn.kofi:hover {
+  filter: brightness(1.08);
+}
+
+/* Contact form */
+.contact {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 64px;
+  align-items: start;
+}
+.contact-form {
+  display: grid;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 24px;
+}
+.contact-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 16px;
+}
+.contact-form input,
+.contact-form textarea {
+  font: inherit;
+  font-size: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+}
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: var(--accent);
+}
+.contact-form .hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.contact-send {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.form-status {
+  margin: 0;
+}
+.form-status.ok {
+  color: #2e7d4f;
+}
+.form-status.error {
+  color: #b03a2e;
 }
 
 /* Three promises */
@@ -747,7 +891,9 @@ main > section {
 @media (max-width: 960px) {
   .story,
   .story.reverse,
-  .selfhost {
+  .selfhost,
+  .beta,
+  .contact {
     grid-template-columns: 1fr;
     gap: 28px;
   }
@@ -786,6 +932,10 @@ main > section {
 @media (max-width: 640px) {
   body {
     font-size: 17px;
+  }
+  /* The hero says "Open beta" already; the header keeps room for its button. */
+  .nav .beta-tag {
+    display: none;
   }
   .nav nav {
     display: none;

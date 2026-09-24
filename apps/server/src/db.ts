@@ -130,6 +130,15 @@ CREATE TABLE IF NOT EXISTS docs (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (project_id, doc)
 );
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  body TEXT NOT NULL,
+  user_id TEXT,
+  read_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -779,6 +788,49 @@ export class Store {
       del.run(v.id);
       total -= v.size;
     }
+  }
+
+  // Messages of the contact form ----------------------------------------------
+
+  addMessage(m: { id: string; name: string; email: string; body: string; userId?: string }) {
+    this.db
+      .prepare(
+        'INSERT INTO messages (id, created_at, name, email, body, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(m.id, Date.now(), m.name, m.email, m.body, m.userId ?? null);
+  }
+
+  messages() {
+    return this.db
+      .prepare(
+        'SELECT id, created_at, name, email, body, read_at FROM messages ORDER BY created_at DESC LIMIT 500',
+      )
+      .all() as {
+      id: string;
+      created_at: number;
+      name: string;
+      email: string;
+      body: string;
+      read_at: number | null;
+    }[];
+  }
+
+  unreadMessages(): number {
+    return (
+      this.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE read_at IS NULL').get() as {
+        n: number;
+      }
+    ).n;
+  }
+
+  markMessageRead(id: string, read: boolean) {
+    this.db
+      .prepare('UPDATE messages SET read_at = ? WHERE id = ?')
+      .run(read ? Date.now() : null, id);
+  }
+
+  deleteMessage(id: string) {
+    this.db.prepare('DELETE FROM messages WHERE id = ?').run(id);
   }
 
   // Quotas & statistics ---------------------------------------------------------

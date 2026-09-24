@@ -2890,3 +2890,50 @@ body.resizing-panel {
 .admin-limit input {
   width: 72px;
 }
+.admin-messages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.admin-messages li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.admin-messages li:not(.read) {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+.admin-messages li.read {
+  opacity: 0.7;
+}
+.admin-messages .msg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.admin-messages .msg-body {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.admin-page .people-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Open beta tag next to the logo */
+.beta-tag {
+  font-family: var(--serif);
+  font-size: 12px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: #c0453a;
+  border: 1px solid color-mix(in srgb, #c0453a 55%, transparent);
+  border-radius: 999px;
+  padding: 0 7px 1px;
+  margin-left: 4px;
+  align-self: flex-start;
+  transform: rotate(-4deg);
+}

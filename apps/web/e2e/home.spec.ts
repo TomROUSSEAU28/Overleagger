@@ -32,3 +32,37 @@ test('homepage: links to the app, the example, and old links still work', async 
   await expect(page.getByTestId('canvas')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('homepage: open beta, support link, and the contact form reaches the admin', async ({
+  page,
+  request,
+}) => {
+  const SERVER = 'http://localhost:8788';
+  // The page talks to the server this browser knows (here: the test server).
+  await page.addInitScript((s) => localStorage.setItem('sb.server', s), SERVER);
+  await page.goto('/');
+  await expect(page.locator('.beta-pill')).toContainText('Open beta');
+  await expect(page.getByTestId('kofi')).toHaveAttribute('href', /ko-fi\.com/);
+  const stamp = Date.now();
+  const form = page.getByTestId('contact-form');
+  await form.locator('input[name=email]').fill('nope');
+  await form.locator('textarea').fill('Hello there');
+  await form.getByRole('button', { name: 'Send' }).click();
+  await expect(form.locator('.form-status')).toContainText('e-mail address');
+  await form.locator('input[name=name]').fill('Léa');
+  await form.locator('input[name=email]').fill(`lea.${stamp}@univ.fr`);
+  await form.locator('textarea').fill(`The PDF export is great (${stamp})`);
+  await form.getByRole('button', { name: 'Send' }).click();
+  await expect(form.locator('.form-status')).toContainText('Thank you');
+
+  // The administrator finds it in the admin page's messages.
+  const signup = await request.post(`${SERVER}/api/auth/signup`, {
+    data: { email: `boss.${stamp}@admin.test`, name: 'Boss', password: 'correct horse battery' },
+  });
+  const { token } = (await signup.json()) as { token: string };
+  const list = await request.get(`${SERVER}/api/admin/messages`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const { messages } = (await list.json()) as { messages: { body: string; name: string }[] };
+  expect(messages.find((m) => m.body.includes(String(stamp)))?.name).toBe('Léa');
+});

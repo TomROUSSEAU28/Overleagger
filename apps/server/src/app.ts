@@ -19,10 +19,12 @@ import { statfs } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { colorFor, hashPassword, hashToken, randomToken, verifyPassword } from './auth';
+import type { Transporter } from 'nodemailer';
 import { startBackups } from './backup';
 import { createCollab, visibleParts } from './collab';
 import { isAdminEmail, type Config } from './config';
 import { Store, type UserRow } from './db';
+import { createMailer } from './mail';
 
 const publicUser = (u: UserRow) => ({
   id: u.id,
@@ -47,8 +49,13 @@ class HttpError extends Error {
 const bad = (msg: string) => new HttpError(400, msg);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function createApp(config: Config) {
+export async function createApp(
+  config: Config,
+  /** Tests: where e-mails go instead of the SMTP server. */
+  options: { mailTransport?: Transporter } = {},
+) {
   const store = new Store(config.dbFile);
+  const mailer = createMailer(config, options.mailTransport);
   const collab = createCollab(store, config);
   const backups = startBackups(store.db, config);
   const app = Fastify({
@@ -153,7 +160,48 @@ export async function createApp(config: Config) {
     name: 'Circuit Notebook',
     signup: config.allowSignup,
     github: Boolean(config.github),
+    ...(config.contactEmail ? { contact: config.contactEmail } : {}),
   }));
+
+  // Contact form of the homepage (no account needed) --------------------------
+
+  const contactTimes = new Map<string, number[]>();
+  app.post('/api/contact', async (req) => {
+    const b = (req.body ?? {}) as {
+      name?: string;
+      email?: string;
+      message?: string;
+      website?: string;
+    };
+    // Robots fill every field, people don't see this one: pretend it worked.
+    if (b.website) return { ok: true };
+    const name = (b.name ?? '').trim().slice(0, 100);
+    const email = (b.email ?? '').trim().toLowerCase();
+    const body = (b.message ?? '').trim();
+    if (!EMAIL.test(email) || email.length > 200)
+      throw bad('Please enter your e-mail address, so I can answer.');
+    if (body.length < 5) throw bad('Your message is empty.');
+    if (body.length > 4000) throw bad('Your message is too long (4000 characters at most).');
+    const now = Date.now();
+    const recent = (contactTimes.get(req.ip) ?? []).filter((t) => now - t < 3600_000);
+    if (recent.length >= 5)
+      throw new HttpError(429, 'Too many messages from here, try again in an hour.');
+    contactTimes.set(req.ip, [...recent, now]);
+    const user = userOf(req);
+    store.addMessage({
+      id: randomToken(9),
+      name,
+      email,
+      body,
+      ...(user ? { userId: user.id } : {}),
+    });
+    // The message is saved in any case; the e-mail is a bonus.
+    await mailer.sendContact({ name, email, body }).catch((e: unknown) => {
+      console.error('Could not e-mail a contact message:', e);
+      return false;
+    });
+    return { ok: true };
+  });
 
   app.post('/api/auth/signup', async (req) => {
     const b = (req.body ?? {}) as {
@@ -772,6 +820,7 @@ export async function createApp(config: Config) {
     const last = backups.last();
     return {
       ...store.stats(week),
+      unreadMessages: store.unreadMessages(),
       dbBytes,
       disk,
       backup: last ? { at: last.at, bytes: last.bytes } : null,
@@ -809,6 +858,33 @@ export async function createApp(config: Config) {
     if (v !== null && (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 10000))
       throw bad('Give a whole number of projects (or nothing for the default).');
     store.setMaxProjects(userId, v);
+    return { ok: true };
+  });
+
+  app.get('/api/admin/messages', async (req) => {
+    requireAdmin(req);
+    return {
+      messages: store.messages().map((m) => ({
+        id: m.id,
+        at: m.created_at,
+        name: m.name,
+        email: m.email,
+        body: m.body,
+        read: m.read_at !== null,
+      })),
+    };
+  });
+
+  app.patch('/api/admin/messages/:id', async (req) => {
+    requireAdmin(req);
+    const { id } = req.params as { id: string };
+    store.markMessageRead(id, (req.body as { read?: boolean } | undefined)?.read !== false);
+    return { ok: true };
+  });
+
+  app.delete('/api/admin/messages/:id', async (req) => {
+    requireAdmin(req);
+    store.deleteMessage((req.params as { id: string }).id);
     return { ok: true };
   });
 

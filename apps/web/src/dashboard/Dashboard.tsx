@@ -536,6 +536,9 @@ export function Dashboard() {
         <a className="dash-brand" href="../" title="About Circuit Notebook">
           <Logo size={28} />
           <span className="logo">Circuit Notebook</span>
+          <span className="beta-tag" title="Open beta: free while it grows">
+            Beta
+          </span>
         </a>
         <div className="dash-top-right">
           <a
@@ -699,6 +702,9 @@ export function Dashboard() {
           Example project
         </button>
         <a href="../">About</a>
+        <a href="../#contact" data-testid="feedback">
+          Send feedback
+        </a>
         <span className="muted">
           {user
             ? 'Local projects stay in this browser until you share them.'
