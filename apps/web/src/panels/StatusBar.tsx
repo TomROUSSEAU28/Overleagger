@@ -13,6 +13,15 @@ const HINTS: Record<ToolId, string> = {
   label: 'Click to place a net label — labels with the same name are connected',
   text: 'Click to place text — use $…$ for LaTeX',
   place: 'Click to place · R rotate · X / Y mirror · Esc to stop',
+  draw: 'Draw freehand with the pencil (pen pressure supported) · Esc to stop',
+  eraser: 'Drag over elements to erase them',
+  shape: 'Drag to draw a shape · Shift keeps a square / circle',
+  line: 'Drag to draw a line or arrow · Shift snaps to 45° · drag the middle handle to curve it',
+  note: 'Click to stick a note',
+  image: 'Click where the image should go (or drop / paste an image anywhere)',
+  button: 'Click to place a link button · Ctrl+click a button to follow it',
+  waveform: 'Drag to draw an oscillogram / chronogram',
+  frame: 'Drag to draw a frame (for presentations and page layout)',
 };
 
 export function StatusBar() {

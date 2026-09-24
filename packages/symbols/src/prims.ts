@@ -79,6 +79,21 @@ export const M = (x: number, y: number, t: string, size?: number): Primitive => 
   ...(size ? { size } : {}),
 });
 
+/** Drawn "+" sign centred on (x, y) (crisper than a font glyph, identical in PDF exports). */
+export const plus = (x: number, y: number, s = 0.3): Primitive[] => [
+  L(x - s, y, x + s, y, { sw: 0.9 }),
+  L(x, y - s, x, y + s, { sw: 0.9 }),
+];
+
+/** Drawn "−" sign centred on (x, y). */
+export const minus = (x: number, y: number, s = 0.3): Primitive[] => [
+  L(x - s, y, x + s, y, { sw: 0.9 }),
+];
+
+/** "+" or "−" from a character. */
+export const sign = (c: string, x: number, y: number, s = 0.3): Primitive[] =>
+  c === '-' || c === '−' ? minus(x, y, s) : plus(x, y, s);
+
 /** Small filled connection dot. */
 export const dot = (x: number, y: number, r = 0.2): Primitive => C(x, y, r, { fill: 'ink', sw: 0 });
 

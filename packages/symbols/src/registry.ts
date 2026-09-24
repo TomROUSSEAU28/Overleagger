@@ -1,4 +1,13 @@
 import { control } from './library/control';
+import {
+  extraAnalog,
+  extraControl,
+  extraMisc,
+  extraPassives,
+  extraPower,
+  extraSemis,
+  extraSources,
+} from './library/extra';
 import { analog, annotations, machines, measurement, switches } from './library/misc';
 import { passives } from './library/passives';
 import { power } from './library/power';
@@ -18,17 +27,24 @@ import type {
 
 export const builtinSymbols: SymbolDef[] = [
   ...passives,
+  ...extraPassives,
   ...sources,
+  ...extraSources,
   ...diodes,
   ...transistors,
   ...thyristors,
+  ...extraSemis,
   ...power,
+  ...extraPower,
   ...switches,
   ...machines,
   ...analog,
+  ...extraAnalog,
   ...measurement,
   ...annotations,
+  ...extraMisc,
   ...control,
+  ...extraControl,
 ];
 
 export const CATEGORY_ORDER = [
@@ -146,5 +162,11 @@ export function groupByCategory(symbols: AnySymbol[]): [string, AnySymbol[]][] {
 
 /** Replace `{key}` placeholders with parameter values. */
 export function fillTemplate(t: string, params: Record<string, string>): string {
-  return t.replace(/\{(\w+)\}/g, (_, k: string) => params[k] ?? '');
+  return t.replace(/\{(\w+)\}/g, (_, k: string) => {
+    if (params[k] !== undefined) return params[k]!;
+    // `{pinN}` reads the N-th name of the comma separated `pins` parameter.
+    const m = /^pin(\d+)$/.exec(k);
+    if (m && params.pins) return params.pins.split(',')[Number(m[1]) - 1]?.trim() ?? '';
+    return '';
+  });
 }

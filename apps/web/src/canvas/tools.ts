@@ -16,7 +16,10 @@ import {
   samePt,
   snap,
   topLevelUnit,
+  resizeRect,
+  isBox,
   type Element,
+  type Handle,
   type Id,
   type Pt,
 } from '@overleagger/core';
@@ -26,7 +29,20 @@ import { useUI } from '../store/ui';
 /** The tool controller of the mounted canvas (used by keyboard shortcuts). */
 export const activeTools: { current: ToolController | null } = { current: null };
 
-type Mode = 'idle' | 'pan' | 'maybe-drag' | 'drag' | 'segment' | 'marquee' | 'block-draw';
+type Mode =
+  | 'idle'
+  | 'pan'
+  | 'maybe-drag'
+  | 'drag'
+  | 'segment'
+  | 'marquee'
+  | 'block-draw'
+  | 'resize'
+  | 'line-edit'
+  | 'rect-draw'
+  | 'line-draw'
+  | 'stroke'
+  | 'erase';
 
 export interface PointerInfo {
   screen: Pt;
@@ -37,7 +53,16 @@ export interface PointerInfo {
   mod: boolean;
   /** Element id under the pointer (from the DOM hit areas). */
   targetId: Id | null;
+  /** Resize handle under the pointer (`nw`…`sw`, or `p0` / `p1` / `bend` for lines). */
+  handle: string | null;
+  /** Pen pressure (0.5 for mice). */
+  pressure: number;
+  /** Element under the pointer, looked up even while the pointer is captured. */
+  hitTest: () => Id | null;
 }
+
+/** Ask the canvas to open the image file picker; the image goes to `at`. */
+export const PICK_IMAGE_EVENT = 'overleagger:pick-image';
 
 /**
  * Pointer state machine for the canvas tools. Transient previews (drag offset, wire draft,
@@ -52,9 +77,11 @@ export class ToolController {
   private segment: { wireId: Id; index: number } | null = null;
   private downTarget: Id | null = null;
   private wasSelected = false;
-  private lastClick = { t: 0, x: 0, y: 0, target: null as Id | null };
+  private lastClick = { t: 0, x: 0, y: 0, target: null as Id | null, tool: '' };
   /** Wire drawing started from a pin with the select tool: go back to select afterwards. */
   private wireFromSelect = false;
+  private resizeTarget: { id: Id; handle: string } | null = null;
+  private erased = new Set<Id>();
 
   constructor(private ed: EditorController) {}
 
@@ -80,11 +107,19 @@ export class ToolController {
 
     // Double click detection (pointer capture breaks native dblclick targets).
     const now = performance.now();
+    // Both clicks must use the same tool (a click right after placing a part is not a double click).
     const isDouble =
       now - this.lastClick.t < 350 &&
       Math.hypot(p.screen.x - this.lastClick.x, p.screen.y - this.lastClick.y) < 6 &&
-      p.button === 0;
-    this.lastClick = { t: isDouble ? 0 : now, x: p.screen.x, y: p.screen.y, target: p.targetId };
+      p.button === 0 &&
+      this.lastClick.tool === ui.tool;
+    this.lastClick = {
+      t: isDouble ? 0 : now,
+      x: p.screen.x,
+      y: p.screen.y,
+      target: p.targetId,
+      tool: ui.tool,
+    };
     if (isDouble) {
       this.doubleClick(p);
       return;
@@ -99,9 +134,42 @@ export class ToolController {
       return;
     }
 
+    if (ui.tool === 'select' && p.handle && this.ed.selection().length === 1) {
+      const id = this.ed.selection()[0]!;
+      const el = this.ed.project.getElement(this.ed.sheetId, id);
+      if (el && !el.locked) {
+        this.resizeTarget = { id, handle: p.handle };
+        this.mode = el.type === 'line' ? 'line-edit' : 'resize';
+        return;
+      }
+    }
+
     switch (ui.tool) {
       case 'select':
         return this.selectDown(p);
+      case 'draw':
+        this.mode = 'stroke';
+        ui.set({ strokeDraft: [p.world.x, p.world.y, p.pressure] });
+        return;
+      case 'eraser':
+        this.mode = 'erase';
+        this.erased = new Set();
+        this.eraseAt(p);
+        return;
+      case 'shape':
+      case 'waveform':
+      case 'frame':
+        this.mode = 'rect-draw';
+        return;
+      case 'line':
+        this.mode = 'line-draw';
+        return;
+      case 'note':
+      case 'button':
+        return this.createBoxAnnotation(ui.tool, this.snapPt(p.world));
+      case 'image':
+        window.dispatchEvent(new CustomEvent(PICK_IMAGE_EVENT, { detail: this.snapPt(p.world) }));
+        return;
       case 'wire':
       case 'signal':
         return this.wireClick(this.snapPt(p.world));
@@ -139,6 +207,7 @@ export class ToolController {
       this.wireClick({ x: pin.x, y: pin.y });
       return;
     }
+    if (p.targetId && p.mod && ed.followLink(p.targetId)) return;
     if (p.targetId) {
       const unit = p.alt ? p.targetId : topLevelUnit(elements, p.targetId);
       const sel = ed.selection();
@@ -205,6 +274,39 @@ export class ToolController {
       case 'block-draw':
         ui.set({ blockDraft: rectFromPoints(this.snapPt(this.startWorld), this.snapPt(world)) });
         return;
+      case 'rect-draw': {
+        const a = p.alt ? this.startWorld : this.snapPt(this.startWorld);
+        let b = p.alt ? world : this.snapPt(world);
+        if (p.shift) {
+          // Square / circle.
+          const d = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+          b = { x: a.x + Math.sign(b.x - a.x || 1) * d, y: a.y + Math.sign(b.y - a.y || 1) * d };
+        }
+        ui.set({ rectDraft: rectFromPoints(a, b) });
+        return;
+      }
+      case 'line-draw': {
+        const a = p.alt ? this.startWorld : this.snapPt(this.startWorld);
+        let b = p.alt ? world : this.snapPt(world);
+        if (p.shift) b = snap45(a, b);
+        ui.set({ lineDraft: [a.x, a.y, b.x, b.y] });
+        return;
+      }
+      case 'stroke': {
+        const d = ui.strokeDraft ?? [];
+        const n = d.length;
+        if (n >= 3 && Math.hypot(world.x - d[n - 3]!, world.y - d[n - 2]!) < 1 / this.zoom())
+          return;
+        ui.set({ strokeDraft: [...d, world.x, world.y, p.pressure] });
+        return;
+      }
+      case 'erase':
+        this.eraseAt(p);
+        return;
+      case 'resize':
+      case 'line-edit':
+        this.previewResize(p);
+        return;
     }
 
     if (ui.wireDraft) {
@@ -221,7 +323,10 @@ export class ToolController {
       ui.tool === 'port' ||
       ui.tool === 'label' ||
       ui.tool === 'text' ||
-      ui.tool === 'block'
+      ui.tool === 'block' ||
+      ui.tool === 'note' ||
+      ui.tool === 'button' ||
+      ui.tool === 'image'
     ) {
       const g = this.snapPt(world);
       if (!ui.ghost || ui.ghost.x !== g.x || ui.ghost.y !== g.y) ui.set({ ghost: g });
@@ -276,6 +381,50 @@ export class ToolController {
         ed.select(p.shift ? [...new Set([...ed.selection(), ...units])] : [...units]);
         return;
       }
+      case 'rect-draw':
+        return this.finishRect();
+      case 'line-draw':
+        return this.finishLine();
+      case 'stroke': {
+        const d = ui.strokeDraft;
+        ui.set({ strokeDraft: null });
+        if (d && d.length >= 6) {
+          const prefs = ui.prefs;
+          ed.addElement({
+            type: 'stroke',
+            pts: d.map((v) => Math.round(v * 100) / 100),
+            size: prefs.highlighter ? prefs.penSize * 5 : prefs.penSize,
+            ...(prefs.highlighter ? { highlighter: true } : {}),
+            ...(prefs.inkColor ? { style: { color: prefs.inkColor } } : {}),
+          });
+        }
+        return;
+      }
+      case 'erase': {
+        const ids = [...this.erased];
+        this.erased = new Set();
+        ui.set({ erasing: [] });
+        if (ids.length) {
+          ed.select(ids);
+          ed.deleteSelection();
+        }
+        return;
+      }
+      case 'resize':
+      case 'line-edit': {
+        const r = ui.resize;
+        ui.set({ resize: null });
+        this.resizeTarget = null;
+        if (!r) return;
+        const el = ed.project.getElement(ed.sheetId, r.id);
+        if (!el) return;
+        const patch: Record<string, unknown> = {};
+        if (r.rect) Object.assign(patch, r.rect);
+        if (r.pts) patch.pts = r.pts;
+        if (r.bend !== undefined) patch.bend = Math.abs(r.bend) < 2 ? undefined : r.bend;
+        ed.applyElements([{ ...el, ...patch } as Element]);
+        return;
+      }
       case 'block-draw': {
         const r = ui.blockDraft;
         ui.set({ blockDraft: null });
@@ -314,6 +463,169 @@ export class ToolController {
     else if (el.type === 'text') ui.set({ inlineEdit: { id: el.id, field: 'text' } });
     else if (el.type === 'label') ui.set({ inlineEdit: { id: el.id, field: 'text' } });
     else if (el.type === 'port') ui.set({ inlineEdit: { id: el.id, field: 'name' } });
+    else if (el.type === 'note' || el.type === 'shape' || el.type === 'line')
+      ui.set({ inlineEdit: { id: el.id, field: 'text' } });
+    else if (el.type === 'button') ui.set({ inlineEdit: { id: el.id, field: 'label' } });
+    else if (el.type === 'frame') ui.set({ inlineEdit: { id: el.id, field: 'name' } });
+  }
+
+  // -------------------------------------------------------------------------
+  // Whiteboard tools
+  // -------------------------------------------------------------------------
+
+  private eraseAt(p: PointerInfo) {
+    const id = p.hitTest();
+    if (!id || this.erased.has(id)) return;
+    const unit = topLevelUnit(this.ed.elements(), id);
+    this.erased.add(unit);
+    const all = expandSelection(this.ed.elements(), [...this.erased]);
+    this.ui.set({ erasing: [...all] });
+  }
+
+  private previewResize(p: PointerInfo) {
+    const t = this.resizeTarget;
+    if (!t) return;
+    const el = this.ed.project.getElement(this.ed.sheetId, t.id);
+    if (!el) return;
+    const w = p.alt ? p.world : this.snapPt(p.world);
+    if (el.type === 'line') {
+      const pts = [...el.pts];
+      if (t.handle === 'p0' || t.handle === 'p1') {
+        const i = t.handle === 'p0' ? 0 : 2;
+        const other = { x: pts[2 - i]!, y: pts[3 - i]! };
+        const q = p.shift ? snap45(other, w) : w;
+        pts[i] = q.x;
+        pts[i + 1] = q.y;
+        this.ui.set({ resize: { id: el.id, pts } });
+      } else {
+        const [x1, y1, x2, y2] = pts as [number, number, number, number];
+        const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+        const bend =
+          ((p.world.x - (x1 + x2) / 2) * -(y2 - y1) + (p.world.y - (y1 + y2) / 2) * (x2 - x1)) /
+          len;
+        this.ui.set({ resize: { id: el.id, bend: Math.round(bend) } });
+      }
+      return;
+    }
+    if (!isBox(el)) return;
+    const dx =
+      (p.alt ? p.world.x : snap(p.world.x, GRID)) -
+      (p.alt ? this.startWorld.x : snap(this.startWorld.x, GRID));
+    const dy =
+      (p.alt ? p.world.y : snap(p.world.y, GRID)) -
+      (p.alt ? this.startWorld.y : snap(this.startWorld.y, GRID));
+    const keep = el.type === 'image' ? !p.shift : p.shift;
+    const rect = resizeRect(
+      { x: el.x, y: el.y, w: el.w, h: el.h },
+      t.handle as Handle,
+      dx,
+      dy,
+      GRID * 2,
+      keep,
+    );
+    this.ui.set({ resize: { id: el.id, rect } });
+  }
+
+  private finishRect() {
+    const ui = this.ui;
+    const ed = this.ed;
+    const r = ui.rectDraft;
+    ui.set({ rectDraft: null });
+    const tool = ui.tool;
+    const start = this.snapPt(this.startWorld);
+    const def =
+      tool === 'waveform'
+        ? { w: 320, h: 160 }
+        : tool === 'frame'
+          ? { w: 480, h: 320 }
+          : { w: 120, h: 80 };
+    const rect = r && r.w >= 10 && r.h >= 10 ? r : { x: start.x, y: start.y, ...def };
+    let el: Element;
+    if (tool === 'shape') {
+      el = ed.addElement({
+        type: 'shape',
+        kind: ui.prefs.shapeKind,
+        ...rect,
+        ...(ui.prefs.sketch ? { sketch: true } : {}),
+        ...(ui.prefs.inkColor ? { style: { color: ui.prefs.inkColor } } : {}),
+      });
+    } else if (tool === 'waveform') {
+      el = ed.addElement({
+        type: 'waveform',
+        ...rect,
+        layout: 'overlay',
+        xLabel: 't',
+        yLabel: 'v',
+        grid: true,
+        axes: true,
+        traces: [
+          {
+            id: 't1',
+            kind: 'sine',
+            amp: 1,
+            offset: 0,
+            periods: 2,
+            phase: 0,
+            duty: 0.5,
+            tau: 0.15,
+            zeta: 0.3,
+            ripple: 0.25,
+            label: 'v(t)',
+          },
+        ],
+      });
+    } else {
+      const n = ed.elements().filter((e) => e.type === 'frame').length + 1;
+      el = ed.addElement({ type: 'frame', ...rect, name: `Frame ${n}` });
+    }
+    ui.set({ tool: 'select', selection: [el.id] });
+  }
+
+  private finishLine() {
+    const ui = this.ui;
+    const d = ui.lineDraft;
+    ui.set({ lineDraft: null });
+    if (!d || Math.hypot(d[2]! - d[0]!, d[3]! - d[1]!) < 5) return;
+    const el = this.ed.addElement({
+      type: 'line',
+      pts: d,
+      ...(ui.prefs.arrow ? { arrowEnd: true } : {}),
+      ...(ui.prefs.sketch ? { sketch: true } : {}),
+      ...(ui.prefs.inkColor ? { style: { color: ui.prefs.inkColor } } : {}),
+    });
+    this.ed.select([el.id]);
+    ui.set({ tool: 'select' });
+  }
+
+  private createBoxAnnotation(tool: 'note' | 'button', at: Pt) {
+    const ed = this.ed;
+    const ui = this.ui;
+    const el =
+      tool === 'note'
+        ? ed.addElement({
+            type: 'note',
+            x: at.x,
+            y: at.y,
+            w: 180,
+            h: 130,
+            text: '',
+            color: '@yellow',
+          })
+        : ed.addElement({
+            type: 'button',
+            x: at.x,
+            y: at.y,
+            w: 150,
+            h: 30,
+            label: 'Open link',
+            link: { kind: 'url', url: 'https://' },
+          });
+    ui.set({
+      tool: 'select',
+      ghost: null,
+      selection: [el.id],
+      inlineEdit: { id: el.id, field: tool === 'note' ? 'text' : 'label' },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -415,6 +727,15 @@ export class ToolController {
     }
     ui.set({ tool: 'select', ghost: null, selection: [el.id] });
   }
+}
+
+/** Constrain b so that the segment a→b is horizontal, vertical or at 45°. */
+export function snap45(a: Pt, b: Pt): Pt {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  const len = Math.hypot(dx, dy);
+  return { x: snap(a.x + Math.cos(ang) * len, GRID), y: snap(a.y + Math.sin(ang) * len, GRID) };
 }
 
 export function wireDraftPoints(d: { pts: number[]; cursor: Pt; hFirst: boolean }): number[] {

@@ -1,6 +1,14 @@
-import { L, R, T, dot, pin, sine, tf, tfPins } from '../prims';
-import type { OptionDef, PinDef, Primitive, StrokeOpts, SymbolDef, SymbolGraphics } from '../types';
-import { diodeBody, diodeFill, igbt, mosfet } from './semiconductors';
+import { L, R, T, dot, pin, sine, tf, tfPins, plus, minus } from '../prims';
+import type {
+  OptionDef,
+  PinDef,
+  Primitive,
+  Standard,
+  StrokeOpts,
+  SymbolDef,
+  SymbolGraphics,
+} from '../types';
+import { diodeBody, diodeFill, gan, igbt, mosfet } from './semiconductors';
 
 const CAT = 'Power modules';
 
@@ -12,24 +20,47 @@ const switchOpt: OptionDef = {
   choices: [
     { value: 'mosfet', label: 'MOSFET + body diode' },
     { value: 'igbt', label: 'IGBT + diode' },
+    { value: 'gan', label: 'GaN HEMT' },
   ],
 };
 
 function cell(kind: unknown, fill: StrokeOpts['fill']): SymbolGraphics {
-  return kind === 'igbt'
-    ? igbt(false, true, false, fill)
-    : mosfet({ p: false, depletion: false, fourTerm: false, bodyDiode: true, circle: false, fill });
+  if (kind === 'igbt') return igbt(false, true, false, fill);
+  if (kind === 'gan') return gan(false, false, false, fill);
+  return mosfet({
+    p: false,
+    depletion: false,
+    fourTerm: false,
+    bodyDiode: true,
+    circle: false,
+    fill,
+  });
 }
 
-/** One bridge leg: high-side switch between y=-4…0, low-side switch between 0…4, at column x=dx+1. */
-function leg(kind: unknown, fill: StrokeOpts['fill'], dx: number, n: string): SymbolGraphics {
-  const c = cell(kind, fill);
-  const hi = { prims: tf(c.prims, { dx, dy: -2 }), pins: tfPins(c.pins, { dx, dy: -2 }) };
-  const lo = { prims: tf(c.prims, { dx, dy: 2 }), pins: tfPins(c.pins, { dx, dy: 2 }) };
+export interface BridgeOpts {
+  kind: unknown;
+  fill: StrokeOpts['fill'];
+  /** Vertical space between the high-side and low-side switches (grid units, even). */
+  gap: number;
+  /** Horizontal distance between legs (grid units, even). */
+  pitch: number;
+}
+
+/**
+ * One bridge leg at column x = dx + 1: high-side switch on top, low-side below, the mid-point
+ * (switching node) at y = 0.
+ */
+function leg(o: BridgeOpts, dx: number, n: string): SymbolGraphics {
+  const h = o.gap / 2;
+  const c = cell(o.kind, o.fill);
+  const hi = { prims: tf(c.prims, { dx, dy: -2 - h }), pins: tfPins(c.pins, { dx, dy: -2 - h }) };
+  const lo = { prims: tf(c.prims, { dx, dy: 2 + h }), pins: tfPins(c.pins, { dx, dy: 2 + h }) };
   const gHi = hi.pins.find((p) => p.id === 'g')!;
   const gLo = lo.pins.find((p) => p.id === 'g')!;
+  const prims = [...hi.prims, ...lo.prims, dot(dx + 1, 0)];
+  if (h > 0) prims.push(L(dx + 1, -h, dx + 1, h));
   return {
-    prims: [...hi.prims, ...lo.prims, dot(dx + 1, 0)],
+    prims,
     pins: [
       { id: `g${n}h`, name: `Gate ${n} high`, x: gHi.x, y: gHi.y },
       { id: `g${n}l`, name: `Gate ${n} low`, x: gLo.x, y: gLo.y },
@@ -37,32 +68,62 @@ function leg(kind: unknown, fill: StrokeOpts['fill'], dx: number, n: string): Sy
   };
 }
 
-function bridge(
-  kind: unknown,
-  fill: StrokeOpts['fill'],
-  legs: number,
-  outNames: string[],
-): SymbolGraphics {
+function bridge(o: BridgeOpts, legs: number, outNames: string[]): SymbolGraphics {
   const prims: Primitive[] = [];
   const pins: PinDef[] = [];
-  const pitch = 8;
+  const rail = 4 + o.gap / 2;
   for (let i = 0; i < legs; i++) {
-    const dx = i * pitch;
-    const g = leg(kind, fill, dx, String(i + 1));
+    const dx = i * o.pitch;
+    const g = leg(o, dx, String(i + 1));
     prims.push(...g.prims, L(dx + 1, 0, dx + 3, 0));
     pins.push(...g.pins, pin(outNames[i]!, dx + 3, 0, `Output ${outNames[i]}`));
   }
   const xl = 1;
-  const xr = 1 + (legs - 1) * pitch;
+  const xr = 1 + (legs - 1) * o.pitch;
   const midX = Math.round((xl + xr) / 2);
   if (legs > 1) {
-    prims.push(L(xl, -4, xr, -4), L(xl, 4, xr, 4));
-    for (let i = 1; i < legs - 1; i++) prims.push(dot(1 + i * pitch, -4), dot(1 + i * pitch, 4));
+    prims.push(L(xl, -rail, xr, -rail), L(xl, rail, xr, rail));
+    for (let i = 1; i < legs - 1; i++) {
+      prims.push(dot(1 + i * o.pitch, -rail), dot(1 + i * o.pitch, rail));
+    }
   }
-  prims.push(L(midX, -4, midX, -6), L(midX, 4, midX, 6));
-  if (legs > 1) prims.push(dot(midX, -4), dot(midX, 4));
-  pins.push(pin('dc+', midX, -6, 'DC+'), pin('dc-', midX, 6, 'DC−'));
+  prims.push(L(midX, -rail, midX, -rail - 2), L(midX, rail, midX, rail + 2));
+  if (legs > 1) prims.push(dot(midX, -rail), dot(midX, rail));
+  pins.push(pin('dc+', midX, -rail - 2, 'DC+'), pin('dc-', midX, rail + 2, 'DC−'));
   return { prims, pins };
+}
+
+const gapOpt: OptionDef = {
+  key: 'gap',
+  label: 'Gap high ↔ low side',
+  type: 'number',
+  default: 4,
+  min: 0,
+  max: 12,
+  step: 2,
+};
+const pitchOpt: OptionDef = {
+  key: 'pitch',
+  label: 'Distance between legs',
+  type: 'number',
+  default: 12,
+  min: 8,
+  max: 30,
+  step: 2,
+};
+
+const evenOpt = (v: unknown, def: number, min: number) => {
+  const n = Math.round(Number(v ?? def) / 2) * 2;
+  return Number.isFinite(n) ? Math.max(min, n) : def;
+};
+
+function bridgeOpts(standard: Standard, opts: Record<string, unknown>): BridgeOpts {
+  return {
+    kind: opts.switch,
+    fill: diodeFill(standard, opts.fill),
+    gap: evenOpt(opts.gap, 4, 0),
+    pitch: evenOpt(opts.pitch, 12, 8),
+  };
 }
 
 /** Diode placed on the segment (x1,y1) → (x2,y2), conducting from the first to the second point. */
@@ -157,8 +218,8 @@ export const power: SymbolDef[] = [
           dot(0, 3),
           sine(-4.1, -0.7, 0.9, 0.45, 1),
           sine(4.1, -0.7, 0.9, 0.45, 1),
-          T(0.8, -4.3, '+', { size: 1 }),
-          T(0.8, 4.3, '−', { size: 1 }),
+          ...plus(0.8, -4.3),
+          ...minus(0.8, 4.3),
         ],
         pins: [
           pin('ac1', -5, 0, 'AC 1'),
@@ -175,8 +236,8 @@ export const power: SymbolDef[] = [
     category: CAT,
     keywords: ['phase leg', 'totem pole', 'buck', 'synchronous'],
     refPrefix: 'Q',
-    options: [switchOpt, fillOpt],
-    build: ({ standard, opts }) => bridge(opts.switch, diodeFill(standard, opts.fill), 1, ['out']),
+    options: [switchOpt, gapOpt, fillOpt],
+    build: ({ standard, opts }) => bridge(bridgeOpts(standard, opts), 1, ['out']),
   },
   {
     id: 'full-bridge',
@@ -184,9 +245,8 @@ export const power: SymbolDef[] = [
     category: CAT,
     keywords: ['h-bridge', 'single phase inverter', 'dab'],
     refPrefix: 'Q',
-    options: [switchOpt, fillOpt],
-    build: ({ standard, opts }) =>
-      bridge(opts.switch, diodeFill(standard, opts.fill), 2, ['a', 'b']),
+    options: [switchOpt, gapOpt, pitchOpt, fillOpt],
+    build: ({ standard, opts }) => bridge(bridgeOpts(standard, opts), 2, ['a', 'b']),
   },
   {
     id: 'inverter-3ph',
@@ -194,9 +254,8 @@ export const power: SymbolDef[] = [
     category: CAT,
     keywords: ['vsi', 'two level', '3 phase', 'motor drive', 'onduleur'],
     refPrefix: 'Q',
-    options: [switchOpt, fillOpt],
-    build: ({ standard, opts }) =>
-      bridge(opts.switch, diodeFill(standard, opts.fill), 3, ['a', 'b', 'c']),
+    options: [switchOpt, gapOpt, pitchOpt, fillOpt],
+    build: ({ standard, opts }) => bridge(bridgeOpts(standard, opts), 3, ['a', 'b', 'c']),
   },
   converter('conv-acdc', 'AC/DC converter (rectifier)', 'ac', 'dc', ['rectifier', 'redresseur']),
   converter('conv-dcdc', 'DC/DC converter', 'dc', 'dc', ['buck', 'boost', 'hacheur', 'chopper']),

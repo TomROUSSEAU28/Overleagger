@@ -1,4 +1,4 @@
-import { C, L, P, PC, T, arrow, arrowHead, dot, pin, tf, tfPins } from '../prims';
+import { C, L, P, PC, arrow, arrowHead, dot, pin, tf, tfPins } from '../prims';
 import type {
   OptionDef,
   Primitive,
@@ -198,7 +198,6 @@ interface FetOpts {
   bodyDiode: boolean;
   circle: boolean;
   fill: StrokeOpts['fill'];
-  gan?: boolean;
 }
 
 function mosfet(opts: FetOpts): SymbolGraphics {
@@ -210,35 +209,71 @@ function mosfet(opts: FetOpts): SymbolGraphics {
   // Gate: plate + lead aligned with the source.
   prims.push(L(-0.3, -1.2, -0.3, 1.2), L(gx, 1, -0.3, 1));
   // Channel
-  if (o.depletion || o.gan) prims.push(L(0.2, -1.3, 0.2, 1.3, { sw: 1.5 }));
+  if (o.depletion) prims.push(L(0.2, -1.3, 0.2, 1.3, { sw: 1.5 }));
   else
     prims.push(
       L(0.2, -1.3, 0.2, -0.7, { sw: 1.5 }),
       L(0.2, -0.3, 0.2, 0.3, { sw: 1.5 }),
       L(0.2, 0.7, 0.2, 1.3, { sw: 1.5 }),
     );
-  if (o.gan) prims.push(L(0.45, -1.3, 0.45, 1.3, { dash: 'dashed', sw: 0.8 }));
   // Drain and source
   prims.push(L(0.2, -1, 1, -1), L(1, -1, 1, -yEnd), L(0.2, 1, 1, 1), L(1, 1, 1, yEnd));
   // Bulk
-  if (!o.gan) {
-    const bulkEnd = o.fourTerm ? 2 : 1;
-    prims.push(L(0.2, 0, bulkEnd, 0));
-    if (!o.fourTerm) prims.push(L(1, 0, 1, 1));
-    // N-channel: arrow towards the channel; P-channel: away from it.
-    prims.push(o.p ? arrowHead(0.95, 0, 0, 0.5) : arrowHead(0.25, 0, 180, 0.5));
-  }
+  const bulkEnd = o.fourTerm ? 2 : 1;
+  prims.push(L(0.2, 0, bulkEnd, 0));
+  if (!o.fourTerm) prims.push(L(1, 0, 1, 1));
+  // N-channel: arrow towards the channel; P-channel: away from it.
+  prims.push(o.p ? arrowHead(0.95, 0, 0, 0.5) : arrowHead(0.25, 0, 180, 0.5));
   const pins = [
     pin('g', gx, 1, 'Gate'),
     pin('d', 1, -yEnd, 'Drain'),
     pin('s', 1, yEnd, 'Source'),
-    ...(o.fourTerm && !o.gan ? [pin('b', 2, 0, 'Bulk')] : []),
+    ...(o.fourTerm ? [pin('b', 2, 0, 'Bulk')] : []),
   ];
   let g: SymbolGraphics = { prims, pins };
   // P-channel: source on top (mirror vertically), the body diode keeps pointing up.
   if (o.p) g = flipY(g);
   if (o.bodyDiode) g.prims.push(...railDiode(o.fill));
   if (o.circle) g.prims.push(C(o.bodyDiode ? 0.9 : 0.5, 0, o.bodyDiode ? 2.05 : 1.8));
+  return g;
+}
+
+/**
+ * GaN HEMT: MOSFET-like outline without bulk arrow or body diode (the channel conducts in
+ * reverse by itself). Enhancement (e-mode) = broken channel, depletion (d-mode) = solid channel.
+ * The substrate is tied to the source.
+ */
+function gan(
+  dmode: boolean,
+  diode: boolean,
+  circle: boolean,
+  fill: StrokeOpts['fill'],
+): SymbolGraphics {
+  const yEnd = circle ? 3 : 2;
+  const gx = circle ? -3 : -2;
+  const prims: Primitive[] = [L(-0.3, -1.2, -0.3, 1.2), L(gx, 1, -0.3, 1)];
+  if (dmode) prims.push(L(0.2, -1.3, 0.2, 1.3, { sw: 1.5 }));
+  else
+    prims.push(
+      L(0.2, -1.3, 0.2, -0.7, { sw: 1.5 }),
+      L(0.2, -0.3, 0.2, 0.3, { sw: 1.5 }),
+      L(0.2, 0.7, 0.2, 1.3, { sw: 1.5 }),
+    );
+  prims.push(
+    L(0.2, -1, 1, -1),
+    L(1, -1, 1, -yEnd),
+    L(0.2, 1, 1, 1),
+    L(1, 1, 1, yEnd),
+    L(0.2, 0, 1, 0),
+    L(1, 0, 1, 1),
+    dot(1, 1, 0.14),
+  );
+  const g: SymbolGraphics = {
+    prims,
+    pins: [pin('g', gx, 1, 'Gate'), pin('d', 1, -yEnd, 'Drain'), pin('s', 1, yEnd, 'Source')],
+  };
+  if (diode) g.prims.push(...railDiode(fill));
+  if (circle) g.prims.push(C(diode ? 0.9 : 0.5, 0, diode ? 2.05 : 1.8));
   return g;
 }
 
@@ -397,17 +432,28 @@ export const transistors: SymbolDef[] = [
     category: TRANSISTORS,
     keywords: ['gan', 'hemt', 'wide bandgap', 'power switch'],
     refPrefix: 'Q',
-    options: [circleOpt(false)],
-    build: ({ opts }) =>
-      mosfet({
-        p: false,
-        depletion: false,
-        fourTerm: false,
-        bodyDiode: false,
-        circle: Boolean(opts.circle),
-        fill: 'ink',
-        gan: true,
-      }),
+    options: [
+      {
+        key: 'mode',
+        label: 'Mode',
+        type: 'enum',
+        default: 'enh',
+        choices: [
+          { value: 'enh', label: 'Enhancement (e-mode)' },
+          { value: 'dep', label: 'Depletion (d-mode)' },
+        ],
+      },
+      { key: 'diode', label: 'Show reverse diode', type: 'bool', default: false },
+      circleOpt(false),
+      fillOption,
+    ],
+    build: ({ standard, opts }) =>
+      gan(
+        opts.mode === 'dep',
+        Boolean(opts.diode),
+        Boolean(opts.circle),
+        diodeFill(standard, opts.fill),
+      ),
   },
 ];
 
@@ -474,7 +520,7 @@ export const thyristors: SymbolDef[] = [
         ...thyristorBase(diodeFill(standard, opts.fill)),
         L(0.55, 1.35, 1.45, 1.35),
         L(0.55, 1.65, 1.45, 1.65),
-        T(-1.3, 1.5, 'IGCT', { size: 0.7 }),
+        L(0.55, 1.9, 1.45, 1.9),
       ],
       pins: [...twoPinsAK(), gatePin()],
     }),
@@ -505,4 +551,4 @@ export const thyristors: SymbolDef[] = [
   },
 ];
 
-export { mosfet, igbt };
+export { gan, igbt, mosfet };

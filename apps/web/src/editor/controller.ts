@@ -19,6 +19,11 @@ import {
   topLevelUnit,
   ungroupElements,
   computeMove,
+  alignUnits,
+  distributeUnits,
+  followPins,
+  moveToNewBlock,
+  type AlignMode,
   type ClipData,
   type Element,
   type Id,
@@ -171,6 +176,89 @@ export class EditorController {
     });
   }
 
+  /** Apply changed elements and drag the ends of attached wires to the new pin positions. */
+  applyWithFollow(changed: Element[]) {
+    this.applyElements([...changed, ...followPins(this.elements(), changed, this.ctx)]);
+  }
+
+  /** Patch one element; attached wires follow when its pins move (options, size…). */
+  patchWithFollow(id: Id, patch: Partial<Element>) {
+    const el = this.project.getElement(this.sheetId, id);
+    if (!el) return;
+    this.applyWithFollow([{ ...el, ...patch } as Element]);
+  }
+
+  align(mode: AlignMode) {
+    this.applyElements(alignUnits(this.elements(), this.selection(), mode, this.ctx));
+  }
+
+  distribute(axis: 'h' | 'v') {
+    this.applyElements(distributeUnits(this.elements(), this.selection(), axis, this.ctx));
+  }
+
+  /** Move the selection into a new hierarchical block. */
+  selectionToBlock() {
+    const ids = this.selection();
+    if (!ids.length) return;
+    const n = this.elements().filter((e) => e.type === 'block').length + 1;
+    const id = this.commit(() =>
+      moveToNewBlock(this.project, this.sheetId, ids, `Block ${n}`, this.ctx),
+    );
+    if (id) this.select([id]);
+  }
+
+  /** Follow the link of a button (URL in a new tab, or a sheet of the project). */
+  followLink(id: Id) {
+    const el = this.project.getElement(this.sheetId, id);
+    if (el?.type !== 'button') return false;
+    if (el.link.kind === 'url') {
+      if (/^(https?:|mailto:)/i.test(el.link.url)) window.open(el.link.url, '_blank', 'noopener');
+    } else this.openSheet(el.link.sheetId);
+    return true;
+  }
+
+  /** Insert an image file (downscaled) centred on a point. */
+  async insertImage(file: File, at: Pt) {
+    const { loadImageFile } = await import('./images');
+    const img = await loadImageFile(file);
+    const w = snap(img.w, GRID);
+    const h = snap(img.h, GRID);
+    const el = this.addElement({
+      type: 'image',
+      x: snap(at.x - w / 2, GRID),
+      y: snap(at.y - h / 2, GRID),
+      w,
+      h,
+      src: img.src,
+      name: file.name,
+    });
+    this.select([el.id]);
+  }
+
+  /** Paste clipboard-like data (templates) at a point. */
+  insertClip(clip: ClipData, at?: Pt) {
+    const box = rectUnion(
+      clip.elements
+        .filter((e) => e.type !== 'group')
+        .map((e) => elementBBox(e, this.ctx, clip.elements)),
+    );
+    const target = at ?? this.viewCenter();
+    const dx = box ? snap(target.x - (box.x + box.w / 2), GRID) : 0;
+    const dy = box ? snap(target.y - (box.y + box.h / 2), GRID) : 0;
+    const ids = this.commit(() => pasteClip(this.project, this.sheetId, clip, dx, dy));
+    const all = this.elements();
+    this.select([...new Set(ids.map((id) => topLevelUnit(all, id)))]);
+  }
+
+  /** World point at the centre of the visible canvas. */
+  viewCenter(): Pt {
+    const vp = this.viewport();
+    return {
+      x: (this.canvasSize.w / 2 - vp.x) / vp.zoom,
+      y: (this.canvasSize.h / 2 - vp.y) / vp.zoom,
+    };
+  }
+
   rotate(ccw = false) {
     const ui = this.ui;
     if (ui.tool === 'place' && ui.placing) {
@@ -180,7 +268,7 @@ export class EditorController {
       return;
     }
     const els = this.selectedElements().filter((e) => !e.locked);
-    if (els.length) this.applyElements(rotateElements(els, this.ctx, ccw));
+    if (els.length) this.applyWithFollow(rotateElements(els, this.ctx, ccw));
   }
 
   mirror(axis: 'x' | 'y') {
@@ -197,7 +285,7 @@ export class EditorController {
       return;
     }
     const els = this.selectedElements().filter((e) => !e.locked);
-    if (els.length) this.applyElements(mirrorElements(els, this.ctx, axis));
+    if (els.length) this.applyWithFollow(mirrorElements(els, this.ctx, axis));
   }
 
   nudge(dx: number, dy: number) {

@@ -17,6 +17,14 @@ function anchorOf(el: Element, ed: ReturnType<typeof useEditor>): { x: number; y
       const l = blockLayout(el, ed.ctx.ports(el.childSheetId));
       return { x: l.x + 6, y: l.y + 6 };
     }
+    case 'note':
+    case 'shape':
+    case 'button':
+      return { x: el.x + 4, y: el.y + 4 };
+    case 'frame':
+      return { x: el.x, y: el.y - 24 };
+    case 'line':
+      return { x: (el.pts[0]! + el.pts[2]!) / 2 - 60, y: (el.pts[1]! + el.pts[3]!) / 2 - 14 };
     default:
       return null;
   }
@@ -45,7 +53,7 @@ export function InlineEditor({ vp }: { vp: Viewport }) {
   if (!edit || !el) return null;
   const a = anchorOf(el, ed);
   if (!a) return null;
-  const multiline = el.type === 'text';
+  const multiline = el.type === 'text' || el.type === 'note';
   const close = (save: boolean) => {
     if (save && value !== initial) {
       ed.commit(() => {

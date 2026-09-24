@@ -45,3 +45,20 @@ export function useUndoState(): { canUndo: boolean; canRedo: boolean } {
   useDocVersion();
   return { canUndo: ed.undo.canUndo(), canRedo: ed.undo.canRedo() };
 }
+
+/** Counter bumped when the project's custom symbols change (to refresh memoized views). */
+export function useSymbolsVersion(): number {
+  const ed = useEditor();
+  const ref = useMemo(() => ({ v: 0 }), []);
+  return useSyncExternalStore(
+    (fn) => {
+      const h = () => {
+        ref.v++;
+        fn();
+      };
+      ed.project.symbols.observe(h);
+      return () => ed.project.symbols.unobserve(h);
+    },
+    () => ref.v,
+  );
+}

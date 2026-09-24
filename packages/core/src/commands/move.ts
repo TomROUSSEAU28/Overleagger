@@ -3,13 +3,19 @@ import { normalizeWire, ptKey, rectUnion, snap, samePt } from '../geometry/geom'
 import type { Element, Id, Rot, WireElement } from '../model/types';
 import { GRID } from '../model/types';
 
-/** Translate one element (wires move all their vertices). */
+/** Shift a flat point list whose points have `stride` numbers (x, y, …). */
+function shiftPts(pts: number[], dx: number, dy: number, stride = 2): number[] {
+  return pts.map((v, i) => (i % stride === 0 ? v + dx : i % stride === 1 ? v + dy : v));
+}
+
+/** Translate one element (wires, lines and strokes move all their vertices). */
 export function translated(el: Element, dx: number, dy: number): Element {
   switch (el.type) {
-    case 'wire': {
-      const pts = el.pts.map((v, i) => (i % 2 === 0 ? v + dx : v + dy));
-      return { ...el, pts };
-    }
+    case 'wire':
+    case 'line':
+      return { ...el, pts: shiftPts(el.pts, dx, dy) };
+    case 'stroke':
+      return { ...el, pts: shiftPts(el.pts, dx, dy, 3) };
     case 'group':
       return el;
     default:
@@ -153,10 +159,34 @@ function transformElement(
   comp: (rot: Rot, mirror: boolean) => [Rot, boolean],
 ): Element {
   switch (el.type) {
-    case 'wire': {
+    case 'wire':
+    case 'line': {
       const pts: number[] = [];
       for (let i = 0; i < el.pts.length; i += 2) pts.push(...f(el.pts[i]!, el.pts[i + 1]!));
       return { ...el, pts };
+    }
+    case 'stroke': {
+      const pts: number[] = [];
+      for (let i = 0; i < el.pts.length; i += 3)
+        pts.push(...f(el.pts[i]!, el.pts[i + 1]!), el.pts[i + 2]!);
+      return { ...el, pts };
+    }
+    case 'shape': {
+      // Shapes turn with the selection: a quarter turn swaps width and height.
+      const [cx, cy] = f(el.x + el.w / 2, el.y + el.h / 2);
+      const [ax, ay] = f(el.x, el.y);
+      const [bx, by] = f(el.x + el.w, el.y + el.h);
+      const w = Math.abs(bx - ax);
+      const h = Math.abs(by - ay);
+      return { ...el, x: snap(cx - w / 2, GRID / 2), y: snap(cy - h / 2, GRID / 2), w, h };
+    }
+    case 'image':
+    case 'note':
+    case 'button':
+    case 'waveform':
+    case 'frame': {
+      const [cx, cy] = f(el.x + el.w / 2, el.y + el.h / 2);
+      return { ...el, x: snap(cx - el.w / 2, GRID), y: snap(cy - el.h / 2, GRID) };
     }
     case 'component': {
       const [x, y] = f(el.x, el.y);
@@ -210,6 +240,42 @@ export function mirrorElements(
       !mirror,
     ]),
   );
+}
+
+/**
+ * After elements changed shape or orientation (rotation, options, size…), move the attached
+ * ends of the other wires to the new positions of their pins. Returns the changed wires.
+ */
+export function followPins(all: Element[], changed: Element[], ctx: SheetContext): Element[] {
+  const byId = new Map(all.map((e) => [e.id, e]));
+  const changedIds = new Set(changed.map((e) => e.id));
+  const moves = new Map<string, { x: number; y: number }>();
+  for (const n of changed) {
+    const o = byId.get(n.id);
+    if (!o) continue;
+    const after = new Map(elementPins(n, ctx).map((p) => [p.pinId, p]));
+    for (const p of elementPins(o, ctx)) {
+      const q = after.get(p.pinId);
+      if (q && (q.x !== p.x || q.y !== p.y)) moves.set(ptKey(p.x, p.y), { x: q.x, y: q.y });
+    }
+  }
+  if (!moves.size) return [];
+  const out: Element[] = [];
+  for (const w of all) {
+    if (w.type !== 'wire' || changedIds.has(w.id) || w.pts.length < 4) continue;
+    let pts = w.pts;
+    const start = moves.get(ptKey(pts[0]!, pts[1]!));
+    const n = pts.length;
+    const end = moves.get(ptKey(pts[n - 2]!, pts[n - 1]!));
+    if (end) pts = moveWireEnd(pts, end.x - pts[n - 2]!, end.y - pts[n - 1]!);
+    if (start) {
+      const r = reversePts(pts);
+      const m = r.length;
+      pts = reversePts(moveWireEnd(r, start.x - r[m - 2]!, start.y - r[m - 1]!));
+    }
+    if (pts !== w.pts) out.push({ ...w, pts });
+  }
+  return out;
 }
 
 /** True when the point is one of the end points of the wire. */

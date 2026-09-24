@@ -2,16 +2,17 @@ import {
   builtinSymbols,
   defaultParams,
   groupByCategory,
+  isStatic,
   resolveSymbol,
   searchSymbols,
   type AnySymbol,
   type Standard,
 } from '@overleagger/symbols';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Search } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { SYMBOL_DND_TYPE } from '../canvas/Canvas';
 import { SymbolPreview } from '../canvas/render/SymbolGraphic';
-import { useEditor, useMeta } from '../editor/context';
+import { useEditor, useMeta, useSymbolsVersion } from '../editor/context';
 import { useUI } from '../store/ui';
 import { DEFAULT_STROKE, THEMES } from '../theme';
 
@@ -63,7 +64,12 @@ export function LibraryPanel() {
   const placing = useUI((s) => s.placing);
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const all = useMemo(() => [...builtinSymbols, ...ed.project.getProjectSymbols()], [ed]);
+  const symbolsVersion = useSymbolsVersion();
+  const all = useMemo(
+    () => [...ed.project.getProjectSymbols(), ...builtinSymbols],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ed, symbolsVersion],
+  );
   const groups = useMemo(() => groupByCategory(searchSymbols(query, all)), [query, all]);
   const pick = (id: string) => ed.startPlacing(id);
 
@@ -82,6 +88,16 @@ export function LibraryPanel() {
           }}
         />
       </div>
+      <div className="lib-actions">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => useUI.getState().set({ modal: 'symbol-editor', editingSymbol: {} })}
+          data-testid="new-symbol"
+        >
+          <Plus size={14} /> New symbol
+        </button>
+      </div>
       <div className="library-scroll">
         {groups.map(([cat, syms]) => {
           const isCollapsed = collapsed[cat] && !query;
@@ -98,17 +114,42 @@ export function LibraryPanel() {
               </button>
               {!isCollapsed && (
                 <div className="tiles">
-                  {syms.map((s) => (
-                    <SymbolTile
-                      key={s.id}
-                      sym={s}
-                      standard={meta.standard}
-                      ink={theme.ink}
-                      paper={theme.paper}
-                      active={placing?.symbolId === s.id}
-                      onPick={pick}
-                    />
-                  ))}
+                  {syms.map((s) =>
+                    isStatic(s) ? (
+                      <div key={s.id} className="symbol-tile-wrap">
+                        <SymbolTile
+                          sym={s}
+                          standard={meta.standard}
+                          ink={theme.ink}
+                          paper={theme.paper}
+                          active={placing?.symbolId === s.id}
+                          onPick={pick}
+                        />
+                        <button
+                          type="button"
+                          className="icon-btn tile-edit"
+                          title="Edit this symbol"
+                          onClick={() =>
+                            useUI
+                              .getState()
+                              .set({ modal: 'symbol-editor', editingSymbol: { id: s.id } })
+                          }
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <SymbolTile
+                        key={s.id}
+                        sym={s}
+                        standard={meta.standard}
+                        ink={theme.ink}
+                        paper={theme.paper}
+                        active={placing?.symbolId === s.id}
+                        onPick={pick}
+                      />
+                    ),
+                  )}
                 </div>
               )}
             </section>

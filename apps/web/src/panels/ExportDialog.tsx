@@ -66,7 +66,8 @@ export function ExportDialog() {
       <div className="row">
         <Field label="Colours">
           <select value={themeName} onChange={(e) => setThemeName(e.target.value as ThemeName)}>
-            <option value="paper">Graphite on paper</option>
+            <option value="paper">Graphite on cream paper</option>
+            <option value="whiteboard">Ink on whiteboard</option>
             <option value="blackboard">Chalk on blackboard</option>
           </select>
         </Field>

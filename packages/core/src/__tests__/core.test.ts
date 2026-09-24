@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   Project,
+  alignUnits,
+  distributeUnits,
+  followPins,
+  moveToNewBlock,
+  resizeRect,
+  translated,
   addComponent,
   analyzeConnectivity,
   blockLayout,
@@ -302,5 +308,61 @@ describe('net labels', () => {
     wire(0, 0, 100, 0);
     p.addElement(sheet, { type: 'label', x: 50, y: 0, text: 'VOUT' });
     expect(findJunctions(p.getElements(sheet), ctx())).toEqual([]);
+  });
+});
+
+describe('phase 2 helpers', () => {
+  it('moves wire ends with the pins when a component rotates', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const r = addComponent(p, sheet, 'resistor', 0, 0, ctx());
+    const w = wire(30, 0, 100, 0);
+    const [rotated] = rotateElements([r], ctx());
+    const follow = followPins(p.getElements(sheet), [rotated!], ctx());
+    const nw = follow.find((e) => e.id === w.id) as WireElement;
+    // Pin 2 moved from (30, 0) to (0, 30).
+    expect([nw.pts[0], nw.pts[1]]).toEqual([0, 30]);
+    expect(nw.pts.slice(-2)).toEqual([100, 0]);
+  });
+
+  it('resizes rectangles from any handle', () => {
+    const r = { x: 0, y: 0, w: 100, h: 50 };
+    expect(resizeRect(r, 'se', 20, 10)).toEqual({ x: 0, y: 0, w: 120, h: 60 });
+    expect(resizeRect(r, 'nw', 10, 10)).toEqual({ x: 10, y: 10, w: 90, h: 40 });
+    expect(resizeRect(r, 'w', 200, 0).w).toBe(20);
+  });
+
+  it('aligns and distributes', () => {
+    const { p, sheet, ctx } = setup();
+    const a = p.addElement(sheet, { type: 'shape', kind: 'rect', x: 0, y: 0, w: 40, h: 40 });
+    const b = p.addElement(sheet, { type: 'shape', kind: 'rect', x: 100, y: 30, w: 40, h: 40 });
+    const c = p.addElement(sheet, { type: 'shape', kind: 'rect', x: 300, y: 60, w: 40, h: 40 });
+    const aligned = alignUnits(p.getElements(sheet), [a.id, b.id, c.id], 'top', ctx());
+    expect(aligned.every((e) => e.type === 'shape' && e.y === 0)).toBe(true);
+    const spread = distributeUnits(p.getElements(sheet), [a.id, b.id, c.id], 'h', ctx());
+    const bx = spread.find((e) => e.id === b.id);
+    expect(bx && 'x' in bx && bx.x).toBe(150);
+  });
+
+  it('moves a selection into a new hierarchical block', () => {
+    const { p, sheet, ctx } = setup();
+    const r = addComponent(p, sheet, 'resistor', 0, 0, ctx());
+    const inner = createBlock(p, sheet, { x: 100, y: 0, w: 80, h: 60 }, 'Inner');
+    const id = moveToNewBlock(p, sheet, [r.id, inner.id], 'Outer', ctx())!;
+    const block = p.getElement(sheet, id);
+    expect(block?.type).toBe('block');
+    if (block?.type !== 'block') return;
+    expect(
+      p
+        .getElements(block.childSheetId)
+        .map((e) => e.type)
+        .sort(),
+    ).toEqual(['block', 'component']);
+    expect(p.getSheet(inner.childSheetId)?.parentSheetId).toBe(block.childSheetId);
+    expect(validateHierarchy(p)).toEqual([]);
+  });
+
+  it('translates strokes and lines', () => {
+    const s = { id: 's', type: 'stroke', z: 0, size: 2, pts: [0, 0, 0.5, 10, 10, 0.5] } as Element;
+    expect((translated(s, 5, 5) as { pts: number[] }).pts).toEqual([5, 5, 0.5, 15, 15, 0.5]);
   });
 });

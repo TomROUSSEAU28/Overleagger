@@ -44,6 +44,36 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
     case 'tool.text':
       ed.setTool('text');
       return true;
+    case 'tool.draw':
+      ed.setTool('draw');
+      return true;
+    case 'tool.eraser':
+      ed.setTool('eraser');
+      return true;
+    case 'tool.shape':
+      ed.setTool('shape');
+      return true;
+    case 'tool.line':
+      ed.setTool('line');
+      return true;
+    case 'tool.note':
+      ed.setTool('note');
+      return true;
+    case 'tool.image':
+      ed.setTool('image');
+      return true;
+    case 'tool.button':
+      ed.setTool('button');
+      return true;
+    case 'tool.waveform':
+      ed.setTool('waveform');
+      return true;
+    case 'tool.frame':
+      ed.setTool('frame');
+      return true;
+    case 'edit.toBlock':
+      ed.selectionToBlock();
+      return true;
     case 'edit.quickAdd':
       ui.set({ modal: 'quickadd' });
       return true;

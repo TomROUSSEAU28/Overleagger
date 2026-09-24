@@ -65,7 +65,23 @@ export function HelpOverlay() {
             <li>
               Text supports LaTeX between dollars: <code>{'$v_L = L\\,\\frac{di}{dt}$'}</code>.
             </li>
-            <li>Switch EU/US symbols in the top bar. Each part can also override the standard.</li>
+            <li>
+              Switch EU/US symbols in the top bar. Each part can also override the standard and
+              change its size.
+            </li>
+            <li>
+              Whiteboard tools: pencil, eraser, shapes (with a hand-drawn option), arrows (drag the
+              middle handle to curve them), sticky notes, images (drop or paste them), link buttons
+              (Ctrl+click to follow), waveforms and frames.
+            </li>
+            <li>
+              The Templates tab inserts ready-made converters, rectifiers, inverters and control
+              loops.
+            </li>
+            <li>
+              “New symbol” in the library opens the symbol editor. “Customize symbol…” in the
+              properties starts from the selected part.
+            </li>
           </ul>
         </section>
       </div>

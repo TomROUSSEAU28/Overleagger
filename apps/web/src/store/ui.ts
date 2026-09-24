@@ -1,10 +1,37 @@
-import type { Id, Pt, Rect, Rot } from '@overleagger/core';
+import type { Handle, Id, Pt, Rect, Rot, ShapeKind } from '@overleagger/core';
 import type { OptionValue } from '@overleagger/symbols';
 import { create } from 'zustand';
 import type { ThemeName } from '../theme';
 
 export type ToolId =
-  'select' | 'pan' | 'wire' | 'signal' | 'block' | 'port' | 'label' | 'text' | 'place';
+  | 'select'
+  | 'pan'
+  | 'wire'
+  | 'signal'
+  | 'block'
+  | 'port'
+  | 'label'
+  | 'text'
+  | 'place'
+  | 'draw'
+  | 'eraser'
+  | 'shape'
+  | 'line'
+  | 'note'
+  | 'image'
+  | 'button'
+  | 'waveform'
+  | 'frame';
+
+export interface ToolPrefs {
+  shapeKind: ShapeKind;
+  sketch: boolean;
+  arrow: boolean;
+  penSize: number;
+  highlighter: boolean;
+  /** Ink colour used for new strokes, shapes and lines (`@name` or CSS colour). */
+  inkColor?: string;
+}
 
 export interface Viewport {
   x: number;
@@ -36,11 +63,20 @@ export interface DragPreview {
   segment?: { wireId: Id; index: number };
 }
 
-export type Modal = null | 'quickadd' | 'help' | 'shortcuts' | 'export' | 'rename';
+export type Modal =
+  null | 'quickadd' | 'help' | 'shortcuts' | 'export' | 'rename' | 'symbol-editor';
+
+/** Live preview of a resize / line edit. */
+export interface ResizePreview {
+  id: Id;
+  rect?: Rect;
+  pts?: number[];
+  bend?: number;
+}
 
 export interface InlineEdit {
   id: Id;
-  field: 'text' | 'name' | 'title';
+  field: 'text' | 'name' | 'title' | 'label';
 }
 
 interface Settings {
@@ -62,11 +98,27 @@ export interface UIState extends Settings {
   marquee: Rect | null;
   ghost: Pt | null;
   blockDraft: Rect | null;
+  /** Rectangle being drawn by the shape / frame / waveform tools. */
+  rectDraft: Rect | null;
+  lineDraft: number[] | null;
+  strokeDraft: number[] | null;
+  resize: ResizePreview | null;
+  erasing: Id[];
+  handle: Handle | null;
+  prefs: ToolPrefs;
+  /** Symbol opened in the symbol editor (undefined = new symbol). */
+  editingSymbol: {
+    id?: string;
+    from?: string;
+    opts?: Record<string, OptionValue>;
+    /** Component switched to the new symbol when it is saved. */
+    replaceId?: Id;
+  } | null;
   hoverPin: Pt | null;
   cursor: Pt | null;
   modal: Modal;
   inlineEdit: InlineEdit | null;
-  leftTab: 'library' | 'sheets';
+  leftTab: 'library' | 'sheets' | 'templates';
   spaceDown: boolean;
 
   set: (patch: Partial<UIState>) => void;
@@ -113,6 +165,13 @@ const transient = {
   marquee: null,
   ghost: null,
   blockDraft: null,
+  rectDraft: null,
+  lineDraft: null,
+  strokeDraft: null,
+  resize: null,
+  erasing: [] as Id[],
+  handle: null,
+  editingSymbol: null,
   hoverPin: null,
   cursor: null,
   modal: null as Modal,
@@ -124,6 +183,7 @@ export const useUI = create<UIState>((set, get) => ({
   ...transient,
   sheetId: null,
   viewports: {},
+  prefs: { shapeKind: 'rect', sketch: false, arrow: true, penSize: 3, highlighter: false },
   leftTab: 'library',
   spaceDown: false,
 
@@ -134,6 +194,9 @@ export const useUI = create<UIState>((set, get) => ({
       wireDraft: null,
       ghost: null,
       blockDraft: null,
+      rectDraft: null,
+      lineDraft: null,
+      strokeDraft: null,
       ...(tool !== 'place' ? { placing: null } : {}),
     }),
   setSelection: (ids) => set({ selection: ids }),

@@ -1,17 +1,22 @@
 import {
   GRID,
+  HANDLES,
   computeMove,
   dragSegment,
-  expandSelection,
-  inflate,
   elementBBox,
+  expandSelection,
+  handlePos,
+  inflate,
+  isBox,
+  lineControlPoint,
   rectUnion,
+  snap,
   type ComponentElement,
   type Element,
-  type Id,
   type Pt,
+  type Rect,
 } from '@overleagger/core';
-import { getBuiltinSymbol, defaultOptions, defaultParams } from '@overleagger/symbols';
+import { defaultOptions, defaultParams, getBuiltinSymbol } from '@overleagger/symbols';
 import {
   useCallback,
   useEffect,
@@ -21,38 +26,52 @@ import {
   type DragEvent,
   type PointerEvent as RPointerEvent,
 } from 'react';
-import { useEditor, useMeta, useSheetElements } from '../editor/context';
+import { useEditor, useMeta, useSheetElements, useSymbolsVersion } from '../editor/context';
 import { useUI } from '../store/ui';
-import { THEMES } from '../theme';
+import { THEMES, resolveColor, type Theme } from '../theme';
 import { InlineEditor } from './InlineEditor';
 import { ComponentView, type RenderOptions } from './render/ElementViews';
 import { SheetRenderer } from './render/SheetRenderer';
-import { ToolController, activeTools, wireDraftPoints, type PointerInfo } from './tools';
+import { strokePath } from './render/shapes';
+import {
+  PICK_IMAGE_EVENT,
+  ToolController,
+  activeTools,
+  wireDraftPoints,
+  type PointerInfo,
+} from './tools';
+import { ToolOptions } from './ToolOptions';
+import { TEMPLATES, templateClip } from '../examples/templates';
+import { TEMPLATE_DND_TYPE } from '../panels/TemplatesPanel';
 
 export const SYMBOL_DND_TYPE = 'application/x-overleagger-symbol';
 
-function targetId(t: EventTarget | null): Id | null {
-  const el = (t as Element | null) && (t as unknown as HTMLElement).closest?.('[data-id]');
-  return el ? el.getAttribute('data-id') : null;
+function closestAttr(t: EventTarget | null, attr: string): string | null {
+  const el = (t as HTMLElement | null)?.closest?.(`[${attr}]`);
+  return el ? el.getAttribute(attr) : null;
 }
 
 export function Canvas() {
   const ed = useEditor();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pickAt = useRef<Pt | null>(null);
   const tools = useMemo(() => new ToolController(ed), [ed]);
   const sheetId = useUI((s) => s.sheetId) ?? ed.project.rootSheetId;
   const elements = useSheetElements(sheetId);
-  const themeName = useUI((s) => s.theme);
-  const theme = THEMES[themeName];
+  const theme = THEMES[useUI((s) => s.theme)];
   const latexRefs = useUI((s) => s.latexRefs);
   const showGrid = useUI((s) => s.showGrid);
   const tool = useUI((s) => s.tool);
   const spaceDown = useUI((s) => s.spaceDown);
   const hoverPin = useUI((s) => s.hoverPin);
   const drag = useUI((s) => s.drag);
+  const resize = useUI((s) => s.resize);
+  const erasing = useUI((s) => s.erasing);
   const storedVp = useUI((s) => s.viewports[sheetId]);
   const meta = useMeta();
+  const symbolsVersion = useSymbolsVersion();
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
   const size = measured ?? { w: 0, h: 0 };
   const [panning, setPanning] = useState(false);
@@ -60,32 +79,51 @@ export function Canvas() {
   const vp = storedVp ?? { x: size.w / 2, y: size.h / 2, zoom: 1 };
 
   const o: RenderOptions = useMemo(
-    () => ({ theme, ctx: ed.ctx, interactive: true, latexRefs, standard: meta.standard }),
-    [theme, ed.ctx, latexRefs, meta.standard],
+    () => ({
+      theme,
+      ctx: ed.ctx,
+      interactive: true,
+      latexRefs,
+      standard: meta.standard,
+      symbolsVersion,
+    }),
+    [theme, ed.ctx, latexRefs, meta.standard, symbolsVersion],
   );
 
-  // Elements with the live drag preview applied.
+  // Elements with the live previews (drag, segment drag, resize) applied.
   const effective = useMemo(() => {
-    if (!drag || (!drag.dx && !drag.dy)) return elements;
-    let changed: Element[];
-    if (drag.segment) {
-      const w = elements.find((e) => e.id === drag.segment!.wireId);
-      changed =
-        w?.type === 'wire'
-          ? [{ ...w, pts: dragSegment(w, drag.segment.index, drag.dx, drag.dy) }]
-          : [];
-    } else {
-      changed = computeMove(
-        elements,
-        expandSelection(elements, drag.ids),
-        drag.dx,
-        drag.dy,
-        ed.ctx,
-      );
+    let changed: Element[] = [];
+    if (drag && (drag.dx || drag.dy)) {
+      if (drag.segment) {
+        const w = elements.find((e) => e.id === drag.segment!.wireId);
+        if (w?.type === 'wire')
+          changed = [{ ...w, pts: dragSegment(w, drag.segment.index, drag.dx, drag.dy) }];
+      } else {
+        changed = computeMove(
+          elements,
+          expandSelection(elements, drag.ids),
+          drag.dx,
+          drag.dy,
+          ed.ctx,
+        );
+      }
     }
+    if (resize) {
+      const el = elements.find((e) => e.id === resize.id);
+      if (el) {
+        const patch: Record<string, unknown> = {};
+        if (resize.rect) Object.assign(patch, resize.rect);
+        if (resize.pts) patch.pts = resize.pts;
+        if (resize.bend !== undefined) patch.bend = resize.bend;
+        changed.push({ ...el, ...patch } as Element);
+      }
+    }
+    if (!changed.length) return elements;
     const map = new Map(changed.map((e) => [e.id, e]));
     return elements.map((e) => map.get(e.id) ?? e);
-  }, [elements, drag, ed.ctx]);
+  }, [elements, drag, resize, ed.ctx]);
+
+  const hidden = useMemo(() => new Set(erasing), [erasing]);
 
   // Track the canvas size.
   useEffect(() => {
@@ -106,6 +144,16 @@ export function Canvas() {
     if (hasSize && !useUI.getState().viewports[sheetId]) ed.fit(sheetId);
   }, [ed, sheetId, hasSize]);
 
+  const toWorld = useCallback(
+    (clientX: number, clientY: number) => {
+      const r = svgRef.current!.getBoundingClientRect();
+      const v = ed.viewport();
+      const screen = { x: clientX - r.left, y: clientY - r.top };
+      return { screen, world: { x: (screen.x - v.x) / v.zoom, y: (screen.y - v.y) / v.zoom } };
+    },
+    [ed],
+  );
+
   const info = useCallback(
     (e: {
       clientX: number;
@@ -116,21 +164,24 @@ export function Canvas() {
       ctrlKey: boolean;
       metaKey: boolean;
       target: EventTarget | null;
+      pressure?: number;
+      pointerType?: string;
     }): PointerInfo => {
-      const r = svgRef.current!.getBoundingClientRect();
-      const screen = { x: e.clientX - r.left, y: e.clientY - r.top };
-      const v = ed.viewport();
+      const { screen, world } = toWorld(e.clientX, e.clientY);
       return {
         screen,
-        world: { x: (screen.x - v.x) / v.zoom, y: (screen.y - v.y) / v.zoom },
+        world,
         button: e.button,
         shift: e.shiftKey,
         alt: e.altKey,
         mod: e.ctrlKey || e.metaKey,
-        targetId: targetId(e.target),
+        targetId: closestAttr(e.target, 'data-id'),
+        handle: closestAttr(e.target, 'data-handle'),
+        pressure: e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5,
+        hitTest: () => closestAttr(document.elementFromPoint(e.clientX, e.clientY), 'data-id'),
       };
     },
-    [ed],
+    [toWorld],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
@@ -142,7 +193,16 @@ export function Canvas() {
       setPanning(true);
     tools.down(p);
   };
-  const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => tools.move(info(e));
+  const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
+    // Pens and fast mice: use coalesced events for smooth freehand strokes.
+    const native = e.nativeEvent;
+    const list =
+      useUI.getState().strokeDraft && native.getCoalescedEvents ? native.getCoalescedEvents() : [];
+    if (list.length > 1)
+      for (const c of list)
+        tools.move(info({ ...c, target: e.target, pointerType: e.pointerType }));
+    else tools.move(info(e));
+  };
   const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
     svgRef.current?.releasePointerCapture(e.pointerId);
     setPanning(false);
@@ -170,7 +230,7 @@ export function Canvas() {
     return () => svg.removeEventListener('wheel', onWheel);
   }, [ed]);
 
-  // Tool controller is also driven by keyboard shortcuts (wire finishing, bend flip).
+  // Keyboard shortcuts drive the mounted tool controller (wire finishing, bend flip).
   useEffect(() => {
     activeTools.current = tools;
     return () => {
@@ -178,21 +238,59 @@ export function Canvas() {
     };
   }, [tools]);
 
+  // Image tool → file picker; images pasted from the clipboard.
+  useEffect(() => {
+    const onPick = (e: Event) => {
+      pickAt.current = (e as CustomEvent<Pt>).detail;
+      fileRef.current?.click();
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+      if (!file) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void ed.insertImage(file, useUI.getState().cursor ?? ed.viewCenter());
+    };
+    window.addEventListener(PICK_IMAGE_EVENT, onPick);
+    document.addEventListener('paste', onPaste, true);
+    return () => {
+      window.removeEventListener(PICK_IMAGE_EVENT, onPick);
+      document.removeEventListener('paste', onPaste, true);
+    };
+  }, [ed]);
+
   const onDragOver = (e: DragEvent) => {
-    if (e.dataTransfer.types.includes(SYMBOL_DND_TYPE)) {
+    const types = e.dataTransfer.types;
+    if (
+      types.includes(SYMBOL_DND_TYPE) ||
+      types.includes(TEMPLATE_DND_TYPE) ||
+      types.includes('Files')
+    ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
   };
   const onDrop = (e: DragEvent) => {
+    const at = toWorld(e.clientX, e.clientY).world;
+    const images = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+    if (images.length) {
+      e.preventDefault();
+      images.forEach((f, i) => void ed.insertImage(f, { x: at.x + i * 30, y: at.y + i * 30 }));
+      return;
+    }
+    const templateId = e.dataTransfer.getData(TEMPLATE_DND_TYPE);
+    const template = TEMPLATES.find((t) => t.id === templateId);
+    if (template) {
+      e.preventDefault();
+      ed.insertClip(templateClip(template), at);
+      return;
+    }
     const symbolId = e.dataTransfer.getData(SYMBOL_DND_TYPE);
     if (!symbolId) return;
     e.preventDefault();
-    const p = info({ ...e, button: 0, target: null });
-    const el = ed.placeComponent(symbolId, {
-      x: Math.round(p.world.x / GRID) * GRID,
-      y: Math.round(p.world.y / GRID) * GRID,
-    });
+    const el = ed.placeComponent(symbolId, { x: snap(at.x, GRID), y: snap(at.y, GRID) });
     ed.select([el.id]);
   };
 
@@ -200,9 +298,11 @@ export function Canvas() {
     ? 'grabbing'
     : spaceDown || tool === 'pan'
       ? 'grab'
-      : hoverPin || tool !== 'select'
-        ? 'crosshair'
-        : 'default';
+      : tool === 'eraser'
+        ? 'cell'
+        : hoverPin || tool !== 'select'
+          ? 'crosshair'
+          : 'default';
 
   // Visible world rectangle (for the grid).
   const world = {
@@ -273,13 +373,44 @@ export function Canvas() {
               />
             </g>
           )}
-          <SheetRenderer elements={effective} o={o} />
+          <SheetRenderer elements={effective} o={o} hidden={hidden} />
           <Overlay elements={effective} o={o} zoom={vp.zoom} />
         </g>
       </svg>
+      <ToolOptions />
       <InlineEditor vp={vp} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        data-testid="image-input"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void ed.insertImage(f, pickAt.current ?? ed.viewCenter());
+          e.target.value = '';
+          useUI.getState().setTool('select');
+        }}
+      />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Overlay: selection, handles and previews (drawn in "non-photo blue" like drafting marks)
+// ---------------------------------------------------------------------------
+
+/** Corner brackets around a rectangle, like registration marks on a technical drawing. */
+function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; len: number }) {
+  const l = Math.min(len, r.w / 2, r.h / 2);
+  const { x, y, w, h } = r;
+  const d = [
+    `M ${x} ${y + l} V ${y} H ${x + l}`,
+    `M ${x + w - l} ${y} H ${x + w} V ${y + l}`,
+    `M ${x + w} ${y + h - l} V ${y + h} H ${x + w - l}`,
+    `M ${x + l} ${y + h} H ${x} V ${y + h - l}`,
+  ].join(' ');
+  return <path d={d} fill="none" stroke={color} strokeWidth={sw * 1.6} strokeLinecap="square" />;
 }
 
 function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions; zoom: number }) {
@@ -291,8 +422,13 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   const tool = useUI((s) => s.tool);
   const placing = useUI((s) => s.placing);
   const blockDraft = useUI((s) => s.blockDraft);
+  const rectDraft = useUI((s) => s.rectDraft);
+  const lineDraft = useUI((s) => s.lineDraft);
+  const strokeDraft = useUI((s) => s.strokeDraft);
+  const prefs = useUI((s) => s.prefs);
   const hoverPin = useUI((s) => s.hoverPin);
-  const accent = o.theme.accent;
+  const t: Theme = o.theme;
+  const sel = t.select;
   const sw = 1 / zoom;
 
   const boxes = useMemo(() => {
@@ -301,7 +437,7 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
       .map((id) => byId.get(id))
       .filter((e): e is Element => Boolean(e))
       .map((e) => {
-        if (e.type === 'wire') return { id: e.id, wire: e.pts };
+        if (e.type === 'wire') return { el: e, wire: e.pts };
         const members =
           e.type === 'group'
             ? elements.filter(
@@ -309,14 +445,12 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
               )
             : [e];
         const r = rectUnion(members.map((m) => elementBBox(m, o.ctx, elements)));
-        return r ? { id: e.id, rect: inflate(r, 4) } : null;
+        return r ? { el: e, rect: r } : null;
       })
-      .filter(Boolean) as {
-      id: Id;
-      rect?: { x: number; y: number; w: number; h: number };
-      wire?: number[];
-    }[];
+      .filter(Boolean) as { el: Element; rect?: Rect; wire?: number[] }[];
   }, [selection, elements, o.ctx]);
+
+  const single = boxes.length === 1 ? boxes[0]!.el : null;
 
   const ghostEl: ComponentElement | null = useMemo(() => {
     if (tool !== 'place' || !placing || !ghost) return null;
@@ -338,105 +472,225 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   }, [tool, placing, ghost, ed.ctx]);
 
   const ghostO = useMemo(() => ({ ...o, interactive: false }), [o]);
+  const hs = 7 / zoom; // handle size
+  const inkColor = resolveColor(prefs.inkColor, t);
 
   return (
-    <g className="overlay" pointerEvents="none">
-      {boxes.map((b) =>
-        b.wire ? (
-          <polyline
-            key={b.id}
-            points={b.wire.join(' ')}
-            fill="none"
-            stroke={accent}
-            strokeOpacity={0.35}
-            strokeWidth={7}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <g className="overlay">
+      <g pointerEvents="none">
+        {boxes.map((b) =>
+          b.wire ? (
+            <polyline
+              key={b.el.id}
+              points={b.wire.join(' ')}
+              fill="none"
+              stroke={sel}
+              strokeOpacity={0.45}
+              strokeWidth={6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : (
+            <g key={b.el.id}>
+              <rect
+                x={inflate(b.rect!, 4).x}
+                y={inflate(b.rect!, 4).y}
+                width={inflate(b.rect!, 4).w}
+                height={inflate(b.rect!, 4).h}
+                fill={t.selectSoft}
+                stroke={sel}
+                strokeWidth={sw}
+                strokeDasharray={`${3 * sw} ${3 * sw}`}
+              />
+              <Brackets r={inflate(b.rect!, 4)} color={sel} sw={sw} len={9 * sw} />
+            </g>
+          ),
+        )}
+        {marquee && (
+          <g>
+            <rect
+              x={marquee.x}
+              y={marquee.y}
+              width={marquee.w}
+              height={marquee.h}
+              fill={t.selectSoft}
+              stroke={sel}
+              strokeWidth={sw}
+              strokeDasharray={`${1.5 * sw} ${3 * sw}`}
+            />
+            <Brackets r={marquee} color={sel} sw={sw} len={9 * sw} />
+          </g>
+        )}
+        {wireDraft && (
+          <>
+            <polyline
+              points={wireDraftPoints(wireDraft).join(' ')}
+              fill="none"
+              stroke={t.ink}
+              strokeOpacity={0.75}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx={wireDraft.cursor.x}
+              cy={wireDraft.cursor.y}
+              r={3 * sw + 1.5}
+              fill="none"
+              stroke={sel}
+              strokeWidth={sw}
+            />
+          </>
+        )}
+        {ghostEl && (
+          <g opacity={0.5}>
+            <ComponentView el={ghostEl} o={ghostO} />
+          </g>
+        )}
+        {ghost && tool !== 'place' && tool !== 'select' && !wireDraft && (
+          <Crosshair p={ghost} color={sel} sw={sw} />
+        )}
+        {blockDraft && <DraftRect r={blockDraft} color={sel} fill={t.selectSoft} />}
+        {rectDraft && (
+          <DraftRect
+            r={rectDraft}
+            color={sel}
+            fill={t.selectSoft}
+            ellipse={tool === 'shape' && prefs.shapeKind === 'ellipse'}
           />
-        ) : (
-          <rect
-            key={b.id}
-            x={b.rect!.x}
-            y={b.rect!.y}
-            width={b.rect!.w}
-            height={b.rect!.h}
-            fill={o.theme.accentSoft}
-            stroke={accent}
-            strokeWidth={sw}
-            strokeDasharray={`${4 * sw} ${3 * sw}`}
-            rx={3 * sw}
-          />
-        ),
-      )}
-      {marquee && (
-        <rect
-          x={marquee.x}
-          y={marquee.y}
-          width={marquee.w}
-          height={marquee.h}
-          fill={o.theme.accentSoft}
-          stroke={accent}
-          strokeWidth={sw}
-          strokeDasharray={`${5 * sw} ${3 * sw}`}
-        />
-      )}
-      {wireDraft && (
-        <>
-          <polyline
-            points={wireDraftPoints(wireDraft).join(' ')}
-            fill="none"
-            stroke={o.theme.ink}
-            strokeOpacity={0.75}
+        )}
+        {lineDraft && (
+          <line
+            x1={lineDraft[0]}
+            y1={lineDraft[1]}
+            x2={lineDraft[2]}
+            y2={lineDraft[3]}
+            stroke={inkColor}
             strokeWidth={1.5}
             strokeLinecap="round"
-            strokeLinejoin="round"
           />
+        )}
+        {strokeDraft && strokeDraft.length >= 6 && (
+          <path
+            d={strokePath(
+              strokeDraft,
+              prefs.highlighter ? prefs.penSize * 5 : prefs.penSize,
+              prefs.highlighter,
+            )}
+            fill={inkColor}
+            fillOpacity={prefs.highlighter ? 0.32 : 1}
+          />
+        )}
+        {hoverPin && (
           <circle
-            cx={wireDraft.cursor.x}
-            cy={wireDraft.cursor.y}
-            r={3 * sw + 1.5}
+            cx={hoverPin.x}
+            cy={hoverPin.y}
+            r={4.5}
             fill="none"
-            stroke={accent}
-            strokeWidth={sw}
+            stroke={sel}
+            strokeWidth={1.6}
           />
-        </>
-      )}
-      {ghostEl && (
-        <g opacity={0.5}>
-          <ComponentView el={ghostEl} o={ghostO} />
+        )}
+      </g>
+      {/* Resize handles (interactive). */}
+      {single && !single.locked && isBox(single) && (
+        <g className="handles">
+          {HANDLES.map((h) => {
+            const p = handlePos(boxes[0]!.rect!, h);
+            return (
+              <rect
+                key={h}
+                data-handle={h}
+                className={`handle handle-${h}`}
+                x={p.x - hs / 2}
+                y={p.y - hs / 2}
+                width={hs}
+                height={hs}
+                fill={t.paper}
+                stroke={sel}
+                strokeWidth={sw * 1.3}
+              />
+            );
+          })}
         </g>
       )}
-      {ghost &&
-        (tool === 'wire' ||
-          tool === 'signal' ||
-          tool === 'port' ||
-          tool === 'label' ||
-          tool === 'text' ||
-          tool === 'block') &&
-        !wireDraft && <Crosshair p={ghost} color={accent} sw={sw} />}
-      {blockDraft && (
-        <rect
-          x={blockDraft.x}
-          y={blockDraft.y}
-          width={blockDraft.w}
-          height={blockDraft.h}
-          fill={o.theme.accentSoft}
-          stroke={accent}
-          strokeWidth={1.5}
-          strokeDasharray="6 4"
-        />
-      )}
-      {hoverPin && (
-        <circle
-          cx={hoverPin.x}
-          cy={hoverPin.y}
-          r={4.5}
-          fill="none"
-          stroke={accent}
-          strokeWidth={1.6}
-        />
+      {single && !single.locked && single.type === 'line' && (
+        <g className="handles">
+          {(['p0', 'p1', 'bend'] as const).map((h) => {
+            const [x1, y1, x2, y2] = single.pts as [number, number, number, number];
+            const c = lineControlPoint(single.pts, single.bend ?? 0);
+            const p =
+              h === 'p0'
+                ? { x: x1, y: y1 }
+                : h === 'p1'
+                  ? { x: x2, y: y2 }
+                  : { x: (x1 + 2 * c.x + x2) / 4, y: (y1 + 2 * c.y + y2) / 4 };
+            return h === 'bend' ? (
+              <circle
+                key={h}
+                data-handle={h}
+                className="handle handle-move"
+                cx={p.x}
+                cy={p.y}
+                r={hs / 2}
+                fill={sel}
+                stroke={t.paper}
+                strokeWidth={sw}
+              />
+            ) : (
+              <rect
+                key={h}
+                data-handle={h}
+                className="handle handle-move"
+                x={p.x - hs / 2}
+                y={p.y - hs / 2}
+                width={hs}
+                height={hs}
+                fill={t.paper}
+                stroke={sel}
+                strokeWidth={sw * 1.3}
+              />
+            );
+          })}
+        </g>
       )}
     </g>
+  );
+}
+
+function DraftRect({
+  r,
+  color,
+  fill,
+  ellipse,
+}: {
+  r: Rect;
+  color: string;
+  fill: string;
+  ellipse?: boolean;
+}) {
+  return ellipse ? (
+    <ellipse
+      cx={r.x + r.w / 2}
+      cy={r.y + r.h / 2}
+      rx={r.w / 2}
+      ry={r.h / 2}
+      fill={fill}
+      stroke={color}
+      strokeWidth={1.2}
+      strokeDasharray="5 4"
+    />
+  ) : (
+    <rect
+      x={r.x}
+      y={r.y}
+      width={r.w}
+      height={r.h}
+      fill={fill}
+      stroke={color}
+      strokeWidth={1.2}
+      strokeDasharray="5 4"
+    />
   );
 }
 

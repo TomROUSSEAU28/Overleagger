@@ -1,6 +1,8 @@
 import {
   GRID,
+  allowedScales,
   expandSelection,
+  resolveComponent,
   type BlockElement,
   type ComponentElement,
   type Element,
@@ -20,11 +22,32 @@ import {
   RotateCw,
   SendToBack,
   Ungroup,
+  AlignStartVertical,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignCenterHorizontal,
+  AlignEndHorizontal,
+  AlignHorizontalDistributeCenter,
+  AlignVerticalDistributeCenter,
+  PackagePlus,
+  Pencil,
+  Plus,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheetElements, useSheets } from '../editor/context';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 import { Field, IconButton } from './common';
+import {
+  ButtonProps,
+  FrameProps,
+  ImageProps,
+  LineProps,
+  NoteProps,
+  ShapeProps,
+  StrokeProps,
+  WaveformProps,
+} from './WhiteboardProps';
 
 export function PropertiesPanel() {
   const ed = useEditor();
@@ -93,6 +116,9 @@ function SheetProps() {
 
 // ---------------------------------------------------------------------------
 
+/** Light fills that stay readable under graphite ink. */
+const FILLS = ['#ffffff', '#f3efe4', '#e6eef8', '#e5f1e1', '#fbf1c7', '#f8e1e1', '#ece6f5'];
+
 function StyleEditor({ els }: { els: Element[] }) {
   const ed = useEditor();
   const theme = THEMES[useUI((s) => s.theme)];
@@ -108,6 +134,8 @@ function StyleEditor({ els }: { els: Element[] }) {
     });
   };
   const current = first.color;
+  const palette = useMeta().palette ?? [];
+  const fillable = els.some((e) => ['shape', 'text', 'block', 'frame', 'button'].includes(e.type));
   return (
     <>
       <h3>Style</h3>
@@ -130,13 +158,60 @@ function StyleEditor({ els }: { els: Element[] }) {
             onClick={() => setStyle({ color: `@${n}` })}
           />
         ))}
+        {palette.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={`swatch${current === c ? ' active' : ''}`}
+            title={`${c} (project colour)`}
+            style={{ background: c }}
+            onClick={() => setStyle({ color: c })}
+          />
+        ))}
         <input
           type="color"
           title="Custom colour"
           value={current && !current.startsWith('@') ? current : resolveColor(current, theme)}
           onChange={(e) => setStyle({ color: e.target.value })}
         />
+        {current && !current.startsWith('@') && !palette.includes(current) && (
+          <IconButton
+            title="Add this colour to the project palette"
+            onClick={() => ed.project.setMeta({ palette: [...palette, current] })}
+          >
+            <Plus size={14} />
+          </IconButton>
+        )}
       </div>
+      {fillable && (
+        <div className="swatches" aria-label="Fill">
+          <span className="field-label">Fill</span>
+          <button
+            type="button"
+            className={`swatch auto${!first.fill ? ' active' : ''}`}
+            title="No fill"
+            onClick={() => setStyle({ fill: undefined })}
+          >
+            ∅
+          </button>
+          {FILLS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`swatch${first.fill === f ? ' active' : ''}`}
+              style={{ background: f }}
+              title={f}
+              onClick={() => setStyle({ fill: f })}
+            />
+          ))}
+          <input
+            type="color"
+            title="Custom fill"
+            value={first.fill ?? '#ffffff'}
+            onChange={(e) => setStyle({ fill: e.target.value })}
+          />
+        </div>
+      )}
       <div className="row">
         <Field label="Stroke">
           <select
@@ -192,7 +267,56 @@ function ArrangeButtons() {
       <IconButton title="Send to back" onClick={() => ed.reorder('back')}>
         <SendToBack size={16} />
       </IconButton>
+      <IconButton
+        title="Move into a new hierarchical block (Ctrl Shift B)"
+        onClick={() => ed.selectionToBlock()}
+      >
+        <PackagePlus size={16} />
+      </IconButton>
     </div>
+  );
+}
+
+function AlignButtons({ count }: { count: number }) {
+  const ed = useEditor();
+  return (
+    <>
+      <h3>Align</h3>
+      <div className="button-row" data-testid="align-buttons">
+        <IconButton title="Align left" onClick={() => ed.align('left')}>
+          <AlignStartVertical size={16} />
+        </IconButton>
+        <IconButton title="Align centres horizontally" onClick={() => ed.align('hcenter')}>
+          <AlignCenterVertical size={16} />
+        </IconButton>
+        <IconButton title="Align right" onClick={() => ed.align('right')}>
+          <AlignEndVertical size={16} />
+        </IconButton>
+        <IconButton title="Align top" onClick={() => ed.align('top')}>
+          <AlignStartHorizontal size={16} />
+        </IconButton>
+        <IconButton title="Align middles vertically" onClick={() => ed.align('vcenter')}>
+          <AlignCenterHorizontal size={16} />
+        </IconButton>
+        <IconButton title="Align bottom" onClick={() => ed.align('bottom')}>
+          <AlignEndHorizontal size={16} />
+        </IconButton>
+        <IconButton
+          title="Distribute horizontally (3 or more)"
+          onClick={() => ed.distribute('h')}
+          disabled={count < 3}
+        >
+          <AlignHorizontalDistributeCenter size={16} />
+        </IconButton>
+        <IconButton
+          title="Distribute vertically (3 or more)"
+          onClick={() => ed.distribute('v')}
+          disabled={count < 3}
+        >
+          <AlignVerticalDistributeCenter size={16} />
+        </IconButton>
+      </div>
+    </>
   );
 }
 
@@ -210,6 +334,14 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
       {el.type === 'port' && <PortProps el={el} />}
       {el.type === 'label' && <LabelProps el={el} />}
       {el.type === 'text' && <TextProps el={el} />}
+      {el.type === 'shape' && <ShapeProps el={el} />}
+      {el.type === 'line' && <LineProps el={el} />}
+      {el.type === 'stroke' && <StrokeProps el={el} />}
+      {el.type === 'image' && <ImageProps el={el} />}
+      {el.type === 'note' && <NoteProps el={el} />}
+      {el.type === 'button' && <ButtonProps el={el} />}
+      {el.type === 'waveform' && <WaveformProps el={el} />}
+      {el.type === 'frame' && <FrameProps el={el} />}
       {el.type === 'group' && (
         <>
           <h3>Group</h3>
@@ -260,6 +392,7 @@ function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) 
         )}
       </div>
       <ArrangeButtons />
+      <AlignButtons count={sel.length} />
       <StyleEditor els={all} />
     </>
   );
@@ -319,6 +452,7 @@ function ComponentProps({ el }: { el: ComponentElement }) {
   const ed = useEditor();
   const sym = ed.ctx.symbol(el.symbolId);
   const upd = (patch: Partial<ComponentElement>) => ed.updateElement(el.id, patch);
+  const resolved = resolveComponent(el, ed.ctx);
   const options = sym && !isStatic(sym) ? (sym.options ?? []) : [];
   return (
     <>
@@ -378,9 +512,45 @@ function ComponentProps({ el }: { el: ComponentElement }) {
           key={o.key}
           o={o}
           value={el.opts[o.key]}
-          onChange={(v) => upd({ opts: { ...el.opts, [o.key]: v } })}
+          onChange={(v) => ed.patchWithFollow(el.id, { opts: { ...el.opts, [o.key]: v } })}
         />
       ))}
+      {resolved && allowedScales(resolved).length > 1 && (
+        <Field label="Size">
+          <select
+            value={el.scale ?? 1}
+            onChange={(e) =>
+              ed.patchWithFollow(el.id, {
+                scale: Number(e.target.value) === 1 ? undefined : Number(e.target.value),
+              })
+            }
+            data-testid="prop-scale"
+          >
+            {allowedScales(resolved).map((k) => (
+              <option key={k} value={k}>
+                {k === 1 ? 'Normal' : `× ${k}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      <button
+        type="button"
+        className="btn"
+        title="Open this symbol in the symbol editor and save a customised copy"
+        onClick={() =>
+          useUI.getState().set({
+            modal: 'symbol-editor',
+            editingSymbol:
+              sym && isStatic(sym)
+                ? { id: sym.id }
+                : { from: el.symbolId, opts: el.opts, replaceId: el.id },
+          })
+        }
+        data-testid="customize-symbol"
+      >
+        <Pencil size={14} /> {sym && isStatic(sym) ? 'Edit symbol' : 'Customize symbol…'}
+      </button>
       <Field label="Symbol standard">
         <select
           value={el.standard ?? ''}
@@ -596,6 +766,19 @@ function TextProps({ el }: { el: TextElement }) {
           </select>
         </Field>
       </div>
+      <Field label="Frame">
+        <select
+          value={el.frame ?? ''}
+          onChange={(e) => upd({ frame: (e.target.value || undefined) as TextElement['frame'] })}
+          data-testid="prop-text-frame"
+        >
+          <option value="">None</option>
+          <option value="box">Box</option>
+          <option value="round">Rounded box</option>
+          <option value="double">Double box</option>
+          <option value="underline">Underline</option>
+        </select>
+      </Field>
     </>
   );
 }

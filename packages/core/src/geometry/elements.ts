@@ -57,6 +57,12 @@ export interface WorldPin {
 // Components
 // ---------------------------------------------------------------------------
 
+/** Size factors that keep every pin of the symbol on the grid. */
+export function allowedScales(r: ResolvedSymbol): number[] {
+  const onGrid = (v: number) => Math.abs(v - Math.round(v)) < 1e-6;
+  return [1, 1.5, 2, 3].filter((s) => r.pins.every((p) => onGrid(p.x * s) && onGrid(p.y * s)));
+}
+
 export function resolveComponent(
   el: ComponentElement,
   ctx: SheetContext,
@@ -68,11 +74,12 @@ export function resolveComponent(
 
 /** Symbol point (grid units) → world point (px) for a placed component. */
 export function componentPoint(
-  el: Pick<ComponentElement, 'x' | 'y' | 'rot' | 'mirror'>,
+  el: Pick<ComponentElement, 'x' | 'y' | 'rot' | 'mirror' | 'scale'>,
   gx: number,
   gy: number,
 ): Pt {
-  const [x, y] = orient(gx * GRID, gy * GRID, el.rot, el.mirror);
+  const s = GRID * (el.scale ?? 1);
+  const [x, y] = orient(gx * s, gy * s, el.rot, el.mirror);
   return { x: x + el.x, y: y + el.y };
 }
 
@@ -338,8 +345,28 @@ export function elementBBox(el: Element, ctx: SheetContext, all?: Element[]): Re
       return ptsBBox(portShape(el));
     case 'label':
       return labelBBox(el);
-    case 'text':
-      return textBBox(el);
+    case 'text': {
+      const b = textBBox(el);
+      return el.frame ? inflateRect(b, TEXT_FRAME_PAD) : b;
+    }
+    case 'shape':
+    case 'image':
+    case 'note':
+    case 'button':
+    case 'waveform':
+    case 'frame':
+      return { x: el.x, y: el.y, w: el.w, h: el.h };
+    case 'line': {
+      const b = ptsBBox(el.pts);
+      const pad = el.arrowStart || el.arrowEnd ? 6 : 2;
+      const c = lineControlPoint(el.pts, el.bend ?? 0);
+      return inflateRect(rectUnion([b, { x: c.x, y: c.y, w: 0, h: 0 }])!, pad);
+    }
+    case 'stroke': {
+      const xy: number[] = [];
+      for (let i = 0; i < el.pts.length; i += 3) xy.push(el.pts[i]!, el.pts[i + 1]!);
+      return inflateRect(ptsBBox(xy), el.size / 2 + 1);
+    }
     case 'group': {
       const members = (all ?? []).filter((e) => isInGroup(e, el.id, all ?? []));
       return (
@@ -349,6 +376,29 @@ export function elementBBox(el: Element, ctx: SheetContext, all?: Element[]): Re
       );
     }
   }
+}
+
+export const TEXT_FRAME_PAD = 6;
+
+const inflateRect = (r: Rect, d: number): Rect => ({
+  x: r.x - d,
+  y: r.y - d,
+  w: r.w + 2 * d,
+  h: r.h + 2 * d,
+});
+
+/**
+ * Control point of a curved line: the quadratic curve passes through the middle offset by
+ * `bend` px perpendicular to the chord (so the control point is at twice that offset).
+ */
+export function lineControlPoint(pts: number[], bend: number): Pt {
+  const [x1, y1, x2, y2] = pts as [number, number, number, number];
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const nx = -(y2 - y1) / len;
+  const ny = (x2 - x1) / len;
+  return { x: mx + nx * bend * 2, y: my + ny * bend * 2 };
 }
 
 /** True if `el` is (directly or indirectly) a member of group `groupId`. */

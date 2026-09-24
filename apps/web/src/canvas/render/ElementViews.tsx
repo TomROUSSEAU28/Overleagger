@@ -7,12 +7,12 @@ import {
   portTextPos,
   resolveComponent,
   textWidth,
+  textBBox,
+  TEXT_FRAME_PAD,
   type BlockElement,
   type ComponentElement,
-  type Element,
   type LabelElement,
   type PortElement,
-  type SheetContext,
   type TextElement,
   type WireElement,
 } from '@overleagger/core';
@@ -20,32 +20,12 @@ import { memo } from 'react';
 import { Tex } from '../../latex/Tex';
 import { hasMath, mixedToTex } from '../../latex/texCache';
 import { refToTex } from './labels';
-import { DEFAULT_STROKE, FONT_SERIF, resolveColor, type Theme } from '../../theme';
-import { SymbolShapes, SymbolText, type Ink } from './SymbolGraphic';
+import { FONT_SERIF } from '../../theme';
+import { SymbolShapes, SymbolText } from './SymbolGraphic';
+import { dashArray, inkOf, type RenderOptions } from './style';
 
-export interface RenderOptions {
-  theme: Theme;
-  ctx: SheetContext;
-  /** Add transparent hit areas and data attributes for pointer interaction. */
-  interactive: boolean;
-  /** Render references like R1 as LaTeX R₁. */
-  latexRefs: boolean;
-  /** Project drawing standard (only used to invalidate memoized views). */
-  standard?: string;
-}
+export type { RenderOptions } from './style';
 
-const dashArray = (dash: string | undefined, w: number) =>
-  dash === 'dashed' ? `${w * 4} ${w * 3}` : dash === 'dotted' ? `0.1 ${w * 2.6}` : undefined;
-
-function inkOf(el: Element, o: RenderOptions): Ink {
-  return {
-    color: resolveColor(el.style?.color, o.theme),
-    paper: o.theme.paper,
-    width: el.style?.width ?? DEFAULT_STROKE,
-  };
-}
-
-/** Plain or mixed (`$…$`) text line. */
 export function RichText({
   text,
   x,
@@ -123,10 +103,15 @@ export const ComponentView = memo(function ComponentView({
   }
   const b = r.bbox;
   const labels = componentLabels(el, o.ctx);
+  const k = el.scale ?? 1;
+  // Keep the stroke width constant when the symbol is enlarged.
+  const shapeInk = k === 1 ? ink : { ...ink, width: ink.width / k };
+  // Local +x axis pointing left on screen → start/end anchors must swap.
+  const flipAnchors = componentPoint({ ...el, x: 0, y: 0 }, 1, 0).x < -0.5;
   return (
     <g data-id={o.interactive ? el.id : undefined} className="el">
       <g
-        transform={`translate(${el.x} ${el.y}) rotate(${el.rot * 90}) scale(${el.mirror ? -1 : 1} 1)`}
+        transform={`translate(${el.x} ${el.y}) rotate(${el.rot * 90}) scale(${(el.mirror ? -1 : 1) * k} ${k})`}
       >
         {o.interactive && (
           <rect
@@ -137,7 +122,7 @@ export const ComponentView = memo(function ComponentView({
             height={b.h * 10 + 6}
           />
         )}
-        <SymbolShapes prims={r.prims} ink={ink} />
+        <SymbolShapes prims={r.prims} ink={shapeInk} />
       </g>
       {r.prims.map((p, i) => {
         if (p.k !== 'text') return null;
@@ -146,12 +131,17 @@ export const ComponentView = memo(function ComponentView({
         // away from the symbol so it does not overlap the drawing.
         const dx = w.x - el.x;
         const dy = w.y - el.y;
+        const own = p.anchor ?? 'middle';
         const anchor =
-          el.rot % 2 === 1 && (p.anchor ?? 'middle') === 'middle' && Math.abs(dx) > Math.abs(dy) + 2
+          el.rot % 2 === 1 && own === 'middle' && Math.abs(dx) > Math.abs(dy) + 2
             ? dx < 0
               ? 'end'
               : 'start'
-            : undefined;
+            : flipAnchors && own !== 'middle'
+              ? own === 'start'
+                ? 'end'
+                : 'start'
+              : undefined;
         return (
           <SymbolText
             key={i}
@@ -161,6 +151,7 @@ export const ComponentView = memo(function ComponentView({
             color={ink.color}
             params={el.params}
             anchor={anchor}
+            scale={k}
           />
         );
       })}
@@ -360,27 +351,45 @@ export const TextView = memo(function TextView({ el, o }: { el: TextElement; o: 
   const ink = inkOf(el, o);
   const lines = el.text.split('\n');
   const lh = el.size * 1.3;
-  const w = Math.max(10, ...lines.map((l) => textWidth(l.replace(/\$/g, ''), el.size)));
-  const x0 = el.align === 'middle' ? el.x - w / 2 : el.align === 'end' ? el.x - w : el.x;
+  const b = textBBox(el);
+  const pad = TEXT_FRAME_PAD;
+  const f = { x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad };
+  const fill = el.style?.fill;
   return (
     <g data-id={o.interactive ? el.id : undefined} className="el">
-      {o.interactive && (
+      {o.interactive && <rect className="hit" x={f.x} y={f.y} width={f.w} height={f.h} />}
+      {(fill || (el.frame && el.frame !== 'underline')) && (
         <rect
-          className="hit"
-          x={x0 - 3}
-          y={el.y - el.size * 0.9}
-          width={w + 6}
-          height={lines.length * lh + 2}
+          x={f.x}
+          y={f.y}
+          width={f.w}
+          height={f.h}
+          rx={el.frame === 'round' ? Math.min(12, f.h / 2) : 0}
+          fill={fill ?? 'none'}
+          stroke={el.frame && el.frame !== 'underline' ? ink.color : 'none'}
+          strokeWidth={ink.width}
+          strokeDasharray={dashArray(el.style?.dash, ink.width)}
         />
       )}
-      {el.style?.fill && (
+      {el.frame === 'double' && (
         <rect
-          x={x0 - 6}
-          y={el.y - el.size * 0.9 - 3}
-          width={w + 12}
-          height={lines.length * lh + 8}
-          fill={el.style.fill}
-          rx={3}
+          x={f.x + 3}
+          y={f.y + 3}
+          width={f.w - 6}
+          height={f.h - 6}
+          fill="none"
+          stroke={ink.color}
+          strokeWidth={ink.width * 0.7}
+        />
+      )}
+      {el.frame === 'underline' && (
+        <line
+          x1={f.x}
+          y1={f.y + f.h}
+          x2={f.x + f.w}
+          y2={f.y + f.h}
+          stroke={ink.color}
+          strokeWidth={ink.width}
         />
       )}
       {lines.map((line, i) => (

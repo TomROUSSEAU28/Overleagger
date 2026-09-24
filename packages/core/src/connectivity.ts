@@ -69,6 +69,8 @@ interface PointInfo {
 export interface Connectivity {
   /** Points where a junction dot must be drawn (≥ 3 branches meet). */
   junctions: Pt[];
+  /** Ids of the wires meeting at each junction (same order as `junctions`). */
+  junctionWires: Id[][];
   /** Net number of every wire (by wire id) and pin (`elId:pinId`). */
   netOf: Map<string, number>;
   /** Pins that touch at least one wire or other pin. */
@@ -160,6 +162,7 @@ export function analyzeConnectivity(elements: Element[], ctx: SheetContext): Con
   for (const pin of allPins) add(`p:${pinKey(pin.elId, pin.pinId)}`);
 
   const junctions: Pt[] = [];
+  const junctionWires: Id[][] = [];
   const connectedPins = new Set<string>();
   for (const p of points.values()) {
     if (!p.poi) continue;
@@ -169,7 +172,10 @@ export function analyzeConnectivity(elements: Element[], ctx: SheetContext): Con
     ];
     for (let i = 1; i < nodes.length; i++) union(nodes[0]!, nodes[i]!);
     if (nodes.length > 1) for (const pin of p.pins) connectedPins.add(pinKey(pin.elId, pin.pinId));
-    if (p.branches >= 3 && p.wires >= 1) junctions.push({ x: p.x, y: p.y });
+    if (p.branches >= 3 && p.wires >= 1) {
+      junctions.push({ x: p.x, y: p.y });
+      junctionWires.push([...p.wireIdx].map((i) => wires[i]!.id));
+    }
   }
 
   // Net labels with the same text are connected.
@@ -194,7 +200,7 @@ export function analyzeConnectivity(elements: Element[], ctx: SheetContext): Con
     netOf.set(k.slice(2), n);
   }
 
-  return { junctions, netOf, connectedPins };
+  return { junctions, junctionWires, netOf, connectedPins };
 }
 
 /** Convenience wrapper returning only the junction dots. */

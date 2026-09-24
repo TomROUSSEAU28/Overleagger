@@ -12,6 +12,16 @@ export type ActionId =
   | 'tool.port'
   | 'tool.label'
   | 'tool.text'
+  | 'tool.draw'
+  | 'tool.eraser'
+  | 'tool.shape'
+  | 'tool.line'
+  | 'tool.note'
+  | 'tool.image'
+  | 'tool.button'
+  | 'tool.waveform'
+  | 'tool.frame'
+  | 'edit.toBlock'
   | 'edit.quickAdd'
   | 'edit.rotate'
   | 'edit.rotateCcw'
@@ -65,6 +75,21 @@ export const ACTIONS: ActionDef[] = [
   { id: 'tool.port', label: 'Sheet port', category: 'Tools', keys: ['p'] },
   { id: 'tool.label', label: 'Net label', category: 'Tools', keys: ['l'] },
   { id: 'tool.text', label: 'Text / LaTeX', category: 'Tools', keys: ['t'] },
+  { id: 'tool.draw', label: 'Pencil (freehand)', category: 'Tools', keys: ['d'] },
+  { id: 'tool.eraser', label: 'Eraser', category: 'Tools', keys: ['e'] },
+  { id: 'tool.shape', label: 'Shape (rectangle, ellipse…)', category: 'Tools', keys: ['s'] },
+  { id: 'tool.line', label: 'Line / arrow', category: 'Tools', keys: ['shift+l'] },
+  { id: 'tool.note', label: 'Sticky note', category: 'Tools', keys: ['n'] },
+  { id: 'tool.image', label: 'Image', category: 'Tools', keys: ['i'] },
+  { id: 'tool.button', label: 'Link button', category: 'Tools', keys: ['k'] },
+  { id: 'tool.waveform', label: 'Waveform / oscillogram', category: 'Tools', keys: ['o'] },
+  { id: 'tool.frame', label: 'Frame', category: 'Tools', keys: ['shift+f'] },
+  {
+    id: 'edit.toBlock',
+    label: 'Move selection into a new block',
+    category: 'Hierarchy',
+    keys: ['mod+shift+b'],
+  },
   { id: 'edit.quickAdd', label: 'Quick add component', category: 'Edit', keys: ['a', 'mod+k'] },
   { id: 'edit.rotate', label: 'Rotate 90°', category: 'Edit', keys: ['r'] },
   { id: 'edit.rotateCcw', label: 'Rotate −90°', category: 'Edit', keys: ['shift+r'] },

@@ -6,6 +6,8 @@ import { LibraryPanel } from '../panels/LibraryPanel';
 import { PropertiesPanel } from '../panels/PropertiesPanel';
 import { QuickAdd } from '../panels/QuickAdd';
 import { SheetsPanel } from '../panels/SheetsPanel';
+import { TemplatesPanel } from '../panels/TemplatesPanel';
+import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
 import { ToolRail } from '../panels/ToolRail';
 import { TopBar } from '../panels/TopBar';
@@ -44,6 +46,16 @@ function EditorLayout() {
               <button
                 type="button"
                 role="tab"
+                aria-selected={tab === 'templates'}
+                className={tab === 'templates' ? 'active' : ''}
+                onClick={() => useUI.getState().set({ leftTab: 'templates' })}
+                data-testid="tab-templates"
+              >
+                Templates
+              </button>
+              <button
+                type="button"
+                role="tab"
                 aria-selected={tab === 'sheets'}
                 className={tab === 'sheets' ? 'active' : ''}
                 onClick={() => useUI.getState().set({ leftTab: 'sheets' })}
@@ -52,7 +64,13 @@ function EditorLayout() {
                 Sheets
               </button>
             </div>
-            {tab === 'library' ? <LibraryPanel /> : <SheetsPanel />}
+            {tab === 'library' ? (
+              <LibraryPanel />
+            ) : tab === 'templates' ? (
+              <TemplatesPanel />
+            ) : (
+              <SheetsPanel />
+            )}
           </aside>
         )}
         <main className="canvas-area">
@@ -69,6 +87,7 @@ function EditorLayout() {
       {modal === 'help' && <HelpOverlay />}
       {modal === 'shortcuts' && <ShortcutsDialog />}
       {modal === 'export' && <ExportDialog />}
+      {modal === 'symbol-editor' && <SymbolEditor />}
     </div>
   );
 }

@@ -3,18 +3,17 @@ import {
   Copy,
   Download,
   FolderOpen,
-  Moon,
   Pencil,
   Plus,
   Shapes,
   Sparkles,
-  Sun,
   Trash,
   Upload,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { seedBuckExample } from '../examples/buck';
 import { Field, Modal } from '../panels/common';
+import { ThemePicker } from '../panels/ThemePicker';
 import { navigate } from '../router';
 import { decodeOlg, download, encodeOlg, safeFileName } from '../storage/olg';
 import {
@@ -114,16 +113,7 @@ export function Dashboard() {
             Hierarchical whiteboard for electronics, power electronics &amp; control diagrams.
           </p>
         </div>
-        <button
-          type="button"
-          className="icon-btn"
-          title={theme === 'paper' ? 'Blackboard theme' : 'Paper theme'}
-          onClick={() =>
-            useUI.getState().setSetting('theme', theme === 'paper' ? 'blackboard' : 'paper')
-          }
-        >
-          {theme === 'paper' ? <Moon size={18} /> : <Sun size={18} />}
-        </button>
+        <ThemePicker />
       </header>
       <div className="dash-actions">
         <button

@@ -6,16 +6,15 @@ import {
   Download,
   Grid3x3,
   Keyboard,
-  Moon,
   PanelLeft,
   PanelRight,
   Redo2,
-  Sun,
   Undo2,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheets, useUndoState } from '../editor/context';
 import { useUI } from '../store/ui';
 import { IconButton } from './common';
+import { ThemePicker } from './ThemePicker';
 
 export function Breadcrumbs() {
   const ed = useEditor();
@@ -44,7 +43,6 @@ export function TopBar() {
   const ed = useEditor();
   const meta = useMeta();
   const { canUndo, canRedo } = useUndoState();
-  const theme = useUI((s) => s.theme);
   const showGrid = useUI((s) => s.showGrid);
   const left = useUI((s) => s.leftPanel);
   const right = useUI((s) => s.rightPanel);
@@ -102,13 +100,7 @@ export function TopBar() {
       >
         <Grid3x3 size={17} />
       </IconButton>
-      <IconButton
-        title={theme === 'paper' ? 'Blackboard theme' : 'Paper theme'}
-        onClick={() => ui().setSetting('theme', theme === 'paper' ? 'blackboard' : 'paper')}
-        testId="theme-toggle"
-      >
-        {theme === 'paper' ? <Moon size={17} /> : <Sun size={17} />}
-      </IconButton>
+      <ThemePicker />
       <IconButton
         title="Library panel"
         active={left}

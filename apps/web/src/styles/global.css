@@ -51,6 +51,22 @@
   color-scheme: light;
 }
 
+:root[data-theme='whiteboard'] {
+  --bg: #f3f5f7;
+  --panel: #ffffff;
+  --panel-2: #f6f7f9;
+  --border: #dfe3e8;
+  --border-strong: #c2c8d0;
+  --ink: #1d1f22;
+  --muted: #6b7280;
+  --accent: #2563b8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(37, 99, 184, 0.1);
+  --warning-bg: #fdf0dd;
+  --hover: rgba(37, 99, 184, 0.07);
+  color-scheme: light;
+}
+
 :root[data-theme='blackboard'] {
   --bg: #171d1a;
   --panel: #1f2723;
@@ -983,5 +999,238 @@ button.kbd {
   }
   .breadcrumbs {
     display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ phase 2 */
+
+.rail-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+.tool-rail {
+  overflow-y: auto;
+}
+
+.tool-options {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 4;
+}
+.tool-options .opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+.tool-options .opt.text {
+  padding: 0 8px;
+  font-variant: small-caps;
+  font-size: 14px;
+}
+.tool-options .opt:hover {
+  background: var(--hover);
+}
+.tool-options .opt.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tool-options .dot {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.tool-options .sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.swatch.small {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+.theme-picker {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.theme-swatch {
+  width: 26px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.theme-swatch.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Handles */
+.canvas .handle {
+  pointer-events: all;
+}
+.canvas .handle-n,
+.canvas .handle-s {
+  cursor: ns-resize;
+}
+.canvas .handle-e,
+.canvas .handle-w {
+  cursor: ew-resize;
+}
+.canvas .handle-ne,
+.canvas .handle-sw {
+  cursor: nesw-resize;
+}
+.canvas .handle-nw,
+.canvas .handle-se {
+  cursor: nwse-resize;
+}
+.canvas .handle-move {
+  cursor: move;
+}
+
+/* Frames are only grabbed by their border and title tab, so their content stays clickable. */
+.canvas .frame .frame-hit {
+  fill: none;
+  pointer-events: stroke;
+}
+.canvas .frame .frame-tab {
+  pointer-events: all;
+}
+.canvas .frame:hover .frame-hit {
+  fill: none;
+  stroke: var(--hover);
+}
+.canvas .button {
+  cursor: pointer;
+}
+
+.trace {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px 2px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+}
+
+.lib-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  cursor: grab;
+  margin: 6px 0;
+}
+.template-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.template-card b {
+  font-size: 14px;
+}
+.template-card span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.symbol-tile-wrap {
+  position: relative;
+}
+.symbol-tile-wrap .tile-edit {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  display: none;
+}
+.symbol-tile-wrap:hover .tile-edit {
+  display: inline-flex;
+}
+.lib-cat-title {
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+  margin: 14px 0 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Symbol editor */
+.symed {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.symed-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.symed-canvas {
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+  max-width: 60vw;
+  height: auto;
+}
+.symed-prim {
+  cursor: pointer;
+}
+.symed-side {
+  min-width: 200px;
+}
+.symed-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+@media (max-width: 900px) {
+  .symed {
+    grid-template-columns: auto 1fr;
+  }
+  .symed-side {
+    grid-column: 1 / -1;
   }
 }

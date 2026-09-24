@@ -84,7 +84,7 @@ export async function exportPdf(
       const node = nodes[i]!;
       const sheet = node.sheet;
       if (i > 0) doc.addPage('a4', 'landscape');
-      const { svg, view, blocks } = await renderSheetSvg(project, ctx, sheet.id, {
+      const { svg, view, blocks, links } = await renderSheetSvg(project, ctx, sheet.id, {
         ...o,
         embedFonts: false,
       });
@@ -142,6 +142,16 @@ export async function exportPdf(
           b.rect.h * s,
           { pageNumber: target },
         );
+      }
+
+      // Link buttons: web pages / online PDFs, or other sheets of the document.
+      for (const l of links) {
+        const x = x0 + (l.rect.x - view.x) * s;
+        const y = y0 + (l.rect.y - view.y) * s;
+        if (l.url && /^(https?:|mailto:)/i.test(l.url))
+          doc.link(x, y, l.rect.w * s, l.rect.h * s, { url: l.url });
+        else if (l.sheetId && pageOf.has(l.sheetId))
+          doc.link(x, y, l.rect.w * s, l.rect.h * s, { pageNumber: pageOf.get(l.sheetId)! });
       }
 
       // Bookmarks mirroring the hierarchy.

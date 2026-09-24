@@ -108,6 +108,7 @@ export function SymbolText({
   color,
   params,
   anchor,
+  scale = 1,
 }: {
   p: TextPrimitive;
   x: number;
@@ -115,10 +116,11 @@ export function SymbolText({
   color: string;
   params: Record<string, string>;
   anchor?: 'start' | 'middle' | 'end';
+  scale?: number;
 }) {
   const t = fillTemplate(p.t, params);
   if (!t) return null;
-  const size = (p.size ?? 1.2) * S;
+  const size = (p.size ?? 1.2) * S * scale;
   const a = anchor ?? p.anchor ?? 'middle';
   if (p.math) return <Tex tex={t} x={x} y={y} size={size} color={color} anchor={a} display />;
   return (

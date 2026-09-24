@@ -1,4 +1,4 @@
-import { C, L, P, PC, T, M, arrow, pin, sine } from '../prims';
+import { C, L, P, PC, M, arrow, pin, sine, plus, minus } from '../prims';
 import type { Primitive, SymbolDef } from '../types';
 
 const CAT = 'Sources';
@@ -8,10 +8,7 @@ const R0 = 1.2;
 const vLeads = (r = R0): Primitive[] => [L(0, -3, 0, -r), L(0, r, 0, 3)];
 const vPins = () => [pin('+', 0, -3, 'Positive'), pin('-', 0, 3, 'Negative')];
 
-const plusMinus = (dy = 0.55): Primitive[] => [
-  T(0, -dy, '+', { size: 1.1 }),
-  T(0, dy + 0.05, '−', { size: 1.1 }),
-];
+const plusMinus = (dy = 0.55): Primitive[] => [...plus(0, -dy), ...minus(0, dy)];
 
 const diamond = (r = 1.35): Primitive => PC([0, -r, r, 0, 0, r, -r, 0]);
 
@@ -140,7 +137,7 @@ export const sources: SymbolDef[] = [
             L(-0.5, 0.3, 0.5, 0.3, { sw: 2.2 }),
             L(0, 0.3, 0, 3),
           ];
-      prims.push(T(1.2, -1.3, '+', { size: 1 }));
+      prims.push(...plus(1.2, -1.3));
       return { prims, pins: vPins() };
     },
   },

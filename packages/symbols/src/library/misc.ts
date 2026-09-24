@@ -1,4 +1,23 @@
-import { A, C, L, M, P, PC, R, T, arrow, arrowHead, bez2, dot, pin, sine, tf } from '../prims';
+import {
+  A,
+  C,
+  L,
+  M,
+  P,
+  PC,
+  R,
+  T,
+  arrow,
+  arrowHead,
+  bez2,
+  dot,
+  pin,
+  sine,
+  tf,
+  sign,
+  plus,
+  minus,
+} from '../prims';
 import type { OptionDef, Primitive, Standard, SymbolDef } from '../types';
 import { diodeBody, diodeFill } from './semiconductors';
 
@@ -244,10 +263,7 @@ function opampGraphics(standard: Standard, supply: boolean, plusTop: boolean, co
   } else {
     prims.push(PC([-2, -2, -2, 2, 2, 0]));
   }
-  prims.push(
-    T(-1.45, -1, plusTop ? '+' : '−', { size: 1 }),
-    T(-1.45, 1, plusTop ? '−' : '+', { size: 1 }),
-  );
+  prims.push(...sign(plusTop ? '+' : '-', -1.45, -1), ...sign(plusTop ? '-' : '+', -1.45, 1));
   if (comparator)
     prims.push(P([-0.5, 0.5, 0.1, 0.5, 0.1, -0.3, 0.7, -0.3]), P([-0.3, 0.5, 0.3, 0.5, 0.3, -0.3]));
   const pins = [
@@ -569,7 +585,7 @@ export const annotations: SymbolDef[] = [
     keywords: ['polarity', 'sign', 'ansi voltage'],
     refPrefix: '',
     build: () => ({
-      prims: [T(0, -1.5, '+', { size: 1.2 }), T(0, 1.5, '−', { size: 1.2 })],
+      prims: [...plus(0, -1.5, 0.4), ...minus(0, 1.5, 0.4)],
       pins: [],
     }),
   },

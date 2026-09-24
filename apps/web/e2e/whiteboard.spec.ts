@@ -1,0 +1,194 @@
+import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+type Handle = {
+  __overleagger: {
+    ed: {
+      viewport(): { x: number; y: number; zoom: number };
+      elements(): { type: string }[];
+      setViewport(v: object): void;
+    };
+  };
+};
+
+async function toScreen(page: Page, x: number, y: number) {
+  const box = (await page.getByTestId('canvas').boundingBox())!;
+  const vp = await page.evaluate(() => (window as unknown as Handle).__overleagger.ed.viewport());
+  return { x: box.x + vp.x + x * vp.zoom, y: box.y + vp.y + y * vp.zoom };
+}
+
+async function dragWorld(page: Page, a: [number, number], b: [number, number]) {
+  const p = await toScreen(page, ...a);
+  const q = await toScreen(page, ...b);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.mouse.move(q.x, q.y, { steps: 6 });
+  await page.mouse.up();
+}
+
+const types = (page: Page) =>
+  page.evaluate(() => (window as unknown as Handle).__overleagger.ed.elements().map((e) => e.type));
+
+async function newProject(page: Page, name: string) {
+  await page.goto('/');
+  await page.getByTestId('new-project').click();
+  await page.getByTestId('new-project-name').fill(name);
+  await page.getByTestId('create-project').click();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await page.evaluate(() =>
+    (window as unknown as Handle).__overleagger.ed.setViewport({ x: 80, y: 80, zoom: 1 }),
+  );
+}
+
+test('whiteboard tools: shapes, arrows, notes, pencil, waveforms, images and links', async ({
+  page,
+}) => {
+  await newProject(page, 'Board');
+  await page.getByTestId('theme-whiteboard').click();
+
+  await page.keyboard.press('s');
+  await expect(page.getByTestId('tool-options')).toBeVisible();
+  await dragWorld(page, [0, 0], [120, 80]);
+  await page.keyboard.press('Shift+L');
+  await dragWorld(page, [0, 120], [200, 120]);
+  // Tool goes back to select; dragging the curve handle bends the arrow instead of drawing.
+  const bend = page.locator('[data-handle=bend]');
+  const bb = (await bend.boundingBox())!;
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + 40, { steps: 4 });
+  await page.mouse.up();
+  expect((await types(page)).filter((t) => t === 'line')).toHaveLength(1);
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('n');
+  let p = await toScreen(page, 260, 0);
+  await page.mouse.click(p.x, p.y);
+  await page.getByTestId('inline-editor').fill('Note with $x^2$');
+  await page.getByTestId('inline-editor').press('Control+Enter');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('d');
+  p = await toScreen(page, 0, 200);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  for (let i = 1; i < 20; i++) {
+    const q = await toScreen(page, i * 8, 200 + (i % 2) * 10);
+    await page.mouse.move(q.x, q.y);
+  }
+  await page.mouse.up();
+
+  await page.keyboard.press('o');
+  await dragWorld(page, [0, 260], [300, 400]);
+  await page.getByTestId('wave-preset').selectOption('buck');
+
+  // Link button to an online PDF.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('k');
+  p = await toScreen(page, 400, 0);
+  await page.mouse.click(p.x, p.y);
+  await page.getByTestId('inline-editor').fill('Datasheet');
+  await page.getByTestId('inline-editor').press('Enter');
+  await page.getByTestId('prop-button-url').fill('https://example.com/datasheet.pdf');
+
+  // Image through the image tool.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('i');
+  p = await toScreen(page, 450, 200);
+  await page.mouse.click(p.x, p.y);
+  await page
+    .getByTestId('image-input')
+    .setInputFiles(fileURLToPath(new URL('./fixture.png', import.meta.url)));
+  await expect.poll(async () => (await types(page)).includes('image')).toBe(true);
+
+  const all = (await types(page)).sort();
+  for (const t of ['button', 'image', 'line', 'note', 'shape', 'stroke', 'waveform'])
+    expect(all).toContain(t);
+
+  // The link survives in the PDF.
+  await page.getByTestId('open-export').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-pdf').click();
+  const pdf = readFileSync((await (await download).path())!).toString('latin1');
+  expect(pdf).toContain('https://example.com/datasheet.pdf');
+});
+
+test('templates insert connected circuits', async ({ page }) => {
+  await newProject(page, 'Templates');
+  await page.getByTestId('tab-templates').click();
+  await page.getByTestId('template-buck').click();
+  expect((await types(page)).filter((t) => t === 'component').length).toBeGreaterThan(5);
+  await expect(page.locator('.junctions circle')).toHaveCount(5);
+});
+
+test('custom symbol editor: draw, add pins, save and place', async ({ page }) => {
+  await newProject(page, 'Symbols');
+  await page.getByTestId('new-symbol').click();
+  await page.getByTestId('symed-name').fill('Heater');
+  const canvas = page.getByTestId('symed-canvas');
+  const box = (await canvas.boundingBox())!;
+  // 22 px per grid unit, origin in the middle.
+  const at = (x: number, y: number) => ({
+    x: box.x + box.width / 2 + x * 22,
+    y: box.y + box.height / 2 + y * 22,
+  });
+  await page.getByTestId('symed-rect').click();
+  let a = at(-2, -1);
+  let b = at(2, 1);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up();
+  await page.getByTestId('symed-line').click();
+  a = at(-3, 0);
+  b = at(-2, 0);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 3 });
+  await page.mouse.up();
+  await page.getByTestId('symed-pin').click();
+  a = at(-3, 0);
+  await page.mouse.click(a.x, a.y);
+  a = at(2, 0);
+  await page.mouse.click(a.x, a.y);
+  await page.getByTestId('symed-save').click();
+
+  const tile = page.locator('[data-testid^="symbol-custom-"]');
+  await expect(tile).toHaveCount(1);
+  await tile.click();
+  const p = await toScreen(page, 100, 100);
+  await page.mouse.click(p.x, p.y);
+  expect(await types(page)).toContain('component');
+});
+
+test('bridge spacing and part size options', async ({ page }) => {
+  await newProject(page, 'Sizes');
+  await page.getByTestId('library-search').fill('half-bridge');
+  await page.getByTestId('symbol-half-bridge').click();
+  const p = await toScreen(page, 100, 100);
+  await page.mouse.click(p.x, p.y);
+  await page.keyboard.press('Escape');
+  await page.mouse.click(p.x + 10, p.y - 40);
+  await expect(page.getByTestId('properties')).toContainText('Gap high');
+  await page.getByTestId('library-search').fill('resistor');
+  await page.getByTestId('symbol-resistor').click();
+  const q = await toScreen(page, 300, 100);
+  await page.mouse.click(q.x, q.y);
+  await page.keyboard.press('Escape');
+  await page.mouse.click(q.x, q.y);
+  await page.getByTestId('prop-scale').selectOption('2');
+  const scale = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __overleagger: {
+            ed: { elements(): { type: string; symbolId?: string; scale?: number }[] };
+          };
+        }
+      ).__overleagger.ed
+        .elements()
+        .find((e) => e.symbolId === 'resistor')?.scale,
+  );
+  expect(scale).toBe(2);
+});

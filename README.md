@@ -7,35 +7,60 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
 ![Status](<https://img.shields.io/badge/status-phase%201%20(core%20editor)-2f5d9e>)
 
-## Features (phase 1)
+## Features
+
+### Schematics (phase 1)
 
 - **Grid canvas**: pan (Space / middle mouse / wheel), zoom (Ctrl + wheel, pinch), fit (`F`).
-- **129 symbols**, each in IEC and ANSI style:
-  - passives, transformers (2/3 windings, centre tap, dot convention, iron/ferrite core);
+- **About 150 symbols**, each in IEC and ANSI style:
+  - passives, coupled inductors, transformers (2/3 windings, centre tap, single-line, 3-phase Y/Δ),
+    shunt, LDR, ferrite bead;
   - sources (DC, AC, pulse, controlled, 3-phase, PV), grounds and rails;
-  - diodes (Schottky, Zener, LED, TVS…), BJT, JFET, GaN HEMT;
+  - diodes (Schottky, Zener, LED, TVS, varicap…), BJT, JFET, phototransistor, **GaN HEMT
+    (e-mode / d-mode)**;
   - **MOSFET N/P, enhancement or depletion, 3 or 4 terminals, with or without body
     (freewheeling) diode, with or without circle**; **IGBT with/without anti-parallel diode**;
-  - thyristors (SCR, GTO, IGCT, TRIAC, DIAC), diode bridge, half/full bridge, 3-phase inverter,
-    AC/DC, DC/DC, DC/AC, AC/AC converter blocks, gate driver;
-  - switches, relays, contactor, breaker, machines (DC, induction, PMSM, BLDC), meters and sensors;
-  - **control blocks** with LaTeX: sum junction, gain, transfer function, PI, PID, integrator,
-    delay, ZOH, saturation, relay, rate limiter, PWM, Clarke/Park, PLL, mux…
+  - thyristors (SCR, GTO, IGCT, TRIAC, DIAC), single- and three-phase diode bridges, half/full
+    bridge and 3-phase inverter (**adjustable gap between high/low side and between legs**),
+    AC/DC… converter blocks, gate driver, isolation barrier;
+  - switches, ideal controlled switch, relays, contactor, breaker, machines, meters, sensors and
+    probes, generic IC, regulator, ADC/DAC, logic gates;
+  - **control blocks** with LaTeX: sum junction, gain, transfer functions, PI, PID, state space,
+    integrators, delay, ZOH, saturation, relay, rate limiter, PWM, Clarke/Park, PLL, mux/demux…
+- **Every part has a size option** (×1.5, ×2, ×3 when the pins stay on the grid).
 - **Wires**: orthogonal routing, `/` flips the bend, drag a pin to start a wire, drag a segment to
-  move it, wires stretch when parts move. **Junction dots appear automatically** where 3 or more
-  connections meet (crossing wires are not connected).
-- **Signal lines** with arrows for block diagrams (same automatic branch points).
-- **Hierarchy**: draw a block, double-click it to open its sheet, add sheet ports: each port becomes
-  a pin of the block. Breadcrumbs + sheet tree. Blocks can be nested without limit.
-- **LaTeX everywhere**: `$…$` in texts, values and labels, rendered with MathJax (vector paths).
-- **Group / ungroup**, z-order, lock, copy / cut / paste (also between projects), duplicate,
-  rotate, mirror, nudge, undo / redo.
-- **Customisable colours** (graphite, pencil, blue, red… or any colour), stroke width, dashes;
-  **paper** and **blackboard** themes.
-- **Keyboard shortcuts** for everything, **re-bindable** in a settings dialog (`?` shows them all).
-- **Projects** saved automatically in the browser (IndexedDB), `.olg` project files to back up / share.
-- **Export**: SVG, PNG and a **smart PDF** — one page per sheet, bookmarks that mirror the
-  hierarchy, clickable blocks that jump to their sub-sheet and a link back to the parent.
+  move it, wires stretch when parts move **or rotate**. **Junction dots appear automatically**
+  where 3 or more connections meet (crossing wires are not connected).
+- **Hierarchy**: blocks open like sub-sheets, sheet ports become block pins, unlimited nesting,
+  **"move selection into a new block"** (`Ctrl Shift B`).
+- **Templates**: buck, boost, buck-boost, flyback, H-bridge inverter, 3-phase inverter + motor,
+  single/three-phase rectifiers, PI loop, cascaded current + voltage loops, RC filter, inverting
+  amplifier.
+
+### Whiteboard (phase 2)
+
+- **Pencil** (pen pressure, highlighter), **eraser**, **shapes** (rectangle, ellipse, diamond,
+  triangle) with an optional **hand-drawn look**, **lines and arrows** you can curve.
+- **Sticky notes**, **text with frames** (box, rounded, double, underline) and LaTeX everywhere.
+- **Images**: image tool, drag and drop, or paste from the clipboard (downscaled automatically).
+- **Link buttons** to a web page / online PDF or to another sheet (Ctrl+click to follow; they stay
+  clickable in the PDF).
+- **Waveform generator** (oscillograms and chronograms): sine, square, PWM, triangle, sawtooth,
+  rectified, DC + ripple, 1st/2nd-order step responses, exponential, custom points; presets such
+  as buck chronogram, PWM carrier, three-phase voltages.
+- **Frames** to organise the board (the base of the coming presentation mode).
+- **Custom symbol editor**: lines, polylines, rectangles, circles, texts and pins on a grid; start
+  from any built-in symbol ("Customize symbol…") and save it to the project library.
+- **Align and distribute**, **project colour palette**, fills, three themes: **cream lab
+  notebook**, **white whiteboard** and **blackboard**, with drafting-style ("non-photo blue")
+  selection marks.
+
+### Files and export
+
+- Projects saved automatically in the browser (IndexedDB), `.olg` project files to back up/share.
+- **SVG, PNG and smart PDF**: one page per sheet, bookmarks that mirror the hierarchy, clickable
+  blocks, link buttons and a link back to the parent sheet.
+- **Keyboard shortcuts** for everything, re-bindable (`?` shows them all).
 
 ## Getting started
 
@@ -57,7 +82,9 @@ Other commands:
 | `pnpm lint`      | ESLint                                  |
 | `pnpm format`    | Prettier                                |
 
-The build is a static site (`base: './'`), so it can be hosted on GitHub Pages or any static host.
+The build is a static site (`base: './'`), so it can be hosted on any static host. The workflow
+`.github/workflows/pages.yml` publishes it on **GitHub Pages** on every push to `main`
+(one-time setup: repository _Settings → Pages → Source: GitHub Actions_).
 
 ## Architecture
 
@@ -77,10 +104,10 @@ apps/web           React + Vite editor: SVG canvas, tools, panels, shortcuts, La
 
 ## Roadmap
 
-- **Phase 2 — Whiteboard**: freehand pencil, shapes, images, sticky notes, link buttons,
-  waveform / oscillogram generator, frames, "selection → block", **custom symbol editor**.
-- **Phase 3 — Presentation & smart PDF**: presentation mode with laser pointer, URL buttons and
-  comments in the PDF, **CircuiTikZ export**.
+- ~~Phase 1 — Core editor~~ ✔
+- ~~Phase 2 — Whiteboard~~ ✔
+- **Phase 3 — Presentation & smart PDF**: presentation mode (frames/sheets as slides, laser
+  pointer, pen overlay, zoom transitions), PDF comments, **CircuiTikZ export**.
 - **Phase 4 — Collaboration**: self-hosted server (Hocuspocus + SQLite, Docker), invitations,
   roles (owner / editor / commenter / viewer), live cursors, comments, version history.
 - **Phase 5 — Extras**: SPICE netlist, BOM.

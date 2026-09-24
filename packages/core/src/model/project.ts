@@ -97,6 +97,7 @@ export class Project {
       rootSheetId: this.meta.get('rootSheetId') as Id,
       formatVersion: (this.meta.get('formatVersion') as number) ?? FORMAT_VERSION,
       createdAt: (this.meta.get('createdAt') as number) ?? 0,
+      palette: (this.meta.get('palette') as string[] | undefined) ?? [],
     };
   }
 

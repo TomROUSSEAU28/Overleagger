@@ -1,4 +1,4 @@
-import { A, L, P, PC, R, T, arrow, dot, pin, sine } from '../prims';
+import { A, L, P, PC, R, T, arrow, dot, pin, sine, plus } from '../prims';
 import type { Primitive, SymbolDef } from '../types';
 
 const CAT = 'Passives';
@@ -156,7 +156,7 @@ export const passives: SymbolDef[] = [
               L(0.3, -1, 0.3, 1, { sw: 1.4 }),
               L(0.3, 0, 2, 0),
             ];
-      prims.push(T(-1.25, -1.1, '+', { size: 1.1 }));
+      prims.push(...plus(-1.2, -1.15));
       return { prims, pins: [pin('+', -2, 0, 'Positive'), pin('-', 2, 0, 'Negative')] };
     },
   },

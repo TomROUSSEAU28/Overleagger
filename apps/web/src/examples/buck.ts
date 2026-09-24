@@ -42,20 +42,20 @@ export function seedBuckExample(p: Project) {
     const vo = addComponent(p, root, 'voltage-arrow', 450, 145, ctx, { rot: 1, mirror: true });
     p.updateElement(root, vo.id, { params: { value: 'v_{out}' }, style: { color: '@blue' } });
 
-    wire(root, [0, 70, 0, 40, 160, 40]);
+    wire(root, [0, 70, 0, 20, 160, 20]);
     wire(root, [0, 130, 0, 190, 400, 190]);
-    wire(root, [160, 160, 160, 190]);
+    wire(root, [160, 180, 160, 190]);
     wire(root, [80, 190, 80, 210]);
     wire(root, [180, 100, 210, 100]);
-    wire(root, [270, 100, 480, 100]);
+    wire(root, [270, 100, 450, 100]);
     wire(root, [320, 125, 320, 100]);
     wire(root, [320, 165, 320, 190]);
     wire(root, [400, 115, 400, 100]);
     wire(root, [400, 175, 400, 190]);
-    wire(root, [90, 90, 130, 90]);
-    wire(root, [90, 130, 130, 130]);
-    p.addElement(root, { type: 'label', x: 90, y: 90, text: '$q_H$' });
-    p.addElement(root, { type: 'label', x: 90, y: 130, text: '$q_L$' });
+    wire(root, [90, 70, 130, 70]);
+    wire(root, [90, 150, 130, 150]);
+    p.addElement(root, { type: 'label', x: 90, y: 70, text: '$q_H$' });
+    p.addElement(root, { type: 'label', x: 90, y: 150, text: '$q_L$' });
     p.addElement(root, { type: 'label', x: 450, y: 100, text: '$v_{out}$' });
 
     // Controller block and its sub-sheet.

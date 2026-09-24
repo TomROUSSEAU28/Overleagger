@@ -2,6 +2,7 @@ import {
   elementBBox,
   rectUnion,
   type BlockElement,
+  type ButtonElement,
   type Id,
   type Project,
   type Rect,
@@ -28,6 +29,8 @@ export interface SheetSvg {
   /** Drawing area in world coordinates (px). */
   view: Rect;
   blocks: { id: Id; childSheetId: Id; rect: Rect; title: string }[];
+  /** Link buttons (clickable in the PDF). */
+  links: { rect: Rect; url?: string; sheetId?: Id }[];
 }
 
 let fontCss: Promise<string> | null = null;
@@ -110,7 +113,14 @@ export async function renderSheetSvg(
       rect: elementBBox(e, ctx, elements),
       title: e.title,
     }));
-  return { svg: `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`, view, blocks };
+  const links = elements
+    .filter((e) => e.type === 'button')
+    .map((e) => {
+      const b = e as ButtonElement;
+      const rect = { x: b.x, y: b.y, w: b.w, h: b.h };
+      return b.link.kind === 'url' ? { rect, url: b.link.url } : { rect, sheetId: b.link.sheetId };
+    });
+  return { svg: `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`, view, blocks, links };
 }
 
 export async function svgToPngBlob(

@@ -6,6 +6,7 @@ export * from './geometry/elements';
 export * from './connectivity';
 export * from './commands/move';
 export * from './commands/ops';
+export * from './commands/layout';
 export * from './hierarchy';
 export * from './clipboard';
 export * from './refdes';

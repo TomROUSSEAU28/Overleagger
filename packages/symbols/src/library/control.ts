@@ -1,4 +1,4 @@
-import { C, L, M, P, PC, R, T, arrow, pin, sine } from '../prims';
+import { C, L, M, P, PC, R, T, arrow, pin, sine, sign } from '../prims';
 import type { OptionDef, PinDef, Primitive, SymbolDef } from '../types';
 
 const CAT = 'Control blocks';
@@ -163,7 +163,7 @@ function sumBlock(): SymbolDef {
       inputs.forEach((inp, i) => {
         prims.push(inp.line);
         const s = signs[i] ?? '+';
-        prims.push(T(inp.sx, inp.sy, s === '-' ? '−' : '+', { size: 1.15 }));
+        prims.push(...sign(s, inp.sx, inp.sy, 0.32));
         pins.push(pin(inp.id, inp.x, inp.y, `Input ${i + 1}`));
       });
       return { prims, pins };
