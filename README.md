@@ -36,11 +36,11 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 - **Mirror / rotate everything**: parts, sheet ports and net labels (their shape goes to the
   other side of the connection point), text (alignment), triangles, images.
 - **My library** (personal, shared by all your projects, stored in the browser for now):
-  - **Your own templates**: select part of a drawing → *Save selection as template* (Templates tab
+  - **Your own templates**: select part of a drawing → _Save selection as template_ (Templates tab
     or the bookmark button in the properties). Pick a category or type a new one. Click or drag a
     template to insert it; custom symbols it uses come with it.
-  - **Your own symbols**: the symbol editor saves to *My library* (every project) or to *This
-    project only*, in any category you type.
+  - **Your own symbols**: the symbol editor saves to _My library_ (every project) or to _This
+    project only_, in any category you type.
   - Export / import the whole library as an `.olglib` file (ready for future user accounts).
 
 ### Whiteboard (phase 2)
