@@ -16,14 +16,23 @@ if [ "$before" = "$after" ] && [ "${1:-}" != "--force" ]; then
 fi
 git log --oneline "$before..$after" | sed 's/^/   /' || true
 
-echo "→ Saving a copy of the data (backups/, the 5 latest are kept)"
+echo "→ Saving a copy of the database (backups/, the 5 latest are kept)"
 mkdir -p backups
 stamp=$(date +%Y%m%d-%H%M%S)
-if docker compose cp circuit-notebook:/data "backups/data-$stamp" >/dev/null 2>&1; then
-  echo "   backups/data-$stamp"
-  ls -1dt backups/data-* | tail -n +6 | xargs -r rm -rf
+# A clean copy made by SQLite itself (only the database: the nightly copies stay in /data).
+if docker compose exec -T circuit-notebook node -e "
+  const s = require('node:sqlite');
+  s.backup(new s.DatabaseSync('/data/circuit-notebook.sqlite'), '/tmp/pre-update.sqlite')
+    .then(() => process.exit(0), (e) => { console.error(e.message); process.exit(1); });
+" 2>/dev/null &&
+  docker compose cp circuit-notebook:/tmp/pre-update.sqlite "backups/cn-$stamp.sqlite" >/dev/null 2>&1; then
+  docker compose exec -T circuit-notebook rm -f /tmp/pre-update.sqlite
+  echo "   backups/cn-$stamp.sqlite ($(du -h "backups/cn-$stamp.sqlite" | cut -f1))"
+  ls -1t backups/cn-*.sqlite | tail -n +6 | xargs -r rm -f
+  # Copies of the whole data folder made by earlier versions of this script: keep the newest.
+  ls -1dt backups/data-* 2>/dev/null | tail -n +2 | xargs -r rm -rf
 else
-  echo "   (no data yet)"
+  echo "   (server not running: no copy)"
 fi
 
 echo "→ Building and restarting"

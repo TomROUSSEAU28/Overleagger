@@ -176,12 +176,23 @@ reach your mailbox and give the site its address, contact@circuitnotebook.com.
 ~/circuit-notebook/deploy/update.sh
 ```
 
-It fetches the latest code, saves a copy of the data in `~/circuit-notebook/backups/` (the 5
-latest are kept), rebuilds, restarts, removes the old images and checks `/api/health`. Nothing
-new on GitHub → it stops there (`--force` rebuilds anyway).
+It fetches the latest code, saves a clean copy of the database in
+`~/circuit-notebook/backups/cn-<date>.sqlite` (the 5 latest are kept), rebuilds, restarts,
+removes the old images and checks `/api/health`. Nothing new on GitHub → it stops there
+(`--force` rebuilds anyway).
 
-To go back to a copy: `docker compose stop`, then
-`docker compose cp backups/data-<date>/. circuit-notebook:/data`, then `docker compose start`.
+To go back to one of these copies:
+
+```bash
+docker compose stop
+docker compose cp backups/cn-<date>.sqlite circuit-notebook:/data/circuit-notebook.sqlite
+docker compose run --rm --entrypoint sh circuit-notebook -c 'rm -f /data/circuit-notebook.sqlite-wal /data/circuit-notebook.sqlite-shm'
+docker compose start
+```
+
+How much room backups take, at most: Hetzner Backups are stored by Hetzner, not on your disk
+(7 kept); the nightly copies take 7 × the database; `update.sh` keeps 5 more. With a 100 MB
+database that is about 1.2 GB. The Administration page shows the free disk space.
 
 Open projects reconnect by themselves; unsynced edits stay in the browsers and sync afterwards.
 
