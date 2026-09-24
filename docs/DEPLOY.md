@@ -122,6 +122,21 @@ docker compose start
 
 - [ ] Try a restore once, before anyone relies on it.
 
+### Start again from zero
+
+To erase every account, shared project, friend, team and version history (after tests, for
+example), and name the administrator at the same time:
+
+```bash
+cd ~/circuit-notebook && git pull
+deploy/reset.sh --admin you@example.com
+```
+
+It asks you to type `RESET`, writes `ADMIN_EMAILS` in `docker-compose.override.yml`, moves the
+old database to `/data/backups/before-reset-<date>/` (nothing is deleted), and starts the latest
+version with an empty database. Projects saved in browsers are not touched. The end of its
+output shows how to undo.
+
 ## 5. Updates
 
 ```bash
