@@ -139,6 +139,23 @@ function useIndexSync(opened: Opened | null) {
     const project = ed.project;
     let t1: ReturnType<typeof setTimeout> | undefined;
     let t2: ReturnType<typeof setTimeout> | undefined;
+    const thumbnail = async () => {
+      if (source.kind === 'cloud' && !roleAtLeast(ed.session?.role, 'editor')) return;
+      const { renderSheetSvg } = await import('../export/render');
+      const r = await renderSheetSvg(project, ed.ctx, project.rootSheetId, {
+        theme: THEMES.paper,
+        background: 'paper',
+        latexRefs: true,
+        margin: 16,
+      });
+      if (source.kind === 'local') await updateEntry(source.id, { thumbnail: r.svg });
+      else
+        await api('PATCH', `/api/projects/${source.id}`, { thumbnail: r.svg }).catch(
+          () => undefined,
+        );
+    };
+    // A project that is only opened (an example, an imported file) also gets its preview.
+    if (source.kind === 'local') t2 = setTimeout(() => void thumbnail(), 800);
     const onChange = () => {
       if (source.kind === 'local') {
         clearTimeout(t1);
@@ -149,24 +166,7 @@ function useIndexSync(opened: Opened | null) {
         );
       }
       clearTimeout(t2);
-      t2 = setTimeout(
-        async () => {
-          if (source.kind === 'cloud' && !roleAtLeast(ed.session?.role, 'editor')) return;
-          const { renderSheetSvg } = await import('../export/render');
-          const r = await renderSheetSvg(project, ed.ctx, project.rootSheetId, {
-            theme: THEMES.paper,
-            background: 'paper',
-            latexRefs: true,
-            margin: 16,
-          });
-          if (source.kind === 'local') await updateEntry(source.id, { thumbnail: r.svg });
-          else
-            await api('PATCH', `/api/projects/${source.id}`, { thumbnail: r.svg }).catch(
-              () => undefined,
-            );
-        },
-        source.kind === 'local' ? 2500 : 6000,
-      );
+      t2 = setTimeout(() => void thumbnail(), source.kind === 'local' ? 1500 : 6000);
     };
     const off = project.subscribe(onChange);
     return () => {
