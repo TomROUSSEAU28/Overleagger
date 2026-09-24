@@ -15,6 +15,7 @@ import { Presentation } from '../present/Presentation';
 import { Loading } from '../brand/Logo';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
+import { PanelReopen, PanelResizer } from '../panels/PanelResizer';
 import { Toast } from '../panels/Toast';
 import { ToolRail } from '../panels/ToolRail';
 import { TopBar } from '../panels/TopBar';
@@ -34,6 +35,8 @@ function EditorLayout() {
   const presenting = useUI((s) => s.presenting);
   const left = useUI((s) => s.leftPanel);
   const right = useUI((s) => s.rightPanel);
+  const leftWidth = useUI((s) => s.leftWidth);
+  const rightWidth = useUI((s) => s.rightWidth);
   const tab = useUI((s) => s.leftTab);
   const theme = useUI((s) => s.theme);
   return (
@@ -42,8 +45,8 @@ function EditorLayout() {
       <AccessBanner />
       <div className="editor-main">
         <ToolRail />
-        {left && (
-          <aside className="left-panel">
+        {left ? (
+          <aside className="left-panel" style={{ width: leftWidth }}>
             <div className="tabs" role="tablist">
               <button
                 type="button"
@@ -86,14 +89,20 @@ function EditorLayout() {
               <SheetsPanel />
             )}
           </aside>
+        ) : (
+          <PanelReopen side="left" />
         )}
+        {left && <PanelResizer side="left" />}
         <main className="canvas-area">
           <Canvas />
         </main>
-        {right && (
-          <aside className="right-panel">
+        {right && <PanelResizer side="right" />}
+        {right ? (
+          <aside className="right-panel" style={{ width: rightWidth }}>
             <PropertiesPanel />
           </aside>
+        ) : (
+          <PanelReopen side="right" />
         )}
       </div>
       <StatusBar />

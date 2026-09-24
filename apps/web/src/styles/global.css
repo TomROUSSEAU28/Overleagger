@@ -1028,7 +1028,7 @@ button.kbd {
 @media (max-width: 900px) {
   .left-panel,
   .right-panel {
-    width: 220px;
+    max-width: 30vw;
   }
   .breadcrumbs {
     display: none;
@@ -1051,7 +1051,7 @@ button.kbd {
 @media (max-width: 760px) {
   .left-panel,
   .right-panel {
-    width: 196px;
+    max-width: 28vw;
   }
   .topbar .btn-label {
     display: none;
@@ -1866,8 +1866,21 @@ fieldset.plain {
   width: 100%;
   resize: vertical;
 }
-.comment-popover form .btn {
-  align-self: flex-end;
+.comment-send {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.comment-send .muted {
+  font-size: 11.5px;
+}
+.comment-popover header .small-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
 }
 .comments-head {
   align-items: center;
@@ -2149,6 +2162,23 @@ fieldset.plain {
   pointer-events: none;
   animation: toast-in 0.18s ease-out;
 }
+.toast.with-action {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.toast button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #9fc1f0;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast button:hover {
+  text-decoration: underline;
+}
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -2178,4 +2208,81 @@ h3,
 .symbol-tile svg,
 .inline-editor {
   font-family: var(--serif);
+}
+
+/* Side panels: a draggable edge (with a small hide button) and a strip to bring them back. */
+.left-panel,
+.right-panel {
+  max-width: 42vw;
+}
+.left-panel {
+  border-right: none;
+}
+.right-panel {
+  border-left: none;
+}
+.panel-resizer {
+  position: relative;
+  flex: 0 0 5px;
+  margin: 0 -2px;
+  z-index: 3;
+  cursor: col-resize;
+  background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat;
+  touch-action: none;
+}
+.panel-resizer:hover,
+body.resizing-panel .panel-resizer {
+  background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat;
+}
+body.resizing-panel {
+  cursor: col-resize;
+  user-select: none;
+}
+.panel-toggle {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  width: 18px;
+  height: 34px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.panel-resizer:hover .panel-toggle,
+.panel-toggle:focus-visible {
+  opacity: 1;
+}
+.panel-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.panel-reopen {
+  flex: 0 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.panel-reopen.left {
+  border-right: 1px solid var(--border);
+}
+.panel-reopen.right {
+  border-left: 1px solid var(--border);
+}
+.panel-reopen:hover {
+  background: var(--hover);
+  color: var(--accent);
 }

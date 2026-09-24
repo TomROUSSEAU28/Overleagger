@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { useEditor, useSheets } from '../editor/context';
 import { useComments, useMe } from './hooks';
+import { toast } from '../store/toast';
 import { useUI, type Viewport } from '../store/ui';
 
 const ago = (t: number) => {
@@ -132,12 +133,71 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
   const isOwner = (ed.session?.role ?? 'owner') === 'owner';
   const textRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setText(''), [openId, draft]);
-  // Focus without scrolling the canvas (autoFocus would scroll it to show the popup).
-  useEffect(() => textRef.current?.focus({ preventScroll: true }), [openId, draft]);
+  // A new comment: the box is ready to type in. An existing thread: just start typing to reply,
+  // and Delete removes it (without scrolling the canvas: autoFocus would).
+  // After posting, the reply box keeps the focus to go on writing.
+  const keepFocus = useRef(false);
+  useEffect(() => {
+    if (!draft && !keepFocus.current) return;
+    keepFocus.current = false;
+    // Next frame: focusing during the click would be undone by the browser's own mousedown.
+    const id = requestAnimationFrame(() => textRef.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(id);
+  }, [openId, draft]);
   const drag = useUI((s) => s.commentDrag);
+  const canDelete =
+    Boolean(thread) && canWrite && (isOwner || thread?.messages[0]?.author.id === me.id);
+  const close = () => useUI.getState().set({ openThread: null, commentDraft: null });
+  const reopen = (id: string) => useUI.getState().set({ openThread: id, commentDraft: null });
+  const resolve = (t: CommentThread) => {
+    ed.project.updateComment(t.id, { resolved: !t.resolved });
+    if (t.resolved) return;
+    close();
+    toast('Comment resolved', {
+      label: 'Undo',
+      run: () => {
+        ed.project.updateComment(t.id, { resolved: false });
+        reopen(t.id);
+      },
+    });
+  };
+  const remove = (t: CommentThread) => {
+    ed.project.deleteComment(t.id);
+    close();
+    toast('Comment deleted', {
+      label: 'Undo',
+      run: () => {
+        ed.project.restoreComment(t);
+        reopen(t.id);
+      },
+    });
+  };
+  // Keys while a thread is open and nothing else has the focus.
+  const threadRef = useRef(thread);
+  threadRef.current = thread;
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = threadRef.current;
+      const el = document.activeElement as HTMLElement | null;
+      if (!t || (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))))
+        return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && canDelete) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        remove(t);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && canWrite) {
+        // Typing replies: the key lands in the reply box.
+        e.stopImmediatePropagation();
+        textRef.current?.focus({ preventScroll: true });
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, canDelete, canWrite]);
   const at = thread && drag?.id === thread.id ? drag : (thread ?? draft);
   if (!at) return null;
-  const close = () => useUI.getState().set({ openThread: null, commentDraft: null });
   // Keep the popup inside the canvas: on the right of the bubble, or on its left near the edge.
   const W = 290;
   const px = at.x * vp.zoom + vp.x;
@@ -153,6 +213,7 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
     if (thread) ed.project.replyComment(thread.id, me, t);
     else if (draft) {
       const id = ed.project.addComment({ sheetId: ed.sheetId, x: draft.x, y: draft.y }, me, t);
+      keepFocus.current = true;
       useUI.getState().set({ commentDraft: null, openThread: id ?? null });
     }
     setText('');
@@ -172,28 +233,26 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
         {thread && canWrite && (
           <button
             type="button"
-            className="icon-btn"
-            title={thread.resolved ? 'Reopen' : 'Resolve'}
-            onClick={() => {
-              ed.project.updateComment(thread.id, { resolved: !thread.resolved });
-              if (!thread.resolved) close();
-            }}
+            className="btn small-btn"
+            title={
+              thread.resolved
+                ? 'Open the discussion again'
+                : 'Mark as done: the bubble is hidden (see it again with “resolved” in the Comments tab)'
+            }
+            onClick={() => resolve(thread)}
             data-testid="comment-resolve"
           >
-            {thread.resolved ? <RotateCcw size={14} /> : <Check size={14} />}
+            {thread.resolved ? <RotateCcw size={13} /> : <Check size={13} />}
+            {thread.resolved ? 'Reopen' : 'Resolve'}
           </button>
         )}
-        {thread && canWrite && (isOwner || thread.messages[0]?.author.id === me.id) && (
+        {canDelete && thread && (
           <button
             type="button"
             className="icon-btn danger"
-            title="Delete the thread"
-            onClick={() => {
-              if (confirm('Delete this comment thread?')) {
-                ed.project.deleteComment(thread.id);
-                close();
-              }
-            }}
+            title="Delete the thread (Delete)"
+            onClick={() => remove(thread)}
+            data-testid="comment-delete"
           >
             <Trash size={14} />
           </button>
@@ -226,22 +285,29 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
             ref={textRef}
             rows={2}
             value={text}
-            placeholder={thread ? 'Reply…' : 'Write a comment… (Ctrl+Enter to post)'}
+            placeholder={thread ? 'Reply…' : 'Write a comment…'}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) post();
+              // Enter posts, like in a chat; Shift+Enter starts a new line.
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                post();
+              }
               if (e.key === 'Escape') close();
             }}
             data-testid="comment-text"
           />
-          <button
-            type="submit"
-            className="btn primary"
-            disabled={!text.trim()}
-            data-testid="comment-post"
-          >
-            {thread ? 'Reply' : 'Comment'}
-          </button>
+          <div className="comment-send">
+            <span className="muted small">Enter to send · Shift+Enter: new line</span>
+            <button
+              type="submit"
+              className="btn primary"
+              disabled={!text.trim()}
+              data-testid="comment-post"
+            >
+              {thread ? 'Reply' : 'Comment'}
+            </button>
+          </div>
         </form>
       ) : (
         <p className="muted small">You can read comments but not write them.</p>

@@ -373,3 +373,65 @@ test('undo shows the sheet where the change was made', async ({ page }) => {
   expect(after).toEqual({ onChild: true, text: false });
   await expect(page.getByTestId('breadcrumbs')).toContainText('Voltage controller');
 });
+
+test('comments: Enter posts, resolve and delete can be undone; panels resize and hide', async ({
+  page,
+}) => {
+  await page.goto('/app/#/example');
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type W = { __overleagger: { ed: any } };
+  const threads = () =>
+    page.evaluate(() =>
+      (window as unknown as W).__overleagger.ed.project
+        .getComments()
+        .map(
+          (t: { messages: unknown[]; resolved?: boolean }) =>
+            `${t.messages.length}${t.resolved ? 'R' : ''}`,
+        )
+        .join(','),
+    );
+  const box = (await page.getByTestId('canvas').boundingBox())!;
+  await page.keyboard.press('c');
+  await page.mouse.click(box.x + 700, box.y + 250);
+  // The box has the focus right away; Enter sends.
+  await page.keyboard.type('Is the dead time long enough?');
+  await page.keyboard.press('Enter');
+  await expect.poll(threads).toBe('1');
+  await page.keyboard.type('Yes');
+  await page.keyboard.press('Enter');
+  await expect.poll(threads).toBe('2');
+
+  await page.getByTestId('comment-resolve').click();
+  await expect.poll(threads).toBe('2R');
+  await page.getByTestId('toast-action').click();
+  await expect.poll(threads).toBe('2');
+
+  // Delete key (not typing): the thread goes, the drawing stays; Undo brings it back.
+  const count = await page.evaluate(
+    () => (window as unknown as W).__overleagger.ed.elements().length,
+  );
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Delete');
+  await expect.poll(threads).toBe('');
+  expect(
+    await page.evaluate(() => (window as unknown as W).__overleagger.ed.elements().length),
+  ).toBe(count);
+  await page.getByTestId('toast-action').click();
+  await expect.poll(threads).toBe('2');
+
+  // Side panels: drag the edge wider, hide, show again with the same width.
+  const width = () =>
+    page.evaluate(() => document.querySelector('.left-panel')?.getBoundingClientRect().width ?? 0);
+  const edge = (await page.getByTestId('resize-left').boundingBox())!;
+  await page.mouse.move(edge.x + 2, edge.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 100, edge.y + 300, { steps: 5 });
+  await page.mouse.up();
+  const wide = await width();
+  expect(wide).toBeGreaterThan(330);
+  await page.getByTestId('hide-left').click();
+  await expect(page.locator('.left-panel')).toHaveCount(0);
+  await page.getByTestId('show-left').click();
+  expect(await width()).toBe(wide);
+});

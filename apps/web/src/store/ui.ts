@@ -95,6 +95,9 @@ interface Settings {
   latexRefs: boolean;
   leftPanel: boolean;
   rightPanel: boolean;
+  /** Widths of the side panels (px), set by dragging their edge. */
+  leftWidth: number;
+  rightWidth: number;
   /** Small feedback animations (also off when the system asks for reduced motion). */
   animations: boolean;
 }
@@ -142,7 +145,7 @@ export interface UIState extends Settings {
   /** Comment thread shown in its popup. */
   openThread: string | null;
   /** Short message shown at the bottom of the editor. */
-  toast: { text: string; at: number } | null;
+  toast: { text: string; at: number; action?: { label: string; run: () => void } } | null;
   /** Comment bubble being dragged, and where it is now (saved when released). */
   commentDrag: { id: string; x: number; y: number } | null;
   showResolved: boolean;
@@ -161,6 +164,8 @@ export interface UIState extends Settings {
 }
 
 const SETTINGS_KEY = 'olg.settings';
+/** Default width of the side panels (px). */
+export const PANEL_WIDTH = 272;
 
 function loadSettings(): Settings {
   const defaults: Settings = {
@@ -169,6 +174,8 @@ function loadSettings(): Settings {
     latexRefs: true,
     leftPanel: true,
     rightPanel: true,
+    leftWidth: PANEL_WIDTH,
+    rightWidth: PANEL_WIDTH,
     animations: true,
   };
   try {
@@ -252,6 +259,8 @@ export const useUI = create<UIState>((set, get) => ({
       latexRefs: s.latexRefs,
       leftPanel: s.leftPanel,
       rightPanel: s.rightPanel,
+      leftWidth: s.leftWidth,
+      rightWidth: s.rightWidth,
       animations: s.animations,
     });
   },

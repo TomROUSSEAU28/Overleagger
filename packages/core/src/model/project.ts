@@ -359,6 +359,21 @@ export class Project {
     });
   }
 
+  /** Put back a thread exactly as it was (undo of a deletion). */
+  restoreComment(thread: CommentThread): void {
+    this.commentTransact(() => {
+      const m = new Y.Map<unknown>();
+      for (const [k, v] of Object.entries(thread)) {
+        if (k === 'messages' || v === undefined || v === false) continue;
+        m.set(k, v);
+      }
+      const msgs = new Y.Array<CommentMessage>();
+      msgs.push(thread.messages.map((x) => ({ ...x })));
+      m.set('messages', msgs);
+      this.comments.set(thread.id, m);
+    });
+  }
+
   deleteComment(threadId: Id): void {
     if (!this.comments.has(threadId)) return;
     this.commentTransact(() => this.comments.delete(threadId));
