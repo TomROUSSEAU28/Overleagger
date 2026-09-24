@@ -24,6 +24,9 @@ import { sampleTrace } from './waveforms';
 
 const generator = rough.generator();
 
+/** Waveform labels are math: accept both `V_{out}` and `$V_{out}$` (like everywhere else). */
+const asMath = (s: string) => s.trim().replace(/^\$([^$]*)\$$/, '$1');
+
 /** Stable pseudo-random seed from an element id (so sketchy shapes do not jitter). */
 function seedOf(id: string): number {
   let h = 7;
@@ -557,7 +560,7 @@ export const WaveformView = memo(function WaveformView({
             {t.label &&
               (el.layout === 'stacked' ? (
                 <Tex
-                  tex={t.label}
+                  tex={asMath(t.label)}
                   x={x0 - 6}
                   y={(band.top + band.bottom) / 2}
                   size={14}
@@ -566,7 +569,7 @@ export const WaveformView = memo(function WaveformView({
                 />
               ) : (
                 <Tex
-                  tex={t.label}
+                  tex={asMath(t.label)}
                   x={x1 - 4}
                   y={vy(s[s.length - 1]!) - 10}
                   size={13}
@@ -579,7 +582,7 @@ export const WaveformView = memo(function WaveformView({
       })}
       {el.xLabel && (
         <Tex
-          tex={el.xLabel}
+          tex={asMath(el.xLabel)}
           x={x1 + 4}
           y={
             (overlay
@@ -595,7 +598,14 @@ export const WaveformView = memo(function WaveformView({
         />
       )}
       {el.yLabel && el.layout !== 'stacked' && (
-        <Tex tex={el.yLabel} x={x0 - 8} y={y + padT - 4} size={14} color={axisColor} anchor="end" />
+        <Tex
+          tex={asMath(el.yLabel)}
+          x={x0 - 8}
+          y={y + padT - 4}
+          size={14}
+          color={axisColor}
+          anchor="end"
+        />
       )}
     </g>
   );

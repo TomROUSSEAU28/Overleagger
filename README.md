@@ -1,8 +1,10 @@
-# SchemaBoard
+# Circuit Notebook
 
-> Power electronics & control diagram editor — schematics, block diagrams and whiteboards in one place.
+<img src="apps/web/public/brand/logo.svg" width="72" alt="Circuit Notebook logo" align="right">
 
-_Formerly “Overleagger”. The internal identifiers (package names, `.olg` files, browser storage)
+> The engineering notebook for circuits. Power electronics & control diagram editor — schematics, block diagrams and whiteboards in one place.
+
+_Formerly “Overleagger” and “SchemaBoard”. The internal identifiers (package names, `.olg` files, browser storage)
 keep the old name so existing projects and files still open._
 
 **A hierarchical whiteboard for electronics, power electronics and control diagrams** — like
@@ -93,7 +95,7 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
 
 ### Collaboration (phase 4)
 
-Everything above works offline in the browser. Connect to a **SchemaBoard server** (your own,
+Everything above works offline in the browser. Connect to a **Circuit Notebook server** (your own,
 see _Self-hosting_) to share projects:
 
 - **Accounts**: email + password, or GitHub sign-in when the server enables it. Your personal
@@ -130,8 +132,11 @@ Requirements: Node ≥ 22.12 and pnpm 10.
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173
+pnpm dev          # http://localhost:5173 (homepage), http://localhost:5173/app/ (editor)
 ```
+
+The site has two pages: the **homepage** (`apps/web/index.html`, plain HTML + CSS, no React) and
+the **editor** (`apps/web/app/index.html`). Old links such as `/#/p/<id>` are sent on to `/app/`.
 
 Other commands:
 
@@ -159,20 +164,24 @@ One container holds the web app and the server (Node 22, Fastify, Hocuspocus/Yjs
 docker compose up -d        # → http://localhost:8787
 ```
 
-Data (accounts, projects, versions) lives in the `schemaboard-data` volume — back it up by
-copying `/data/schemaboard.sqlite`. Settings (environment variables, see `docker-compose.yml`):
+Data (accounts, projects, versions) lives in the `circuit-notebook-data` volume — back it up by
+copying `/data/circuit-notebook.sqlite`. Settings (environment variables, see `docker-compose.yml`):
 
-| Variable                                    | Default                    | Meaning                                                     |
-| ------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
-| `PUBLIC_URL`                                | `http://localhost:8787`    | Public address (invite links, GitHub sign-in)               |
-| `ALLOW_SIGNUP`                              | `true`                     | `false`: new accounts only through an invite link           |
-| `CORS_ORIGINS`                              | `*`                        | Web app origins allowed to call the API (e.g. GitHub Pages) |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | —                          | Enables “Continue with GitHub”                              |
-| `DB_FILE`                                   | `/data/schemaboard.sqlite` | SQLite file                                                 |
-| `SESSION_DAYS` / `AUTO_VERSION_MINUTES`     | `30` / `10`                | Sign-in lifetime / time between automatic versions          |
+| Variable                                    | Default                         | Meaning                                                     |
+| ------------------------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `PUBLIC_URL`                                | `http://localhost:8787`         | Public address (invite links, GitHub sign-in)               |
+| `ALLOW_SIGNUP`                              | `true`                          | `false`: new accounts only through an invite link           |
+| `CORS_ORIGINS`                              | `*`                             | Web app origins allowed to call the API (e.g. GitHub Pages) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | —                               | Enables “Continue with GitHub”                              |
+| `DB_FILE`                                   | `/data/circuit-notebook.sqlite` | SQLite file                                                 |
+| `SESSION_DAYS` / `AUTO_VERSION_MINUTES`     | `30` / `10`                     | Sign-in lifetime / time between automatic versions          |
+| `TRUST_PROXY`                               | `false`                         | `true` behind a reverse proxy or Cloudflare Tunnel          |
 
 Put it behind HTTPS (Caddy, nginx, Traefik…) for real use: WebSockets go through `/collab`. The
 GitHub Pages version of the app can use any server: _Connect to a server_ on the dashboard.
+
+A step-by-step plan for a public deployment (Hetzner + Cloudflare, backups, legal, launch) is in
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Architecture
 

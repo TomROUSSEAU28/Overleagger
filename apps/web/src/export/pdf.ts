@@ -10,6 +10,7 @@ import {
 } from '@overleagger/core';
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
+import { siteFile } from '../site';
 import { renderSheetSvg, type SvgExportOptions } from './render';
 
 const PAGE = { w: 841.89, h: 595.28 }; // A4 landscape, pt
@@ -28,10 +29,9 @@ async function fetchBase64(url: string): Promise<string | null> {
 }
 
 async function registerFonts(doc: jsPDF): Promise<string> {
-  const base = import.meta.env.BASE_URL;
   const [roman, italic] = await Promise.all([
-    fetchBase64(`${base}fonts/cmu-serif-500-roman.ttf`),
-    fetchBase64(`${base}fonts/cmu-serif-500-italic.ttf`),
+    fetchBase64(siteFile('fonts/cmu-serif-500-roman.ttf')),
+    fetchBase64(siteFile('fonts/cmu-serif-500-italic.ttf')),
   ]);
   if (!roman) return 'times';
   doc.addFileToVFS('cmu-serif-roman.ttf', roman);
@@ -67,7 +67,7 @@ export async function exportPdf(
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
   doc.setProperties({
     title: meta.name,
-    creator: 'SchemaBoard',
+    creator: 'Circuit Notebook',
     subject: 'Hierarchical schematic',
   });
   const font = await registerFonts(doc);
@@ -126,7 +126,7 @@ export async function exportPdf(
       doc.text(`Page ${i + 1} / ${nodes.length}`, PAGE.w - MARGIN, PAGE.h - MARGIN + 6, {
         align: 'right',
       });
-      doc.text('Made with SchemaBoard', MARGIN, PAGE.h - MARGIN + 6);
+      doc.text('Made with Circuit Notebook', MARGIN, PAGE.h - MARGIN + 6);
 
       // Clickable blocks → sub-sheet pages.
       for (const b of blocks) {

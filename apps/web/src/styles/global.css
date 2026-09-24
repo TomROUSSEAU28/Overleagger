@@ -2009,3 +2009,64 @@ fieldset.plain {
     sans-serif;
   font-variant: normal;
 }
+
+/* Brand */
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar .brand svg {
+  flex-shrink: 0;
+}
+.loading {
+  flex-direction: column;
+  gap: 4px;
+}
+.loading-logo {
+  animation: olg-breathe 1.4s ease-in-out infinite;
+}
+@keyframes olg-breathe {
+  50% {
+    transform: scale(0.94);
+    opacity: 0.75;
+  }
+}
+.dash-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 40px 0 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.dash-foot a {
+  color: var(--accent);
+}
+.dash-foot .muted {
+  margin-left: auto;
+}
+
+/* Phones: the editor works, but say it is made for a computer. */
+.small-screen-note {
+  display: none;
+}
+@media (max-width: 760px) {
+  .small-screen-note {
+    display: block;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 40;
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+}

@@ -116,7 +116,7 @@ export const useUserLib = create<UserLibState>((setState, getState) => ({
 
 export function parseLibraryFile(text: string): LibraryFile {
   const data = JSON.parse(text) as Partial<LibraryFile>;
-  if (data.format !== LIBRARY_FORMAT) throw new Error('Not a SchemaBoard library file.');
+  if (data.format !== LIBRARY_FORMAT) throw new Error('Not a Circuit Notebook library file.');
   return {
     format: LIBRARY_FORMAT,
     version: 1,

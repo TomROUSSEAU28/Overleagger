@@ -10,6 +10,7 @@ import {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { loadTex } from '../latex/texCache';
 import { SheetRenderer } from '../canvas/render/SheetRenderer';
+import { siteFile } from '../site';
 import { FONT_SERIF, type Theme } from '../theme';
 
 export type Background = 'paper' | 'white' | 'transparent';
@@ -48,9 +49,8 @@ async function toBase64(buf: ArrayBuffer): Promise<string> {
 
 function embeddedFontCss(): Promise<string> {
   if (!fontCss) {
-    const base = import.meta.env.BASE_URL;
     const face = async (file: string, style: string, weight: number) => {
-      const res = await fetch(`${base}fonts/${file}`);
+      const res = await fetch(siteFile(`fonts/${file}`));
       if (!res.ok) return '';
       const b64 = await toBase64(await res.arrayBuffer());
       return `@font-face{font-family:'CMU Serif';font-style:${style};font-weight:${weight};src:url(data:font/woff2;base64,${b64}) format('woff2');}`;

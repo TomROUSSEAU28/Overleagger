@@ -30,7 +30,7 @@ async function elementTypes(page: Page) {
 }
 
 test('draw a schematic with a hierarchical block, then export a smart PDF', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('new-project').click();
   await page.getByTestId('new-project-name').fill('E2E project');
   await page.getByTestId('create-project').click();
@@ -136,13 +136,13 @@ test('draw a schematic with a hierarchical block, then export a smart PDF', asyn
 });
 
 test('dashboard lists projects and the example opens with its sub-sheet', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('open-example').click();
   await expect(page.getByTestId('canvas')).toBeVisible();
   await expect(page.locator('.junctions circle').first()).toBeVisible();
   await page.getByTestId('tab-sheets').click();
   await page.getByTestId('sheet-Voltage controller').click();
   await expect(page.getByTestId('breadcrumbs')).toContainText('Voltage controller');
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByTestId('project-card').first()).toBeVisible();
 });

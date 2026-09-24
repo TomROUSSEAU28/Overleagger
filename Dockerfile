@@ -1,4 +1,4 @@
-# SchemaBoard — web app + collaboration server in one image.
+# Circuit Notebook — web app + collaboration server in one image.
 #   docker compose up -d   →   http://localhost:8787
 # Data (accounts, projects, history) lives in the /data volume.
 
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=build /out /app
 ENV NODE_ENV=production \
     PORT=8787 \
-    DB_FILE=/data/schemaboard.sqlite \
+    DB_FILE=/data/circuit-notebook.sqlite \
     WEB_DIR=/app/web \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning
 # The server runs as the unprivileged "node" user: it must own the data folder.

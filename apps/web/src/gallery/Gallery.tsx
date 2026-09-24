@@ -1,3 +1,4 @@
+import { Logo } from '../brand/Logo';
 import {
   librarySymbols,
   defaultParams,
@@ -68,7 +69,9 @@ export function Gallery() {
     <div className="gallery" data-theme={theme} data-testid="gallery">
       <header className="dash-head">
         <div>
-          <h1 className="logo big">Symbol gallery</h1>
+          <h1 className="logo big brand-title">
+            <Logo size={34} /> Symbol gallery
+          </h1>
           <p className="tagline">
             {librarySymbols.length} symbols · IEC 60617 (EU) and IEEE 315 / ANSI (US) ·{' '}
             <a href="#/">back to projects</a>

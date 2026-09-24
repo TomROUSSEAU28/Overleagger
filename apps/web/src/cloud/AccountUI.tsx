@@ -3,6 +3,7 @@ import { Cloud, CloudOff, LogIn, LogOut, Server, UserRound } from 'lucide-react'
 import { useEffect, useState } from 'react';
 import { Field, Modal } from '../panels/common';
 import { navigate } from '../router';
+import { Loading, Logo } from '../brand/Logo';
 import { ApiError, api, useCloud } from './cloud';
 
 /** Small round avatar with initials in the person's colour. */
@@ -36,7 +37,7 @@ export function Avatar({
   );
 }
 
-/** Choose (or forget) the SchemaBoard server. */
+/** Choose (or forget) the Circuit Notebook server. */
 export function ServerDialog({ onClose }: { onClose: () => void }) {
   const cloud = useCloud();
   const [url, setUrl] = useState(cloud.server ?? 'http://localhost:8787');
@@ -51,13 +52,13 @@ export function ServerDialog({ onClose }: { onClose: () => void }) {
           const ok = await cloud.setServer(url);
           setBusy(false);
           if (ok) onClose();
-          else setError('No SchemaBoard server answers at this address.');
+          else setError('No Circuit Notebook server answers at this address.');
         }}
       >
         <p className="muted small">
-          SchemaBoard works fully in your browser. To share projects and work together in real time,
-          connect to a SchemaBoard server (your lab's, or one you run yourself with Docker — see the
-          README).
+          Circuit Notebook works fully in your browser. To share projects and work together in real
+          time, connect to a Circuit Notebook server (your lab's, or one you run yourself with
+          Docker — see the README).
         </p>
         <Field label="Server address">
           <input
@@ -65,7 +66,7 @@ export function ServerDialog({ onClose }: { onClose: () => void }) {
             className="mono"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://schemaboard.my-lab.org"
+            placeholder="https://circuits.my-lab.org"
             data-testid="server-url"
           />
         </Field>
@@ -289,7 +290,7 @@ export function AuthPage({ token }: { token: string }) {
       navigate(pending ? `/invite/${pending}` : '/');
     })();
   }, [token]);
-  return <div className="loading">Signing in…</div>;
+  return <Loading text="Signing in…" />;
 }
 
 /** `#/invite/<token>`: join a shared project. */
@@ -304,7 +305,7 @@ export function InvitePage({ token }: { token: string }) {
     void (async () => {
       await cloud.init();
       if (!useCloud.getState().server) {
-        setError('This invite link belongs to a SchemaBoard server this page cannot reach.');
+        setError('This invite link belongs to a Circuit Notebook server this page cannot reach.');
         return;
       }
       try {
@@ -328,7 +329,9 @@ export function InvitePage({ token }: { token: string }) {
   return (
     <div className="invite-page">
       <div className="invite-card">
-        <h1 className="logo big">SchemaBoard</h1>
+        <h1 className="logo big brand-title">
+          <Logo size={34} /> Circuit Notebook
+        </h1>
         {error && <p className="warning">{error}</p>}
         {!error && !info && <p className="muted">Checking the invite…</p>}
         {info && (

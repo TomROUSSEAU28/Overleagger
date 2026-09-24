@@ -524,7 +524,7 @@ export function sheetToCircuitikz(
     ([hex, name]) => `\\definecolor{${name}}{HTML}{${hex}}`,
   );
   const env = [
-    `% ${meta.name} — ${sheet?.name ?? ''} (exported from SchemaBoard)`,
+    `% ${meta.name} — ${sheet?.name ?? ''} (exported from Circuit Notebook)`,
     ...colorDefs,
     `\\begin{circuitikz}[${style}, line width=0.6pt, line cap=round, line join=round]`,
     `\\ctikzset{bipoles/length=${num(unit * 3.2)}cm}`,

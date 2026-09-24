@@ -13,6 +13,7 @@ import {
   Sparkles,
   Undo2,
 } from 'lucide-react';
+import { Logo } from '../brand/Logo';
 import { CollabBar } from '../cloud/CollabUI';
 import { useEditor, useMeta, useSheets, useUndoState } from '../editor/context';
 import { useUI } from '../store/ui';
@@ -55,7 +56,8 @@ export function TopBar() {
     <header className="topbar">
       <a className="brand" href="#/" title="All projects">
         <ArrowLeft size={16} />
-        <span className="logo">SchemaBoard</span>
+        <Logo size={22} />
+        <span className="logo">Circuit Notebook</span>
       </a>
       <input
         className="project-name"

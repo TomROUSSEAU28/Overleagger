@@ -1,14 +1,14 @@
-# Self-hosted SchemaBoard: web app + real-time collaboration server.
+# Self-hosted Circuit Notebook: web app + real-time collaboration server.
 #   docker compose up -d          then open http://localhost:8787
 services:
-  schemaboard:
+  circuit-notebook:
     build: .
-    image: schemaboard
+    image: circuit-notebook
     restart: unless-stopped
     ports:
       - '8787:8787'
     volumes:
-      - schemaboard-data:/data
+      - circuit-notebook-data:/data
     environment:
       # Public address of this server (used in invite links and GitHub sign-in).
       PUBLIC_URL: http://localhost:8787
@@ -19,6 +19,8 @@ services:
       # GITHUB_CLIENT_SECRET: ...
       # If the web app is hosted elsewhere (e.g. GitHub Pages), allow its origin:
       # CORS_ORIGINS: https://you.github.io
+      # Behind a reverse proxy or Cloudflare Tunnel (real visitor IPs for the login throttle):
+      # TRUST_PROXY: 'true'
 
 volumes:
-  schemaboard-data:
+  circuit-notebook-data:

@@ -36,6 +36,7 @@ export interface SessionState {
   members: Members;
 }
 
+// (Storage name kept from the first version of the app, so cached projects stay available.)
 const DB = (id: string) => `schemaboard-cloud-${id}`;
 
 export class CloudSession {

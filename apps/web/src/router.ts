@@ -6,6 +6,7 @@ export type Route =
   | { page: 'cloud'; projectId: string }
   | { page: 'invite'; token: string }
   | { page: 'auth'; token: string }
+  | { page: 'example' }
   | { page: 'gallery' };
 
 export function parseHash(hash: string): Route {
@@ -19,6 +20,7 @@ export function parseHash(hash: string): Route {
   const a = /^auth\?token=([\w-]+)/.exec(h);
   if (a) return { page: 'auth', token: a[1]! };
   if (h.startsWith('gallery')) return { page: 'gallery' };
+  if (h.startsWith('example')) return { page: 'example' };
   return { page: 'dashboard' };
 }
 

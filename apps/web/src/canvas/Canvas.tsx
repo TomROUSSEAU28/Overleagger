@@ -343,6 +343,11 @@ export function Canvas() {
   return (
     <div
       className="canvas-wrap"
+      // Overlays (popups, inline editors) must never scroll the drawing area.
+      onScroll={(e) => {
+        e.currentTarget.scrollLeft = 0;
+        e.currentTarget.scrollTop = 0;
+      }}
       ref={wrapRef}
       onDragOver={onDragOver}
       onDrop={onDrop}

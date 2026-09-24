@@ -2,7 +2,7 @@
   "name": "@overleagger/server",
   "version": "0.1.0",
   "private": true,
-  "description": "SchemaBoard collaboration server: accounts, sharing, real-time sync (Hocuspocus), history.",
+  "description": "Circuit Notebook collaboration server: accounts, sharing, real-time sync (Hocuspocus), history.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",

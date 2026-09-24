@@ -1,5 +1,5 @@
 /**
- * Connection to a SchemaBoard server (optional): which server, who is signed in, and a small
+ * Connection to a Circuit Notebook server (optional): which server, who is signed in, and a small
  * JSON API helper. Without a server the app stays 100 % local, as before.
  *
  * The server is found in this order: the one saved by the user, `VITE_SERVER_URL` at build
@@ -91,7 +91,9 @@ async function health(server: string): Promise<ServerInfo | null> {
     const res = await fetch(`${server}/api/health`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = (await res.json()) as ServerInfo;
-    return data?.ok && data.name === 'SchemaBoard' ? data : null;
+    return data?.ok && (data.name === 'Circuit Notebook' || data.name === 'SchemaBoard')
+      ? data
+      : null;
   } catch {
     return null;
   }
@@ -110,8 +112,9 @@ export const useCloud = create<CloudState>((set, get) => ({
     const candidates = [
       read(SERVER_KEY),
       import.meta.env.VITE_SERVER_URL as string | undefined,
-      // Served by the SchemaBoard server itself?
-      `${location.origin}${location.pathname.replace(/\/[^/]*$/, '')}`,
+      // Served by the Circuit Notebook server itself?
+      // (the app lives in `<base>/app/`, the server answers at `<base>/api/…`)
+      `${location.origin}${location.pathname.replace(/\/app(\/[^/]*)?$/, '')}`,
     ].filter((x): x is string => Boolean(x));
     for (const c of candidates) {
       const info = await health(normalize(c));

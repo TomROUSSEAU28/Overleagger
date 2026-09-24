@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Circuit Notebook">
+  <title>Circuit Notebook</title>
+  <defs>
+    <clipPath id="page"><rect x="5" y="5" width="54" height="54" rx="9"/></clipPath>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="9" fill="#f7f3e8"/>
+  <g clip-path="url(#page)">
+    <path d="M5 20.5H59M5 43.5H59" stroke="#9db5d6" stroke-width="1.4"/>
+    <path d="M17 5V59" stroke="#d24b3e" stroke-width="2.2"/>
+  </g>
+  <path d="M17 32H23L25.5 25.5L30.5 38.5L35.5 25.5L40.5 38.5L43 32H48" fill="none" stroke="#262626" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="51" cy="32" r="3" fill="#f7f3e8" stroke="#262626" stroke-width="2.4"/>
+  <circle cx="17" cy="32" r="3.6" fill="#262626"/>
+  <rect x="5" y="5" width="54" height="54" rx="9" fill="none" stroke="#262626" stroke-width="3"/>
+</svg>

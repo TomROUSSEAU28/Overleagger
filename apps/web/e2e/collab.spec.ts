@@ -7,7 +7,7 @@ async function person(browser: Browser, name: string): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   page.on('dialog', (d) => void d.accept());
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('connect-server').click();
   await page.getByTestId('server-url').fill(SERVER);
   await page.getByTestId('server-connect').click();

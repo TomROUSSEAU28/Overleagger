@@ -31,7 +31,7 @@ const types = (page: Page) =>
   page.evaluate(() => (window as unknown as Handle).__overleagger.ed.elements().map((e) => e.type));
 
 async function newProject(page: Page, name: string) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('new-project').click();
   await page.getByTestId('new-project-name').fill(name);
   await page.getByTestId('create-project').click();
@@ -115,7 +115,7 @@ test('whiteboard tools: shapes, arrows, notes, pencil, waveforms, images and lin
 });
 
 test('save a selection as a template and reuse it in another project', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('open-example').click();
   await expect(page.getByTestId('canvas')).toBeVisible();
   const dots = await page.getByTestId('canvas').locator('.junctions circle').count();
@@ -209,7 +209,7 @@ test('bridge spacing and part size options', async ({ page }) => {
 });
 
 test('presentation mode: slides, drill into a block, laser and pen', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.getByTestId('open-example').click();
   await expect(page.getByTestId('canvas')).toBeVisible();
   await page.getByTestId('present').click();

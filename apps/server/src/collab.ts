@@ -31,7 +31,7 @@ export const FORBIDDEN_CHANGE = 4403;
 
 export function createCollab(store: Store, config: Config) {
   const hocuspocus = new Hocuspocus<CollabContext>({
-    name: 'schemaboard',
+    name: 'circuit-notebook',
     quiet: true,
     debounce: 1500,
     maxDebounce: 8000,

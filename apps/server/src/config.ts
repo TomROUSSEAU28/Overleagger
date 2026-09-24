@@ -17,6 +17,8 @@ export interface Config {
   sessionTtlMs: number;
   /** Minimum time between two automatic versions of a project. */
   autoVersionEveryMs: number;
+  /** Behind a reverse proxy / tunnel: take the visitor's IP from X-Forwarded-For. */
+  trustProxy: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -25,7 +27,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port,
     host: env.HOST ?? '0.0.0.0',
-    dbFile: env.DB_FILE ?? './data/schemaboard.sqlite',
+    dbFile: env.DB_FILE ?? './data/circuit-notebook.sqlite',
     publicUrl: (env.PUBLIC_URL ?? `http://localhost:${port}`).replace(/\/$/, ''),
     corsOrigins: cors === '*' ? '*' : cors.split(',').map((s) => s.trim()),
     allowSignup: env.ALLOW_SIGNUP !== 'false',
@@ -35,5 +37,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     sessionTtlMs: Number(env.SESSION_DAYS ?? 30) * 24 * 3600 * 1000,
     autoVersionEveryMs: Number(env.AUTO_VERSION_MINUTES ?? 10) * 60 * 1000,
+    trustProxy: env.TRUST_PROXY === 'true',
   };
 }

@@ -5,7 +5,7 @@
  */
 import type { CommentThread, Id } from '@overleagger/core';
 import { Check, MessageSquare, RotateCcw, Trash, X } from 'lucide-react';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useEditor, useSheets } from '../editor/context';
 import { useComments, useMe } from './hooks';
 import { useUI, type Viewport } from '../store/ui';
@@ -86,13 +86,21 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
   const thread = openId ? threads.find((t) => t.id === openId) : undefined;
   const canWrite = ed.project.canWrite(undefined, 'comments');
   const isOwner = (ed.session?.role ?? 'owner') === 'owner';
+  const textRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setText(''), [openId, draft]);
+  // Focus without scrolling the canvas (autoFocus would scroll it to show the popup).
+  useEffect(() => textRef.current?.focus({ preventScroll: true }), [openId, draft]);
   const at = thread ?? draft;
   if (!at) return null;
   const close = () => useUI.getState().set({ openThread: null, commentDraft: null });
+  // Keep the popup inside the canvas: on the right of the bubble, or on its left near the edge.
+  const W = 290;
+  const px = at.x * vp.zoom + vp.x;
+  const py = at.y * vp.zoom + vp.y;
+  const left = px + 26 + W > ed.canvasSize.w - 8 ? Math.max(8, px - 16 - W) : px + 26;
   const style: CSSProperties = {
-    left: at.x * vp.zoom + vp.x + 26,
-    top: Math.max(8, at.y * vp.zoom + vp.y - 30),
+    left,
+    top: Math.min(Math.max(8, py - 30), Math.max(8, ed.canvasSize.h - 330)),
   };
   const post = () => {
     const t = text.trim();
@@ -170,7 +178,7 @@ export function CommentPopover({ vp }: { vp: Viewport }) {
           }}
         >
           <textarea
-            autoFocus
+            ref={textRef}
             rows={2}
             value={text}
             placeholder={thread ? 'Reply…' : 'Write a comment… (Ctrl+Enter to post)'}

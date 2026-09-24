@@ -3,18 +3,375 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Circuit Notebook — power electronics &amp; control diagrams, in your browser</title>
     <meta
       name="description"
-      content="SchemaBoard — power electronics and control diagram editor: schematics, block diagrams and hierarchical whiteboards."
+      content="Draw power-electronics schematics, control loops, flowcharts and whiteboards on hierarchical sheets. IEC and ANSI symbols, automatic junction dots, LaTeX everywhere, smart PDF and CircuiTikZ export, real-time collaboration. Free, in your browser."
     />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f7f5ef'/%3E%3Cpath d='M4 16h6l3-7 6 14 3-7h6' fill='none' stroke='%23262626' stroke-width='2.4' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E"
+    <meta name="theme-color" content="#f7f3e8" />
+    <link rel="icon" type="image/svg+xml" href="/brand/logo.svg" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Circuit Notebook" />
+    <meta property="og:title" content="Circuit Notebook — the engineering notebook for circuits" />
+    <meta
+      property="og:description"
+      content="Schematics, control loops and flowcharts on hierarchical sheets, with LaTeX everywhere. Free, in your browser."
     />
-    <title>SchemaBoard — power electronics &amp; control diagrams</title>
+    <meta property="og:image" content="/brand/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Circuit Notebook",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any (web browser)",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+        "description": "Editor for power-electronics schematics, control-loop block diagrams, flowcharts and whiteboards, with hierarchical sheets, LaTeX and real-time collaboration."
+      }
+    </script>
+    <script>
+      // Old links pointed at the app on this page (#/p/…): send them to the app.
+      if (/^#\/(p|cloud|invite|auth|gallery|example)\b/.test(location.hash))
+        location.replace('app/' + location.hash);
+    </script>
+    <script type="module" src="/src/landing/landing.ts"></script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <header class="nav">
+      <a class="brand" href="./" aria-label="Circuit Notebook, home">
+        <img src="/brand/logo.svg" alt="" width="30" height="30" />
+        <span>Circuit Notebook</span>
+      </a>
+      <nav aria-label="Sections">
+        <a href="#features">Features</a>
+        <a href="#together">Collaboration</a>
+        <a href="#latex">LaTeX</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn primary" href="app/">Open the app</a>
+    </header>
+
+    <main>
+      <!-- Hero: a page of the notebook -->
+      <section class="hero ruled">
+        <div class="hero-text">
+          <p class="kicker">Power electronics · control · process</p>
+          <h1>The engineering notebook<br />for circuits.</h1>
+          <p class="lead">
+            Draw converters, control loops and flowcharts on sheets that open like blocks, with
+            <b>IEC or ANSI symbols</b>, <b>junction dots that place themselves</b> and
+            <b>LaTeX everywhere</b>. Then present it, export it to your report, or work on it with
+            your team — right in your browser.
+          </p>
+          <div class="cta">
+            <a class="btn primary big" href="app/">Start drawing — it's free</a>
+            <a class="btn big" href="app/#/example">Open the buck converter example</a>
+          </div>
+          <p class="small muted">
+            No account needed · works offline · your projects stay on your computer
+          </p>
+        </div>
+        <figure class="shot hero-shot">
+          <img
+            src="/landing/hero.webp"
+            width="2040"
+            height="1230"
+            alt="The Circuit Notebook editor with a synchronous buck converter: MOSFETs with body diodes, LC filter, a hierarchical voltage-controller block and LaTeX labels."
+            fetchpriority="high"
+          />
+          <figcaption class="margin-note note-1">
+            <svg viewBox="0 0 60 40" aria-hidden="true">
+              <path d="M58 4C38 6 18 14 6 34M6 34l2-10M6 34l9-5" />
+            </svg>
+            junction dots appear by themselves
+          </figcaption>
+          <figcaption class="margin-note note-2">
+            <svg viewBox="0 0 60 40" aria-hidden="true">
+              <path d="M2 36C22 32 42 22 54 6M54 6l-9 3M54 6l-1 10" />
+            </svg>
+            a whole sheet inside this block
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- Three promises -->
+      <section class="promises" aria-label="Highlights">
+        <div>
+          <h2>Symbols done right</h2>
+          <p>
+            152 parts in 12 families — MOSFETs with body diode, IGBTs, GaN, thyristors, bridges,
+            transformers with any number of secondaries, machines, sensors, control blocks — in
+            IEC&nbsp;60617 or IEEE&nbsp;315 style.
+          </p>
+        </div>
+        <div>
+          <h2>Sheets inside blocks</h2>
+          <p>
+            A block is a whole sheet: open it, draw the controller, add ports — they become the
+            block's pins. Nest as deep as your design goes.
+          </p>
+        </div>
+        <div>
+          <h2>Made for your report</h2>
+          <p>
+            LaTeX in every label, a clickable PDF with one page per sheet, SVG and PNG, and
+            <b>CircuiTikZ</b> code you paste straight into your thesis.
+          </p>
+        </div>
+      </section>
+
+      <!-- Feature stories -->
+      <section id="features" class="story">
+        <div class="story-text">
+          <p class="kicker">Hierarchy</p>
+          <h2>From the power stage to the PI controller</h2>
+          <p>
+            Double-click a block to go inside. The Sheets tab shows the whole tree, breadcrumbs
+            bring you back up, and sheet ports stay connected to the pins of their block — even in
+            the exported PDF, where every block is a link to its page.
+          </p>
+          <ul class="ticks">
+            <li>Wires snap to the grid and follow parts when you move or rotate them</li>
+            <li>Labels turn with the part, like in LTspice</li>
+            <li>Your own symbols and templates, in categories you choose</li>
+          </ul>
+        </div>
+        <figure class="shot">
+          <img
+            src="/landing/hierarchy.webp"
+            width="2040"
+            height="1230"
+            loading="lazy"
+            alt="Inside the voltage-controller block: reference, summing junction, PI controller, PWM comparator and sheet ports."
+          />
+        </figure>
+      </section>
+
+      <section class="story reverse">
+        <div class="story-text">
+          <p class="kicker">Whiteboard</p>
+          <h2>A whiteboard that knows electronics</h2>
+          <p>
+            Pencil with pen pressure, shapes, arrows, sticky notes, images and waveforms (PWM,
+            ripple, step responses, three-phase…) next to your schematic. Flowcharts are built in:
+            ISO&nbsp;5807 shapes and connectors that stay attached when you move things.
+          </p>
+          <ul class="ticks">
+            <li>Right-angle connectors with <i>Yes / No</i> labels</li>
+            <li>Hand-drawn look for sketches, crisp lines for reports</li>
+            <li>Cream notebook, white whiteboard or blackboard theme</li>
+          </ul>
+        </div>
+        <figure class="shot">
+          <img
+            src="/landing/whiteboard.webp"
+            width="2040"
+            height="1230"
+            loading="lazy"
+            alt="A perturb-and-observe MPPT flowchart with a power curve and a sticky note, on the whiteboard theme."
+          />
+        </figure>
+      </section>
+
+      <section id="together" class="story">
+        <div class="story-text">
+          <p class="kicker">Collaboration</p>
+          <h2>Work on it together, live</h2>
+          <p>
+            Share a project with a link: see each other's cursors and selections, comment right on
+            the drawing, follow what someone is looking at, and go back to any earlier version.
+            Everyone gets the right access — edit, comment or view — and the server checks it for
+            every change.
+          </p>
+          <ul class="ticks">
+            <li>Keeps working offline, syncs when you are back</li>
+            <li>Lock a sheet so only you can change it</li>
+            <li>Host it yourself for your lab or your team</li>
+          </ul>
+        </div>
+        <figure class="shot">
+          <img
+            src="/landing/collab.webp"
+            width="2040"
+            height="1230"
+            loading="lazy"
+            alt="Two people on the same project: a comment thread about the inductor and a teammate's cursor on the capacitor."
+          />
+        </figure>
+      </section>
+
+      <section class="story reverse">
+        <div class="story-text">
+          <p class="kicker">Presentation</p>
+          <h2>Present straight from your drawing</h2>
+          <p>
+            Frames become slides. Click a block to dive into its sheet, point with the laser, write
+            with the pen, and let your classmates follow along on their own screens.
+          </p>
+        </div>
+        <figure class="shot dark">
+          <img
+            src="/landing/present.webp"
+            width="2040"
+            height="1230"
+            loading="lazy"
+            alt="Presentation mode on the blackboard theme with a laser pointer on the buck converter."
+          />
+        </figure>
+      </section>
+
+      <section id="latex" class="story">
+        <div class="story-text">
+          <p class="kicker">LaTeX</p>
+          <h2>Straight into your thesis</h2>
+          <p>
+            Export a sheet as CircuiTikZ code: resistors, capacitors, inductors and diodes use
+            native CircuiTikZ symbols, every other part is drawn exactly as on screen, and your
+            <code>$...$</code> formulas stay formulas.
+          </p>
+          <pre class="code"><code>\begin{circuitikz}[european]
+  \draw (0,0) to[R] (1,0);
+  \draw (1,0) to[cute inductor] (2.5,0);
+  \node at (3,-1) {$K_p + \frac{K_i}{s}$};
+\end{circuitikz}</code></pre>
+        </div>
+        <figure class="shot paper">
+          <img
+            src="/landing/latex.webp"
+            width="801"
+            height="672"
+            loading="lazy"
+            alt="The buck converter compiled with pdflatex from the CircuiTikZ export."
+          />
+          <figcaption class="caption">Compiled with pdflatex, untouched.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Everything else -->
+      <section class="grid-section" aria-labelledby="more">
+        <h2 id="more">And the small things that save your evening</h2>
+        <div class="cards">
+          <article>
+            <h3>Automatic junction dots</h3>
+            <p>Three connections meet, a dot appears. Crossing wires stay apart.</p>
+          </article>
+          <article>
+            <h3>Symbol editor</h3>
+            <p>Start from any part or from scratch, place the pins, save it to your library.</p>
+          </article>
+          <article>
+            <h3>Your templates</h3>
+            <p>
+              Save any selection — a half-bridge with its driver, a cascade loop — and reuse it
+              everywhere.
+            </p>
+          </article>
+          <article>
+            <h3>Smart PDF</h3>
+            <p>One page per sheet, bookmarks, clickable blocks and ports, links and comments.</p>
+          </article>
+          <article>
+            <h3>Links everywhere</h3>
+            <p>Link a part to its datasheet or a shape to another sheet; Ctrl+click to follow.</p>
+          </article>
+          <article>
+            <h3>Keyboard first</h3>
+            <p>
+              A shortcut for everything, and you can change them. Press <kbd>?</kbd> to see them
+              all.
+            </p>
+          </article>
+          <article>
+            <h3>Private by default</h3>
+            <p>
+              Projects live in your browser; share only what you choose. Export a file any time.
+            </p>
+          </article>
+          <article>
+            <h3>Self-hostable</h3>
+            <p>One Docker container for the app and the collaboration server.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="selfhost" aria-labelledby="host">
+        <div>
+          <h2 id="host">Run it for your lab</h2>
+          <p>
+            The collaboration server — accounts, sharing, live sync and history — is a single
+            container with a SQLite database. A small virtual server is enough.
+          </p>
+        </div>
+        <pre class="code"><code>docker compose up -d
+# → http://localhost:8787</code></pre>
+      </section>
+
+      <section id="faq" class="faq">
+        <h2>Questions</h2>
+        <details>
+          <summary>Is it free?</summary>
+          <p>Yes. Drawing, exporting and presenting are free and need no account.</p>
+        </details>
+        <details>
+          <summary>Where are my projects saved?</summary>
+          <p>
+            In your browser, on your computer. Nothing is sent anywhere unless you share a project
+            with a collaboration server. You can also download a project file (.olg) to back it up
+            or move it.
+          </p>
+        </details>
+        <details>
+          <summary>Does it work offline?</summary>
+          <p>
+            Yes. Once opened, the editor works without a connection; shared projects sync again when
+            you are back online.
+          </p>
+        </details>
+        <details>
+          <summary>EU or US symbols?</summary>
+          <p>
+            Both: IEC&nbsp;60617 (Europe) and IEEE&nbsp;315 / ANSI (US). Switch the whole project in
+            one click, or override a single part.
+          </p>
+        </details>
+        <details>
+          <summary>Can I put the drawings in my LaTeX report?</summary>
+          <p>
+            Yes: export a vector PDF or SVG, or CircuiTikZ code that compiles with pdflatex. All the
+            labels can be LaTeX.
+          </p>
+        </details>
+        <details>
+          <summary>Does it simulate circuits?</summary>
+          <p>
+            Not yet — Circuit Notebook is for drawing, explaining and presenting. A SPICE netlist
+            export is on the roadmap.
+          </p>
+        </details>
+      </section>
+
+      <section class="final ruled">
+        <h2>Open a new page.</h2>
+        <a class="btn primary big" href="app/">Start drawing</a>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="brand">
+        <img src="/brand/logo.svg" alt="" width="22" height="22" />
+        <span>Circuit Notebook</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="app/">Open the app</a>
+        <a href="app/#/gallery">Symbol gallery</a>
+        <a href="app/#/example">Example</a>
+      </nav>
+      <p class="muted small">
+        Drawn with graphite and LaTeX. Fonts: Computer Modern Unicode (SIL OFL).
+        <span data-year></span>
+      </p>
+    </footer>
   </body>
 </html>

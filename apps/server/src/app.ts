@@ -1,5 +1,5 @@
 /**
- * SchemaBoard server: REST API (accounts, projects, members, invite links, versions, personal
+ * Circuit Notebook server: REST API (accounts, projects, members, invite links, versions, personal
  * library) + WebSocket sync (`/collab`) + optionally the web app itself.
  */
 import cors from '@fastify/cors';
@@ -30,7 +30,12 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function createApp(config: Config) {
   const store = new Store(config.dbFile);
   const collab = createCollab(store, config);
-  const app = Fastify({ logger: false, bodyLimit: 8 * 1024 * 1024 });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: 8 * 1024 * 1024,
+    // Behind Cloudflare / Caddy every request comes from the proxy: read the real IP instead.
+    trustProxy: config.trustProxy,
+  });
 
   await app.register(cors, {
     origin: config.corsOrigins === '*' ? true : config.corsOrigins,
@@ -100,7 +105,7 @@ export async function createApp(config: Config) {
 
   app.get('/api/health', async () => ({
     ok: true,
-    name: 'SchemaBoard',
+    name: 'Circuit Notebook',
     signup: config.allowSignup,
     github: Boolean(config.github),
   }));
@@ -208,7 +213,7 @@ export async function createApp(config: Config) {
     });
     const { access_token } = (await tokenRes.json()) as { access_token?: string };
     if (!access_token) throw bad('GitHub refused the sign-in.');
-    const gh = { Authorization: `Bearer ${access_token}`, 'User-Agent': 'SchemaBoard' };
+    const gh = { Authorization: `Bearer ${access_token}`, 'User-Agent': 'CircuitNotebook' };
     const profile = (await (
       await fetch('https://api.github.com/user', { headers: gh })
     ).json()) as {
@@ -275,10 +280,10 @@ export async function createApp(config: Config) {
       try {
         Y.applyUpdate(doc, Buffer.from(b.state, 'base64'));
       } catch {
-        throw bad('This is not a SchemaBoard project.');
+        throw bad('This is not a Circuit Notebook project.');
       }
       const p = new Project(doc);
-      if (!p.rootSheetId) throw bad('This is not a SchemaBoard project.');
+      if (!p.rootSheetId) throw bad('This is not a Circuit Notebook project.');
       name = name || p.getMeta().name;
       state = Y.encodeStateAsUpdate(doc);
     } else {
@@ -517,7 +522,7 @@ export async function createApp(config: Config) {
   // -------------------------------------------------------------------------
 
   if (config.webDir)
-    await app.register(fastifyStatic, { root: config.webDir, index: 'index.html' });
+    await app.register(fastifyStatic, { root: config.webDir, index: 'index.html', redirect: true });
 
   async function close() {
     await app.close();

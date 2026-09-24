@@ -12,6 +12,7 @@ import { TemplatesPanel } from '../panels/TemplatesPanel';
 import { AccessBanner } from '../cloud/CollabUI';
 import { CommentsPanel, CommentsTab } from '../comments/Comments';
 import { Presentation } from '../present/Presentation';
+import { Loading } from '../brand/Logo';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
 import { ToolRail } from '../panels/ToolRail';
@@ -102,6 +103,10 @@ function EditorLayout() {
       {modal === 'symbol-editor' && <SymbolEditor />}
       {modal === 'save-template' && <SaveTemplateDialog />}
       {presenting && <Presentation />}
+      <p className="small-screen-note">
+        Circuit Notebook is made for a computer screen: on a phone you can look at projects, but
+        drawing is much easier with a mouse.
+      </p>
     </div>
   );
 }
@@ -206,8 +211,20 @@ export function EditorPage({ source }: { source: ProjectSource }) {
 
   const ok = state && 'ed' in state ? state : null;
   useIndexSync(ok);
+  // Tab title: the project's name.
+  useEffect(() => {
+    if (!ok) return;
+    const p = ok.ed.project;
+    const set = () => (document.title = `${p.getMeta().name} — Circuit Notebook`);
+    set();
+    const off = p.subscribe(set);
+    return () => {
+      off();
+      document.title = 'Circuit Notebook';
+    };
+  }, [ok]);
 
-  if (!state) return <div className="loading">Opening project…</div>;
+  if (!state) return <Loading text="Opening project…" />;
   if ('error' in state)
     return (
       <div className="loading">

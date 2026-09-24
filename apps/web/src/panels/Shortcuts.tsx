@@ -75,8 +75,16 @@ export function HelpOverlay() {
               (Ctrl+click to follow), waveforms and frames.
             </li>
             <li>
-              The Templates tab inserts ready-made converters, rectifiers, inverters and control
-              loops.
+              Flowcharts: pick a flowchart shape (S), then draw lines (Shift L) from shape to shape
+              — they attach to the connection points and follow the shapes.
+            </li>
+            <li>
+              Templates: select part of a drawing and “Save selection as template” to reuse it in
+              any project.
+            </li>
+            <li>
+              Present with F5 (frames become slides), comment with C, share with the Share button
+              when connected to a server.
             </li>
             <li>
               “New symbol” in the library opens the symbol editor. “Customize symbol…” in the

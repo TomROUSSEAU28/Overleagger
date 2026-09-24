@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Project, ROLE_LABELS } from '@overleagger/core';
+import { Logo } from '../brand/Logo';
 import { AccountMenu } from '../cloud/AccountUI';
 import { api, bytesToBase64, useCloud, type CloudProjectEntry } from '../cloud/cloud';
 import { seedBuckExample } from '../examples/buck';
@@ -120,6 +121,10 @@ export function Dashboard() {
   const user = useCloud((s) => s.user);
   const [cloudProjects, setCloudProjects] = useState<CloudProjectEntry[] | null>(null);
 
+  useEffect(() => {
+    document.title = 'Your projects — Circuit Notebook';
+  }, []);
+
   const refresh = useCallback(() => {
     listProjects()
       .then(setProjects)
@@ -166,7 +171,9 @@ export function Dashboard() {
     <div className="dashboard" data-theme={theme}>
       <header className="dash-head">
         <div>
-          <h1 className="logo big">SchemaBoard</h1>
+          <h1 className="logo big brand-title">
+            <Logo size={38} /> Circuit Notebook
+          </h1>
           <p className="tagline">
             Power electronics &amp; control diagram editor — schematics, block diagrams and
             whiteboards, with sheets you can open like blocks.
@@ -295,7 +302,7 @@ export function Dashboard() {
           <div className="empty">
             <p>No project yet.</p>
             <p className="muted">
-              Create a new one, or open the example to see what SchemaBoard can do.
+              Create a new one, or open the example to see what Circuit Notebook can do.
             </p>
           </div>
         )}
@@ -390,6 +397,13 @@ export function Dashboard() {
           </article>
         ))}
       </section>
+      <footer className="dash-foot">
+        <Logo size={18} />
+        <span>Circuit Notebook</span>
+        <a href="../">About</a>
+        <a href="#/gallery">Symbol gallery</a>
+        <span className="muted">Projects stay in this browser unless you share them.</span>
+      </footer>
       {showNew && <NewProjectDialog onClose={() => setShowNew(false)} />}
     </div>
   );
