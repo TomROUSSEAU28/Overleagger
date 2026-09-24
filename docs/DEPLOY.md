@@ -114,8 +114,11 @@ ranges** (<https://www.cloudflare.com/ips/>). Also set `TRUST_PROXY: 'true'`.
 ## 5. Updates
 
 ```bash
-cd circuit-notebook && git pull && docker compose up -d --build
+~/circuit-notebook/deploy/update.sh
 ```
+
+It fetches the latest code, rebuilds, restarts, removes the old images and checks
+`/api/health`. Nothing new on GitHub → it stops there (`--force` rebuilds anyway).
 
 Open projects reconnect by themselves; unsynced edits stay in the browsers and sync afterwards.
 
