@@ -1,5 +1,6 @@
 import { analyzeConnectivity, type Element, type Pt } from '@overleagger/core';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useUI } from '../../store/ui';
 import { resolveColor } from '../../theme';
 import {
   BlockView,
@@ -56,17 +57,33 @@ export function ElementView({ el, o }: { el: Element; o: RenderOptions }) {
   }
 }
 
+/** One junction dot. Whether it pops in is decided once, when it appears. */
+function Dot({ p, color, pop }: { p: Pt; color: string; pop: boolean }) {
+  const [popped] = useState(pop);
+  return <circle cx={p.x} cy={p.y} r={3.3} fill={color} className={popped ? 'pop' : undefined} />;
+}
+
 export const Junctions = memo(function Junctions({
   points,
   colors,
+  interactive = false,
 }: {
   points: Pt[];
   colors: string[];
+  interactive?: boolean;
 }) {
+  // Dots already there when the sheet opens, or moving with a drag, don't pop.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+  const calm = useUI((s) => Boolean(s.drag || s.resize) || !s.animations);
+  const pop = interactive && ready && !calm;
   return (
     <g className="junctions" pointerEvents="none">
       {points.map((p, i) => (
-        <circle key={`${p.x},${p.y}`} cx={p.x} cy={p.y} r={3.3} fill={colors[i]} />
+        <Dot key={`${p.x},${p.y}`} p={p} color={colors[i]!} pop={pop} />
       ))}
     </g>
   );
@@ -105,7 +122,7 @@ export const SheetRenderer = memo(function SheetRenderer({
       {ordered.map((el) => (
         <ElementView key={el.id} el={el} o={o} />
       ))}
-      <Junctions points={conn.junctions} colors={colors} />
+      <Junctions points={conn.junctions} colors={colors} interactive={o.interactive} />
     </g>
   );
 });

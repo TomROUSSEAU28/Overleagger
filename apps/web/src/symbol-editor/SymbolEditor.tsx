@@ -1,5 +1,6 @@
 import { newId } from '@overleagger/core';
 import {
+  CATEGORY_ORDER,
   builtinSymbols,
   defaultOptions,
   isStatic,
@@ -15,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEven
 import { SymbolPreview, SymbolShapes, SymbolText } from '../canvas/render/SymbolGraphic';
 import { useEditor, useMeta } from '../editor/context';
 import { Field, IconButton, Modal } from '../panels/common';
+import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { DEFAULT_STROKE, THEMES } from '../theme';
 
@@ -54,7 +56,21 @@ export function SymbolEditor() {
   const meta = useMeta();
   const editing = useUI((s) => s.editingSymbol);
   const theme = THEMES[useUI((s) => s.theme)];
-  const existing = editing?.id ? ed.project.symbols.get(editing.id) : undefined;
+  const libSymbols = useUserLib((s) => s.symbols);
+  const inLibrary = editing?.id ? libSymbols.find((s) => s.id === editing.id) : undefined;
+  const existing = editing?.id ? (ed.project.symbols.get(editing.id) ?? inLibrary) : undefined;
+  /** Where the symbol is saved: this project only, or the personal library (every project). */
+  const [scope, setScope] = useState<'project' | 'library'>(
+    inLibrary || !existing ? 'library' : 'project',
+  );
+  const categories = [
+    ...new Set([
+      ...libSymbols.map((s) => s.category),
+      ...ed.project.getProjectSymbols().map((s) => s.category),
+      'Custom',
+      ...CATEGORY_ORDER,
+    ]),
+  ];
 
   const [name, setName] = useState(existing?.name ?? 'My symbol');
   const [refPrefix, setRefPrefix] = useState(existing?.refPrefix ?? 'X');
@@ -77,7 +93,10 @@ export function SymbolEditor() {
 
   const startFrom = (id: string, opts?: Record<string, OptionValue>) => {
     setFrom(id);
-    const src = builtinSymbols.find((s) => s.id === id) ?? ed.project.symbols.get(id);
+    const src =
+      builtinSymbols.find((s) => s.id === id) ??
+      ed.project.symbols.get(id) ??
+      libSymbols.find((s) => s.id === id);
     if (!src) return;
     const g = resolveSymbol(
       src,
@@ -251,8 +270,12 @@ export function SymbolEditor() {
       ...(params.hideValueLabel ? { hideValueLabel: true } : {}),
       ...(params.params ? { params: params.params } : {}),
     };
+    if (scope === 'library') useUserLib.getState().saveSymbol(def);
+    else if (inLibrary) useUserLib.getState().removeSymbol(id);
     ed.commit(() => {
-      ed.project.symbols.set(id, def);
+      // Library symbols are copied into the project when used: keep that copy up to date.
+      if (scope === 'project' || ed.project.symbols.has(id) || editing?.replaceId)
+        ed.project.symbols.set(id, def);
       if (editing?.replaceId) ed.updateElement(editing.replaceId, { symbolId: id, opts: {} });
     });
     close();
@@ -260,6 +283,13 @@ export function SymbolEditor() {
 
   const remove = () => {
     if (!existing) return;
+    if (inLibrary) {
+      if (!confirm(`Remove “${existing.name}” from your library? (Projects keep their copy)`))
+        return;
+      useUserLib.getState().removeSymbol(existing.id);
+      close();
+      return;
+    }
     const used = ed.project
       .listSheets()
       .some((s) =>
@@ -415,10 +445,30 @@ export function SymbolEditor() {
             <Field label="Reference prefix">
               <input value={refPrefix} onChange={(e) => setRefPrefix(e.target.value)} />
             </Field>
-            <Field label="Category">
-              <input value={category} onChange={(e) => setCategory(e.target.value)} />
+            <Field label="Category (pick or type)">
+              <input
+                list="symbol-categories"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                data-testid="symed-category"
+              />
+              <datalist id="symbol-categories">
+                {categories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </Field>
           </div>
+          <Field label="Save in">
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value as 'project' | 'library')}
+              data-testid="symed-scope"
+            >
+              <option value="library">My library (every project)</option>
+              <option value="project">This project only</option>
+            </select>
+          </Field>
           {selPrim && selPrim.k !== 'text' && (
             <>
               <h3>Shape</h3>
@@ -570,7 +620,7 @@ export function SymbolEditor() {
           disabled={!prims.length}
           data-testid="symed-save"
         >
-          Save to library
+          {scope === 'library' ? 'Save to my library' : 'Save to project'}
         </button>
       </div>
     </Modal>

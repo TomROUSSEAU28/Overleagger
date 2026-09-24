@@ -23,6 +23,7 @@ import {
   distributeUnits,
   followPins,
   moveToNewBlock,
+  newId,
   type AlignMode,
   type ClipData,
   type Element,
@@ -32,8 +33,11 @@ import {
   type Rect,
   type SheetContext,
 } from '@overleagger/core';
+import type { StaticSymbolDef } from '@overleagger/symbols';
 import type * as Y from 'yjs';
+import { motionEnabled, popIn, ripple, vanish } from '../canvas/juice';
 import { useUI, type ToolId, type Viewport } from '../store/ui';
+import { useUserLib, type UserTemplate } from '../storage/userLibrary';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 8;
@@ -52,7 +56,16 @@ export class EditorController {
   constructor(project: Project) {
     this.project = project;
     this.undo = createUndoManager(project);
-    this.ctx = makeContext(project);
+    const base = makeContext(project);
+    // Symbols of the personal library are usable in every project (they are copied into the
+    // project when placed, so the project file stays self-contained).
+    this.ctx = {
+      get standard() {
+        return base.standard;
+      },
+      symbol: (id) => base.symbol(id) ?? useUserLib.getState().symbols.find((s) => s.id === id),
+      ports: base.ports,
+    };
   }
 
   destroy() {
@@ -118,6 +131,7 @@ export class EditorController {
   deleteSelection() {
     const ids = this.selection();
     if (!ids.length) return;
+    vanish([...expandSelection(this.elements(), ids)]);
     this.commit(() => deleteElements(this.project, this.sheetId, ids));
     this.select([]);
   }
@@ -154,6 +168,7 @@ export class EditorController {
     const ids = this.commit(() => pasteClip(this.project, this.sheetId, clip, dx, dy));
     const all = this.elements();
     this.select([...new Set(ids.map((id) => topLevelUnit(all, id)))]);
+    popIn(ids, 8);
     return true;
   }
 
@@ -163,6 +178,7 @@ export class EditorController {
     const out = this.commit(() => duplicateElements(this.project, this.sheetId, ids));
     const all = this.elements();
     this.select([...new Set(out.map((id) => topLevelUnit(all, id)))]);
+    popIn(out, 8);
   }
 
   /** Replace elements by modified copies (same ids). */
@@ -235,8 +251,48 @@ export class EditorController {
     this.select([el.id]);
   }
 
+  /** Copy personal-library symbols into the project (if missing), so its file stays complete. */
+  private adoptSymbols(defs: StaticSymbolDef[]) {
+    for (const d of defs) if (!this.project.symbols.has(d.id)) this.project.symbols.set(d.id, d);
+  }
+
+  /** Insert one of the user's templates (centred on a point, or on the view). */
+  insertTemplate(t: UserTemplate, at?: Pt) {
+    this.insertClip(t.clip, at, t.symbols);
+  }
+
+  /** Save the selection in the personal library as a reusable template. */
+  saveSelectionAsTemplate(info: { name: string; category: string; description?: string }) {
+    const ids = this.selection();
+    if (!ids.length) return null;
+    const clip = copyElements(this.project, this.sheetId, ids);
+    const used = new Set<string>();
+    const collect = (els: Element[]) => {
+      for (const e of els) if (e.type === 'component') used.add(e.symbolId);
+    };
+    collect(clip.elements);
+    for (const s of clip.sheets) collect(s.elements);
+    const symbols = [...used]
+      .map(
+        (id) =>
+          this.project.symbols.get(id) ?? useUserLib.getState().symbols.find((s) => s.id === id),
+      )
+      .filter((s): s is StaticSymbolDef => Boolean(s));
+    const t: UserTemplate = {
+      id: newId(10),
+      name: info.name.trim() || 'Untitled template',
+      category: info.category.trim() || 'My templates',
+      ...(info.description?.trim() ? { description: info.description.trim() } : {}),
+      createdAt: Date.now(),
+      clip,
+      symbols,
+    };
+    useUserLib.getState().saveTemplate(t);
+    return t;
+  }
+
   /** Paste clipboard-like data (templates) at a point. */
-  insertClip(clip: ClipData, at?: Pt) {
+  insertClip(clip: ClipData, at?: Pt, symbols: StaticSymbolDef[] = []) {
     const box = rectUnion(
       clip.elements
         .filter((e) => e.type !== 'group')
@@ -245,9 +301,24 @@ export class EditorController {
     const target = at ?? this.viewCenter();
     const dx = box ? snap(target.x - (box.x + box.w / 2), GRID) : 0;
     const dy = box ? snap(target.y - (box.y + box.h / 2), GRID) : 0;
-    const ids = this.commit(() => pasteClip(this.project, this.sheetId, clip, dx, dy));
+    const ids = this.commit(() => {
+      this.adoptSymbols(symbols);
+      return pasteClip(this.project, this.sheetId, clip, dx, dy);
+    });
     const all = this.elements();
     this.select([...new Set(ids.map((id) => topLevelUnit(all, id)))]);
+    // Unfold from the centre outwards.
+    const byDistance = (id: string) => {
+      const e = all.find((x) => x.id === id);
+      if (!e || e.type === 'group') return Infinity;
+      const b = elementBBox(e, this.ctx, all);
+      return Math.hypot(b.x + b.w / 2 - target.x, b.y + b.h / 2 - target.y);
+    };
+    popIn(
+      [...ids].sort((a, b) => byDistance(a) - byDistance(b)),
+      14,
+    );
+    ripple(target.x, target.y, 'place', 1.8);
   }
 
   /** World point at the centre of the visible canvas. */
@@ -342,14 +413,23 @@ export class EditorController {
   }
 
   placeComponent(symbolId: string, at: Pt, rot: 0 | 1 | 2 | 3 = 0, mirror = false) {
-    const el = this.commit(() =>
-      addComponent(this.project, this.sheetId, symbolId, at.x, at.y, this.ctx, { rot, mirror }),
-    );
+    const el = this.commit(() => {
+      const mine = useUserLib.getState().symbols.find((s) => s.id === symbolId);
+      if (mine) this.adoptSymbols([mine]);
+      return addComponent(this.project, this.sheetId, symbolId, at.x, at.y, this.ctx, {
+        rot,
+        mirror,
+      });
+    });
+    popIn([el.id]);
+    ripple(at.x, at.y);
     return el;
   }
 
   addElement(el: Parameters<Project['addElement']>[1]): Element {
-    return this.commit(() => this.project.addElement(this.sheetId, el));
+    const out = this.commit(() => this.project.addElement(this.sheetId, el));
+    popIn([out.id]);
+    return out;
   }
 
   doUndo() {
@@ -433,7 +513,41 @@ export class EditorController {
   }
 
   setViewport(vp: Viewport, sheetId = this.sheetId) {
+    this.stopViewportAnimation();
     this.ui.setViewport(sheetId, vp);
+  }
+
+  private vpAnim = 0;
+
+  private stopViewportAnimation() {
+    if (this.vpAnim) cancelAnimationFrame(this.vpAnim);
+    this.vpAnim = 0;
+  }
+
+  /** Glide to a viewport (fit, zoom buttons); instant when animations are off. */
+  animateViewport(to: Viewport, sheetId = this.sheetId) {
+    const from = this.ui.viewports[sheetId];
+    if (!from || !motionEnabled()) {
+      this.setViewport(to, sheetId);
+      return;
+    }
+    this.stopViewportAnimation();
+    const t0 = performance.now();
+    const dur = 240;
+    // Interpolate the zoom geometrically so the motion feels even at every scale.
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const k = 1 - (1 - t) ** 3;
+      const zoom = from.zoom * (to.zoom / from.zoom) ** k;
+      // Keep the world point under the screen centre moving linearly.
+      const c = { x: this.canvasSize.w / 2, y: this.canvasSize.h / 2 };
+      const wa = { x: (c.x - from.x) / from.zoom, y: (c.y - from.y) / from.zoom };
+      const wb = { x: (c.x - to.x) / to.zoom, y: (c.y - to.y) / to.zoom };
+      const w = { x: wa.x + (wb.x - wa.x) * k, y: wa.y + (wb.y - wa.y) * k };
+      this.ui.setViewport(sheetId, { x: c.x - w.x * zoom, y: c.y - w.y * zoom, zoom });
+      this.vpAnim = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    this.vpAnim = requestAnimationFrame(step);
   }
 
   contentBounds(sheetId = this.sheetId): Rect | undefined {
@@ -458,19 +572,22 @@ export class EditorController {
         Math.min((w - margin * 2) / Math.max(b.w, 1), (h - margin * 2) / Math.max(b.h, 1), 2),
       ),
     );
-    this.setViewport(
+    this.animateViewport(
       { x: w / 2 - (b.x + b.w / 2) * zoom, y: h / 2 - (b.y + b.h / 2) * zoom, zoom },
       sheetId,
     );
   }
 
+  /** Zoom around a screen point (wheel: instant) or the view centre (buttons, keys: animated). */
   zoomAt(factor: number, screen?: Pt) {
     const vp = this.viewport();
     const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, vp.zoom * factor));
     const s = screen ?? { x: this.canvasSize.w / 2, y: this.canvasSize.h / 2 };
     const wx = (s.x - vp.x) / vp.zoom;
     const wy = (s.y - vp.y) / vp.zoom;
-    this.setViewport({ x: s.x - wx * zoom, y: s.y - wy * zoom, zoom });
+    const next = { x: s.x - wx * zoom, y: s.y - wy * zoom, zoom };
+    if (screen) this.setViewport(next);
+    else this.animateViewport(next);
   }
 
   zoomReset() {

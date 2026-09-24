@@ -33,9 +33,15 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
   where 3 or more connections meet (crossing wires are not connected).
 - **Hierarchy**: blocks open like sub-sheets, sheet ports become block pins, unlimited nesting,
   **"move selection into a new block"** (`Ctrl Shift B`).
-- **Templates**: buck, boost, buck-boost, flyback, H-bridge inverter, 3-phase inverter + motor,
-  single/three-phase rectifiers, PI loop, cascaded current + voltage loops, RC filter, inverting
-  amplifier.
+- **Mirror / rotate everything**: parts, sheet ports and net labels (their shape goes to the
+  other side of the connection point), text (alignment), triangles, images.
+- **My library** (personal, shared by all your projects, stored in the browser for now):
+  - **Your own templates**: select part of a drawing → *Save selection as template* (Templates tab
+    or the bookmark button in the properties). Pick a category or type a new one. Click or drag a
+    template to insert it; custom symbols it uses come with it.
+  - **Your own symbols**: the symbol editor saves to *My library* (every project) or to *This
+    project only*, in any category you type.
+  - Export / import the whole library as an `.olglib` file (ready for future user accounts).
 
 ### Whiteboard (phase 2)
 
@@ -50,10 +56,14 @@ can open** like sub-sheets, and a **graphite-on-paper / LaTeX** look.
   as buck chronogram, PWM carrier, three-phase voltages.
 - **Frames** to organise the board (the base of the coming presentation mode).
 - **Custom symbol editor**: lines, polylines, rectangles, circles, texts and pins on a grid; start
-  from any built-in symbol ("Customize symbol…") and save it to the project library.
+  from any built-in symbol ("Customize symbol…") and save it to your library or to the project.
 - **Align and distribute**, **project colour palette**, fills, three themes: **cream lab
   notebook**, **white whiteboard** and **blackboard**, with drafting-style ("non-photo blue")
   selection marks.
+- **Small animations** that stay discreet: parts pop in when placed (with a graphite ring), settle
+  when dropped, fade out when deleted; new junction dots pop; a blue ring marks a new connection;
+  smooth zoom-to-fit. Toggle them with the ✦ button (they are off automatically when the system
+  asks for reduced motion).
 
 ### Files and export
 

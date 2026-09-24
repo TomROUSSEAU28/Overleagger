@@ -114,12 +114,27 @@ test('whiteboard tools: shapes, arrows, notes, pencil, waveforms, images and lin
   expect(pdf).toContain('https://example.com/datasheet.pdf');
 });
 
-test('templates insert connected circuits', async ({ page }) => {
-  await newProject(page, 'Templates');
+test('save a selection as a template and reuse it in another project', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('open-example').click();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  const dots = await page.getByTestId('canvas').locator('.junctions circle').count();
+  expect(dots).toBeGreaterThan(2);
+  await page.getByTestId('canvas').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Control+a');
   await page.getByTestId('tab-templates').click();
-  await page.getByTestId('template-buck').click();
+  await page.getByTestId('save-template').click();
+  await page.getByTestId('template-name').fill('My buck');
+  // A category of my own.
+  await page.getByTestId('template-category').fill('Power stages');
+  await page.getByTestId('template-save').click();
+  await expect(page.getByTestId('templates')).toContainText('Power stages');
+
+  await newProject(page, 'Reuse');
+  await page.getByTestId('tab-templates').click();
+  await page.getByTestId('template-My buck').click();
   expect((await types(page)).filter((t) => t === 'component').length).toBeGreaterThan(5);
-  await expect(page.locator('.junctions circle')).toHaveCount(5);
+  await expect(page.getByTestId('canvas').locator('.junctions circle')).toHaveCount(dots);
 });
 
 test('custom symbol editor: draw, add pins, save and place', async ({ page }) => {

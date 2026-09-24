@@ -33,7 +33,10 @@ import {
   validateHierarchy,
   type ComponentElement,
   type Element,
+  type LabelElement,
   type PortElement,
+  type ShapeElement,
+  type TextElement,
   type WireElement,
 } from '../index';
 
@@ -261,6 +264,27 @@ describe('moving', () => {
     const [m] = mirrorElements([rot as Element], ctx(), 'x') as ComponentElement[];
     expect(m!.mirror).toBe(true);
     expect(m!.rot).toBe(3);
+  });
+
+  it('mirrors ports, labels, text and triangles in place', () => {
+    const { p, sheet, ctx } = setup();
+    const port = p.addElement(sheet, { type: 'port', x: 100, y: 40, name: 'in', dir: 'in' });
+    const [mp] = mirrorElements([port], ctx(), 'x') as PortElement[];
+    expect([mp!.x, mp!.y, mp!.flip]).toEqual([100, 40, true]);
+    const label = p.addElement(sheet, { type: 'label', x: 20, y: 20, text: 'a' });
+    expect((mirrorElements([label], ctx(), 'x')[0] as LabelElement).flip).toBe(true);
+    const text = p.addElement(sheet, {
+      type: 'text',
+      x: 0,
+      y: 0,
+      text: 'hi',
+      size: 14,
+      align: 'start',
+    });
+    expect((mirrorElements([text], ctx(), 'x')[0] as TextElement).align).toBe('end');
+    const tri = p.addElement(sheet, { type: 'shape', kind: 'triangle', x: 0, y: 0, w: 40, h: 40 });
+    expect((mirrorElements([tri], ctx(), 'y')[0] as ShapeElement).dir).toBe('b');
+    expect((rotateElements([tri], ctx())[0] as ShapeElement).dir).toBe('r');
   });
 });
 

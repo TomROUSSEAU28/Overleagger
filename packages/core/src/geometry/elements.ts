@@ -310,7 +310,7 @@ export function elementPins(el: Element, ctx: SheetContext): WorldPin[] {
 
 function labelBBox(el: LabelElement): Rect {
   const w = Math.max(20, textWidth(el.text, 12) + 6);
-  return { x: el.x, y: el.y - 16, w, h: 16 };
+  return { x: el.flip ? el.x - w : el.x, y: el.y - 16, w, h: 16 };
 }
 
 export function textBBox(el: TextElement): Rect {

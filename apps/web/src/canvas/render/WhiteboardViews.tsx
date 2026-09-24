@@ -45,7 +45,9 @@ function RoughPaths({ drawable }: { drawable: ReturnType<typeof generator.rectan
   );
 }
 
-function shapePoints(el: Pick<ShapeElement, 'kind' | 'x' | 'y' | 'w' | 'h'>): [number, number][] {
+function shapePoints(
+  el: Pick<ShapeElement, 'kind' | 'x' | 'y' | 'w' | 'h' | 'dir'>,
+): [number, number][] {
   const { x, y, w, h } = el;
   if (el.kind === 'diamond')
     return [
@@ -54,11 +56,32 @@ function shapePoints(el: Pick<ShapeElement, 'kind' | 'x' | 'y' | 'w' | 'h'>): [n
       [x + w / 2, y + h],
       [x, y + h / 2],
     ];
-  return [
-    [x + w / 2, y],
-    [x + w, y + h],
-    [x, y + h],
-  ];
+  switch (el.dir) {
+    case 'b':
+      return [
+        [x, y],
+        [x + w, y],
+        [x + w / 2, y + h],
+      ];
+    case 'r':
+      return [
+        [x, y],
+        [x + w, y + h / 2],
+        [x, y + h],
+      ];
+    case 'l':
+      return [
+        [x + w, y],
+        [x + w, y + h],
+        [x, y + h / 2],
+      ];
+    default:
+      return [
+        [x + w / 2, y],
+        [x + w, y + h],
+        [x, y + h],
+      ];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +287,11 @@ export const ImageView = memo(function ImageView({
         width={el.w}
         height={el.h}
         preserveAspectRatio="none"
+        transform={
+          el.flipX || el.flipY
+            ? `translate(${el.flipX ? 2 * el.x + el.w : 0} ${el.flipY ? 2 * el.y + el.h : 0}) scale(${el.flipX ? -1 : 1} ${el.flipY ? -1 : 1})`
+            : undefined
+        }
       />
       {o.interactive && <rect className="hit" x={el.x} y={el.y} width={el.w} height={el.h} />}
       {el.style?.width !== undefined && el.style.width > 0 && (

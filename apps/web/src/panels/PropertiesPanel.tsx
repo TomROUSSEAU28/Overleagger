@@ -16,6 +16,7 @@ import { isStatic, type OptionDef, type Standard } from '@overleagger/symbols';
 import {
   ArrowLeftRight,
   ArrowUpDown,
+  BookmarkPlus,
   BringToFront,
   Group,
   LogIn,
@@ -116,6 +117,18 @@ function SheetProps() {
 
 // ---------------------------------------------------------------------------
 
+const WIDTH_TYPES: Element['type'][] = [
+  'component',
+  'wire',
+  'block',
+  'port',
+  'shape',
+  'line',
+  'text',
+  'waveform',
+];
+const DASH_TYPES: Element['type'][] = ['component', 'wire', 'block', 'shape', 'line', 'text'];
+
 /** Light fills that stay readable under graphite ink. */
 const FILLS = ['#ffffff', '#f3efe4', '#e6eef8', '#e5f1e1', '#fbf1c7', '#f8e1e1', '#ece6f5'];
 
@@ -136,53 +149,63 @@ function StyleEditor({ els }: { els: Element[] }) {
   const current = first.color;
   const palette = useMeta().palette ?? [];
   const fillable = els.some((e) => ['shape', 'text', 'block', 'frame', 'button'].includes(e.type));
+  // Only offer the settings the selected elements actually draw with.
+  const hasWidth = els.some(
+    (e) => WIDTH_TYPES.includes(e.type) && (e.type !== 'text' || Boolean(e.frame)),
+  );
+  const hasDash = els.some(
+    (e) => DASH_TYPES.includes(e.type) && (e.type !== 'text' || Boolean(e.frame)),
+  );
+  const hasColor = els.some((e) => e.type !== 'image');
   return (
     <>
       <h3>Style</h3>
-      <div className="swatches" role="radiogroup" aria-label="Ink colour">
-        <button
-          type="button"
-          className={`swatch auto${!current ? ' active' : ''}`}
-          title="Theme ink"
-          onClick={() => setStyle({ color: undefined })}
-        >
-          A
-        </button>
-        {INK_NAMES.slice(1).map((n) => (
+      {hasColor && (
+        <div className="swatches" role="radiogroup" aria-label="Ink colour">
           <button
-            key={n}
             type="button"
-            className={`swatch${current === `@${n}` ? ' active' : ''}`}
-            title={n}
-            style={{ background: theme.palette[n] }}
-            onClick={() => setStyle({ color: `@${n}` })}
-          />
-        ))}
-        {palette.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={`swatch${current === c ? ' active' : ''}`}
-            title={`${c} (project colour)`}
-            style={{ background: c }}
-            onClick={() => setStyle({ color: c })}
-          />
-        ))}
-        <input
-          type="color"
-          title="Custom colour"
-          value={current && !current.startsWith('@') ? current : resolveColor(current, theme)}
-          onChange={(e) => setStyle({ color: e.target.value })}
-        />
-        {current && !current.startsWith('@') && !palette.includes(current) && (
-          <IconButton
-            title="Add this colour to the project palette"
-            onClick={() => ed.project.setMeta({ palette: [...palette, current] })}
+            className={`swatch auto${!current ? ' active' : ''}`}
+            title="Theme ink"
+            onClick={() => setStyle({ color: undefined })}
           >
-            <Plus size={14} />
-          </IconButton>
-        )}
-      </div>
+            A
+          </button>
+          {INK_NAMES.slice(1).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`swatch${current === `@${n}` ? ' active' : ''}`}
+              title={n}
+              style={{ background: theme.palette[n] }}
+              onClick={() => setStyle({ color: `@${n}` })}
+            />
+          ))}
+          {palette.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`swatch${current === c ? ' active' : ''}`}
+              title={`${c} (project colour)`}
+              style={{ background: c }}
+              onClick={() => setStyle({ color: c })}
+            />
+          ))}
+          <input
+            type="color"
+            title="Custom colour"
+            value={current && !current.startsWith('@') ? current : resolveColor(current, theme)}
+            onChange={(e) => setStyle({ color: e.target.value })}
+          />
+          {current && !current.startsWith('@') && !palette.includes(current) && (
+            <IconButton
+              title="Add this colour to the project palette"
+              onClick={() => ed.project.setMeta({ palette: [...palette, current] })}
+            >
+              <Plus size={14} />
+            </IconButton>
+          )}
+        </div>
+      )}
       {fillable && (
         <div className="swatches" aria-label="Fill">
           <span className="field-label">Fill</span>
@@ -212,38 +235,46 @@ function StyleEditor({ els }: { els: Element[] }) {
           />
         </div>
       )}
-      <div className="row">
-        <Field label="Stroke">
-          <select
-            value={first.width ?? ''}
-            onChange={(e) =>
-              setStyle({ width: e.target.value ? Number(e.target.value) : undefined })
-            }
-          >
-            <option value="">Default</option>
-            {[0.8, 1, 1.5, 2, 2.5, 3, 4].map((w) => (
-              <option key={w} value={w}>
-                {w} px
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Line">
-          <select
-            value={first.dash ?? 'solid'}
-            onChange={(e) =>
-              setStyle({
-                dash:
-                  e.target.value === 'solid' ? undefined : (e.target.value as 'dashed' | 'dotted'),
-              })
-            }
-          >
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-            <option value="dotted">Dotted</option>
-          </select>
-        </Field>
-      </div>
+      {(hasWidth || hasDash) && (
+        <div className="row">
+          {hasWidth && (
+            <Field label="Stroke">
+              <select
+                value={first.width ?? ''}
+                onChange={(e) =>
+                  setStyle({ width: e.target.value ? Number(e.target.value) : undefined })
+                }
+              >
+                <option value="">Default</option>
+                {[0.8, 1, 1.5, 2, 2.5, 3, 4].map((w) => (
+                  <option key={w} value={w}>
+                    {w} px
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {hasDash && (
+            <Field label="Line">
+              <select
+                value={first.dash ?? 'solid'}
+                onChange={(e) =>
+                  setStyle({
+                    dash:
+                      e.target.value === 'solid'
+                        ? undefined
+                        : (e.target.value as 'dashed' | 'dotted'),
+                  })
+                }
+              >
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+            </Field>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -272,6 +303,12 @@ function ArrangeButtons() {
         onClick={() => ed.selectionToBlock()}
       >
         <PackagePlus size={16} />
+      </IconButton>
+      <IconButton
+        title="Save as a template in my library"
+        onClick={() => useUI.getState().set({ modal: 'save-template' })}
+      >
+        <BookmarkPlus size={16} />
       </IconButton>
     </div>
   );
@@ -731,6 +768,14 @@ function LabelProps({ el }: { el: LabelElement }) {
           onChange={(e) => ed.updateElement(el.id, { text: e.target.value })}
         />
       </Field>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={Boolean(el.flip)}
+          onChange={(e) => ed.updateElement(el.id, { flip: e.target.checked || undefined })}
+        />
+        Text on the left
+      </label>
       <p className="muted small">Labels with the same name are connected, even without a wire.</p>
     </>
   );

@@ -13,6 +13,7 @@ import { memo, useMemo, useState } from 'react';
 import { SYMBOL_DND_TYPE } from '../canvas/Canvas';
 import { SymbolPreview } from '../canvas/render/SymbolGraphic';
 import { useEditor, useMeta, useSymbolsVersion } from '../editor/context';
+import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { DEFAULT_STROKE, THEMES } from '../theme';
 
@@ -65,11 +66,13 @@ export function LibraryPanel() {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const symbolsVersion = useSymbolsVersion();
-  const all = useMemo(
-    () => [...ed.project.getProjectSymbols(), ...builtinSymbols],
+  const libSymbols = useUserLib((s) => s.symbols);
+  const all = useMemo(() => {
+    const own = ed.project.getProjectSymbols();
+    const ids = new Set(own.map((s) => s.id));
+    return [...own, ...libSymbols.filter((s) => !ids.has(s.id)), ...builtinSymbols];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ed, symbolsVersion],
-  );
+  }, [ed, symbolsVersion, libSymbols]);
   const groups = useMemo(() => groupByCategory(searchSymbols(query, all)), [query, all]);
   const pick = (id: string) => ed.startPlacing(id);
 

@@ -9,6 +9,7 @@ import {
   PanelLeft,
   PanelRight,
   Redo2,
+  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheets, useUndoState } from '../editor/context';
@@ -44,6 +45,7 @@ export function TopBar() {
   const meta = useMeta();
   const { canUndo, canRedo } = useUndoState();
   const showGrid = useUI((s) => s.showGrid);
+  const animations = useUI((s) => s.animations);
   const left = useUI((s) => s.leftPanel);
   const right = useUI((s) => s.rightPanel);
   const ui = useUI.getState;
@@ -101,6 +103,14 @@ export function TopBar() {
         <Grid3x3 size={17} />
       </IconButton>
       <ThemePicker />
+      <IconButton
+        title={animations ? 'Animations: on' : 'Animations: off'}
+        active={animations}
+        onClick={() => ui().setSetting('animations', !animations)}
+        testId="toggle-animations"
+      >
+        <Sparkles size={17} />
+      </IconButton>
       <IconButton
         title="Library panel"
         active={left}

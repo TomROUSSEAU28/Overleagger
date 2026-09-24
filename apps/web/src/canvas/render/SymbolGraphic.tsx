@@ -12,15 +12,19 @@ export interface Ink {
   paper: string;
   /** Base stroke width in px. */
   width: number;
+  /** Line style applied to every solid line of the symbol (e.g. "not fitted" parts). */
+  dash?: 'dashed' | 'dotted' | 'solid';
 }
 
 function strokeProps(p: Exclude<Primitive, TextPrimitive>, ink: Ink) {
   const sw = p.sw ?? 1;
   const fill = p.fill === 'ink' ? ink.color : p.fill === 'paper' ? ink.paper : 'none';
+  const style =
+    p.dash ?? (ink.dash && ink.dash !== 'solid' && p.fill !== 'ink' ? ink.dash : undefined);
   const dash =
-    p.dash === 'dashed'
+    style === 'dashed'
       ? `${ink.width * 3.2} ${ink.width * 2.4}`
-      : p.dash === 'dotted'
+      : style === 'dotted'
         ? `0.1 ${ink.width * 2.4}`
         : undefined;
   return {

@@ -105,7 +105,11 @@ export const ComponentView = memo(function ComponentView({
   const labels = componentLabels(el, o.ctx);
   const k = el.scale ?? 1;
   // Keep the stroke width constant when the symbol is enlarged.
-  const shapeInk = k === 1 ? ink : { ...ink, width: ink.width / k };
+  const shapeInk = {
+    ...ink,
+    width: ink.width / k,
+    ...(el.style?.dash ? { dash: el.style.dash } : {}),
+  };
   // Local +x axis pointing left on screen → start/end anchors must swap.
   const flipAnchors = componentPoint({ ...el, x: 0, y: 0 }, 1, 0).x < -0.5;
   return (
@@ -325,7 +329,9 @@ export const LabelView = memo(function LabelView({
   const w = Math.max(20, textWidth(el.text, 12) + 6);
   return (
     <g data-id={o.interactive ? el.id : undefined} className="el">
-      {o.interactive && <rect className="hit" x={el.x} y={el.y - 16} width={w} height={16} />}
+      {o.interactive && (
+        <rect className="hit" x={el.flip ? el.x - w : el.x} y={el.y - 16} width={w} height={16} />
+      )}
       <line
         x1={el.x}
         y1={el.y}
@@ -336,11 +342,11 @@ export const LabelView = memo(function LabelView({
       />
       <RichText
         text={el.text}
-        x={el.x + 3}
+        x={el.flip ? el.x - 3 : el.x + 3}
         y={el.y - 8}
         size={12}
         color={ink.color}
-        anchor="start"
+        anchor={el.flip ? 'end' : 'start'}
         italic={!hasMath(el.text)}
       />
     </g>

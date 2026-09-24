@@ -25,6 +25,7 @@ import {
 } from '@overleagger/core';
 import type { EditorController } from '../editor/controller';
 import { useUI } from '../store/ui';
+import { ripple, settle } from './juice';
 
 /** The tool controller of the mounted canvas (used by keyboard shortcuts). */
 export const activeTools: { current: ToolController | null } = { current: null };
@@ -293,6 +294,7 @@ export class ToolController {
         return;
       }
       case 'stroke': {
+        if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) return;
         const d = ui.strokeDraft ?? [];
         const n = d.length;
         if (n >= 3 && Math.hypot(world.x - d[n - 3]!, world.y - d[n - 2]!) < 1 / this.zoom())
@@ -344,9 +346,9 @@ export class ToolController {
         ui.set({ drag: null });
         if (d && (d.dx || d.dy)) {
           const elements = ed.elements();
-          ed.applyElements(
-            computeMove(elements, expandSelection(elements, d.ids), d.dx, d.dy, ed.ctx),
-          );
+          const moved = expandSelection(elements, d.ids);
+          ed.applyElements(computeMove(elements, moved, d.dx, d.dy, ed.ctx));
+          settle([...moved]);
         }
         return;
       }
@@ -386,8 +388,10 @@ export class ToolController {
       case 'line-draw':
         return this.finishLine();
       case 'stroke': {
-        const d = ui.strokeDraft;
+        let d = ui.strokeDraft;
         ui.set({ strokeDraft: null });
+        // A simple click leaves a dot.
+        if (d && d.length === 3) d = [...d, d[0]! + 0.5, d[1]! + 0.5, d[2]!];
         if (d && d.length >= 6) {
           const prefs = ui.prefs;
           ed.addElement({
@@ -678,6 +682,13 @@ export class ToolController {
       const pts = normalizeWire(d.pts);
       if (pts.length >= 4) {
         const kind = ui.tool === 'signal' ? 'signal' : 'power';
+        // A small blue ring where the new wire lands on a pin or another wire.
+        const n = pts.length;
+        for (const [x, y] of [
+          [pts[0]!, pts[1]!],
+          [pts[n - 2]!, pts[n - 1]!],
+        ] as [number, number][])
+          if (this.isConnectionPoint({ x, y })) ripple(x, y, 'connect');
         this.ed.addElement({
           type: 'wire',
           pts,

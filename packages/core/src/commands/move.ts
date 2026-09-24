@@ -1,6 +1,6 @@
 import { elementPins, elementBBox, type SheetContext } from '../geometry/elements';
 import { normalizeWire, ptKey, rectUnion, snap, samePt } from '../geometry/geom';
-import type { Element, Id, Rot, WireElement } from '../model/types';
+import type { Element, Id, Rot, Side, WireElement } from '../model/types';
 import { GRID } from '../model/types';
 
 /** Shift a flat point list whose points have `stride` numbers (x, y, …). */
@@ -153,10 +153,28 @@ export function nearestSegment(w: WireElement, x: number, y: number): number {
 
 type PtFn = (x: number, y: number) => [number, number];
 
+/** Quarter turn (cw / ccw) or mirror about a vertical ('x') / horizontal ('y') axis. */
+type Op = { rot: 'cw' | 'ccw' } | { mirror: 'x' | 'y' };
+
+const SIDE_CW: Record<Side, Side> = { t: 'r', r: 'b', b: 'l', l: 't' };
+const SIDE_CCW: Record<Side, Side> = { t: 'l', l: 'b', b: 'r', r: 't' };
+
+function turnSide(s: Side, op: Op): Side {
+  if ('rot' in op) return (op.rot === 'cw' ? SIDE_CW : SIDE_CCW)[s];
+  if (op.mirror === 'x') return s === 'l' ? 'r' : s === 'r' ? 'l' : s;
+  return s === 't' ? 'b' : s === 'b' ? 't' : s;
+}
+
+/** Left ↔ right mirror (the only flip that changes ports, labels and text alignment). */
+const flipsX = (op: Op) => 'mirror' in op && op.mirror === 'x';
+
+const MIRROR_ALIGN = { start: 'end', end: 'start', middle: 'middle' } as const;
+
 function transformElement(
   el: Element,
   f: PtFn,
   comp: (rot: Rot, mirror: boolean) => [Rot, boolean],
+  op: Op,
 ): Element {
   switch (el.type) {
     case 'wire':
@@ -178,9 +196,20 @@ function transformElement(
       const [bx, by] = f(el.x + el.w, el.y + el.h);
       const w = Math.abs(bx - ax);
       const h = Math.abs(by - ay);
-      return { ...el, x: snap(cx - w / 2, GRID / 2), y: snap(cy - h / 2, GRID / 2), w, h };
+      const out = { ...el, x: snap(cx - w / 2, GRID / 2), y: snap(cy - h / 2, GRID / 2), w, h };
+      // Triangles point somewhere: turn / flip their apex too.
+      if (el.kind === 'triangle') out.dir = turnSide(el.dir ?? 't', op);
+      return out;
     }
-    case 'image':
+    case 'image': {
+      const [cx, cy] = f(el.x + el.w / 2, el.y + el.h / 2);
+      const out = { ...el, x: snap(cx - el.w / 2, GRID), y: snap(cy - el.h / 2, GRID) };
+      if ('mirror' in op) {
+        if (op.mirror === 'x') out.flipX = !el.flipX;
+        else out.flipY = !el.flipY;
+      }
+      return out;
+    }
     case 'note':
     case 'button':
     case 'waveform':
@@ -200,16 +229,30 @@ function transformElement(
     }
     case 'group':
       return el;
-    default: {
+    case 'port':
+    case 'label': {
+      // The shape / flag goes to the other side of its connection point.
       const [x, y] = f(el.x, el.y);
-      return { ...el, x, y };
+      return flipsX(op) ? { ...el, x, y, flip: !el.flip } : { ...el, x, y };
     }
+    case 'text': {
+      const [x, y] = f(el.x, el.y);
+      // Text stays readable: mirroring only swaps its alignment.
+      const align = flipsX(op) ? MIRROR_ALIGN[el.align] : el.align;
+      return { ...el, x, y, align };
+    }
+    default:
+      return el;
   }
 }
 
+/** Elements whose anchor point is also their connection point. */
+const ANCHORED: Element['type'][] = ['component', 'port', 'label', 'text'];
+
 function selectionCenter(elements: Element[], ctx: SheetContext): [number, number] {
-  if (elements.length === 1 && elements[0]!.type === 'component')
-    return [elements[0]!.x, elements[0]!.y];
+  // A single part turns / flips around its own anchor, so the wires attached to it stay put.
+  const one = elements.length === 1 ? elements[0]! : undefined;
+  if (one && ANCHORED.includes(one.type) && 'x' in one) return [one.x, one.y];
   const r = rectUnion(elements.map((e) => elementBBox(e, ctx, elements)));
   if (!r) return [0, 0];
   return [snap(r.x + r.w / 2, GRID), snap(r.y + r.h / 2, GRID)];
@@ -222,7 +265,9 @@ export function rotateElements(elements: Element[], ctx: SheetContext, ccw = fal
     ? (x, y) => [cx + (y - cy), cy - (x - cx)]
     : (x, y) => [cx - (y - cy), cy + (x - cx)];
   return elements.map((el) =>
-    transformElement(el, f, (rot, mirror) => [((rot + (ccw ? 3 : 1)) % 4) as Rot, mirror]),
+    transformElement(el, f, (rot, mirror) => [((rot + (ccw ? 3 : 1)) % 4) as Rot, mirror], {
+      rot: ccw ? 'ccw' : 'cw',
+    }),
   );
 }
 
@@ -235,10 +280,12 @@ export function mirrorElements(
   const [cx, cy] = selectionCenter(elements, ctx);
   const f: PtFn = axis === 'x' ? (x, y) => [2 * cx - x, y] : (x, y) => [x, 2 * cy - y];
   return elements.map((el) =>
-    transformElement(el, f, (rot, mirror) => [
-      (axis === 'x' ? (4 - rot) % 4 : (6 - rot) % 4) as Rot,
-      !mirror,
-    ]),
+    transformElement(
+      el,
+      f,
+      (rot, mirror) => [(axis === 'x' ? (4 - rot) % 4 : (6 - rot) % 4) as Rot, !mirror],
+      { mirror: axis },
+    ),
   );
 }
 

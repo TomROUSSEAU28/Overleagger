@@ -23,10 +23,12 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type PointerEvent as RPointerEvent,
 } from 'react';
 import { useEditor, useMeta, useSheetElements, useSymbolsVersion } from '../editor/context';
+import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { THEMES, resolveColor, type Theme } from '../theme';
 import { InlineEditor } from './InlineEditor';
@@ -41,7 +43,6 @@ import {
   type PointerInfo,
 } from './tools';
 import { ToolOptions } from './ToolOptions';
-import { TEMPLATES, templateClip } from '../examples/templates';
 import { TEMPLATE_DND_TYPE } from '../panels/TemplatesPanel';
 
 export const SYMBOL_DND_TYPE = 'application/x-overleagger-symbol';
@@ -69,6 +70,7 @@ export function Canvas() {
   const drag = useUI((s) => s.drag);
   const resize = useUI((s) => s.resize);
   const erasing = useUI((s) => s.erasing);
+  const animations = useUI((s) => s.animations);
   const storedVp = useUI((s) => s.viewports[sheetId]);
   const meta = useMeta();
   const symbolsVersion = useSymbolsVersion();
@@ -198,10 +200,25 @@ export function Canvas() {
     const native = e.nativeEvent;
     const list =
       useUI.getState().strokeDraft && native.getCoalescedEvents ? native.getCoalescedEvents() : [];
-    if (list.length > 1)
+    if (list.length > 1) {
+      // Copy the fields explicitly: `{ ...event }` would lose clientX/clientY, which are
+      // prototype getters (this used to turn every pencil point into NaN).
       for (const c of list)
-        tools.move(info({ ...c, target: e.target, pointerType: e.pointerType }));
-    else tools.move(info(e));
+        tools.move(
+          info({
+            clientX: c.clientX,
+            clientY: c.clientY,
+            button: e.button,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            target: e.target,
+            pressure: c.pressure,
+            pointerType: e.pointerType,
+          }),
+        );
+    } else tools.move(info(e));
   };
   const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
     svgRef.current?.releasePointerCapture(e.pointerId);
@@ -281,10 +298,10 @@ export function Canvas() {
       return;
     }
     const templateId = e.dataTransfer.getData(TEMPLATE_DND_TYPE);
-    const template = TEMPLATES.find((t) => t.id === templateId);
+    const template = useUserLib.getState().templates.find((t) => t.id === templateId);
     if (template) {
       e.preventDefault();
-      ed.insertClip(templateClip(template), at);
+      ed.insertTemplate(template, at);
       return;
     }
     const symbolId = e.dataTransfer.getData(SYMBOL_DND_TYPE);
@@ -328,6 +345,8 @@ export function Canvas() {
         width={size.w}
         height={size.h}
         style={{ cursor }}
+        data-anim={animations ? 'on' : 'off'}
+        data-busy={drag || resize ? 'drag' : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -373,7 +392,14 @@ export function Canvas() {
               />
             </g>
           )}
-          <SheetRenderer elements={effective} o={o} hidden={hidden} />
+          <g key={sheetId} className="sheet-enter">
+            <SheetRenderer elements={effective} o={o} hidden={hidden} />
+          </g>
+          <g
+            className="fx-layer"
+            pointerEvents="none"
+            style={{ '--fx-ink': theme.ink, '--fx-sel': theme.select } as CSSProperties}
+          />
           <Overlay elements={effective} o={o} zoom={vp.zoom} />
         </g>
       </svg>
@@ -410,7 +436,16 @@ function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; l
     `M ${x + w} ${y + h - l} V ${y + h} H ${x + w - l}`,
     `M ${x + l} ${y + h} H ${x} V ${y + h - l}`,
   ].join(' ');
-  return <path d={d} fill="none" stroke={color} strokeWidth={sw * 1.6} strokeLinecap="square" />;
+  return (
+    <path
+      className="brackets"
+      d={d}
+      fill="none"
+      stroke={color}
+      strokeWidth={sw * 1.6}
+      strokeLinecap="square"
+    />
+  );
 }
 
 function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions; zoom: number }) {

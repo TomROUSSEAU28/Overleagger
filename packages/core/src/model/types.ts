@@ -94,6 +94,8 @@ export interface LabelElement extends BaseElement {
   x: number;
   y: number;
   text: string;
+  /** Flag drawn to the left of its connection point. */
+  flip?: boolean;
 }
 
 export type TextAlign = 'start' | 'middle' | 'end';
@@ -129,6 +131,8 @@ export type ShapeKind = 'rect' | 'ellipse' | 'diamond' | 'triangle';
 export interface ShapeElement extends BaseElement, BoxFields {
   type: 'shape';
   kind: ShapeKind;
+  /** Where a triangle points (default 't', apex up). */
+  dir?: Side;
   /** Corner radius for rectangles (px). */
   radius?: number;
   /** Hand-drawn rendering (rough.js). */
@@ -165,6 +169,8 @@ export interface ImageElement extends BaseElement, BoxFields {
   /** Data URL of the (downscaled) image. */
   src: string;
   name?: string;
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 export interface NoteElement extends BaseElement, BoxFields {

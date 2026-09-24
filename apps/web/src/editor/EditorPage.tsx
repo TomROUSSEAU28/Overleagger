@@ -6,6 +6,7 @@ import { LibraryPanel } from '../panels/LibraryPanel';
 import { PropertiesPanel } from '../panels/PropertiesPanel';
 import { QuickAdd } from '../panels/QuickAdd';
 import { SheetsPanel } from '../panels/SheetsPanel';
+import { SaveTemplateDialog } from '../panels/SaveTemplateDialog';
 import { TemplatesPanel } from '../panels/TemplatesPanel';
 import { SymbolEditor } from '../symbol-editor/SymbolEditor';
 import { StatusBar } from '../panels/StatusBar';
@@ -88,6 +89,7 @@ function EditorLayout() {
       {modal === 'shortcuts' && <ShortcutsDialog />}
       {modal === 'export' && <ExportDialog />}
       {modal === 'symbol-editor' && <SymbolEditor />}
+      {modal === 'save-template' && <SaveTemplateDialog />}
     </div>
   );
 }

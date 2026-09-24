@@ -1,5 +1,8 @@
 import {
   Project,
+  copyElements,
+  pasteClip,
+  type ClipData,
   elementPins,
   makeContext,
   onSegmentInterior,
@@ -9,7 +12,6 @@ import {
 } from '@overleagger/core';
 import { describe, expect, it } from 'vitest';
 import { seedBuckExample } from './buck';
-import { TEMPLATES, buildTemplate, templateClip } from './templates';
 
 /** Wire ends that touch nothing (no pin, label or other wire). */
 function danglingEnds(p: Project, sheet: string): string[] {
@@ -42,20 +44,27 @@ function danglingEnds(p: Project, sheet: string): string[] {
   return out;
 }
 
-describe('templates', () => {
-  for (const t of TEMPLATES) {
-    it(`${t.id} has every wire end connected`, () => {
-      const p = Project.create('t');
-      buildTemplate(t, p, p.rootSheetId);
-      expect(danglingEnds(p, p.rootSheetId)).toEqual([]);
-      expect(templateClip(t).elements.length).toBeGreaterThan(3);
-    });
-  }
-
+describe('examples', () => {
   it('the example project is fully connected', () => {
     const p = Project.create('example');
     seedBuckExample(p);
     for (const s of p.listSheets()) expect(danglingEnds(p, s.id), s.name).toEqual([]);
     expect(validateHierarchy(p)).toEqual([]);
+  });
+
+  it('a circuit saved as a template stays connected when inserted elsewhere', () => {
+    const src = Project.create('example');
+    seedBuckExample(src);
+    const sheet = src.rootSheetId;
+    const clip = copyElements(
+      src,
+      sheet,
+      src.getElements(sheet).map((e) => e.id),
+    );
+    const dst = Project.create('other');
+    pasteClip(dst, dst.rootSheetId, JSON.parse(JSON.stringify(clip)) as ClipData, 200, 100);
+    expect(danglingEnds(dst, dst.rootSheetId)).toEqual([]);
+    expect(dst.listSheets().length).toBe(src.listSheets().length);
+    expect(validateHierarchy(dst)).toEqual([]);
   });
 });

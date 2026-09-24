@@ -6,6 +6,7 @@ import type {
   LineElement,
   NoteElement,
   ShapeElement,
+  Side,
   StrokeElement,
   Trace,
   TraceKind,
@@ -66,6 +67,21 @@ export function ShapeProps({ el }: { el: ShapeElement }) {
               value={el.radius ?? 0}
               onChange={(e) => upd({ radius: Number(e.target.value) || undefined })}
             />
+          </Field>
+        )}
+        {el.kind === 'triangle' && (
+          <Field label="Points">
+            <select
+              value={el.dir ?? 't'}
+              onChange={(e) =>
+                upd({ dir: e.target.value === 't' ? undefined : (e.target.value as Side) })
+              }
+            >
+              <option value="t">Up</option>
+              <option value="r">Right</option>
+              <option value="b">Down</option>
+              <option value="l">Left</option>
+            </select>
           </Field>
         )}
       </div>

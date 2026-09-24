@@ -64,7 +64,14 @@ export interface DragPreview {
 }
 
 export type Modal =
-  null | 'quickadd' | 'help' | 'shortcuts' | 'export' | 'rename' | 'symbol-editor';
+  | null
+  | 'quickadd'
+  | 'help'
+  | 'shortcuts'
+  | 'export'
+  | 'rename'
+  | 'symbol-editor'
+  | 'save-template';
 
 /** Live preview of a resize / line edit. */
 export interface ResizePreview {
@@ -85,6 +92,8 @@ interface Settings {
   latexRefs: boolean;
   leftPanel: boolean;
   rightPanel: boolean;
+  /** Small feedback animations (also off when the system asks for reduced motion). */
+  animations: boolean;
 }
 
 export interface UIState extends Settings {
@@ -114,6 +123,8 @@ export interface UIState extends Settings {
     /** Component switched to the new symbol when it is saved. */
     replaceId?: Id;
   } | null;
+  /** Template being renamed in the save-template dialog (null = save the selection). */
+  editingTemplate: string | null;
   hoverPin: Pt | null;
   cursor: Pt | null;
   modal: Modal;
@@ -138,6 +149,7 @@ function loadSettings(): Settings {
     latexRefs: true,
     leftPanel: true,
     rightPanel: true,
+    animations: true,
   };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -172,6 +184,7 @@ const transient = {
   erasing: [] as Id[],
   handle: null,
   editingSymbol: null,
+  editingTemplate: null,
   hoverPin: null,
   cursor: null,
   modal: null as Modal,
@@ -210,6 +223,7 @@ export const useUI = create<UIState>((set, get) => ({
       latexRefs: s.latexRefs,
       leftPanel: s.leftPanel,
       rightPanel: s.rightPanel,
+      animations: s.animations,
     });
   },
   resetEditor: () => set({ ...transient, sheetId: null, viewports: {} }),
