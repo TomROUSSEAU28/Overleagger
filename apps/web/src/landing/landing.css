@@ -1,4 +1,5 @@
-/* Circuit Notebook — homepage. Same look as the app: graphite on a ruled notebook page. */
+/* Circuit Notebook — homepage. Same look as the app: graphite on a ruled notebook page.
+   Always the cream notebook, even when the computer is in dark mode. */
 
 @font-face {
   font-family: 'CMU Serif';
@@ -40,23 +41,6 @@
   --serif: 'CMU Serif', 'Latin Modern Roman', Georgia, serif;
   --mono: 'CMU Typewriter Text', ui-monospace, Menlo, monospace;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  /* Chalk on a blackboard. */
-  :root {
-    --paper: #1f2421;
-    --paper-2: #262c28;
-    --card: #2a302c;
-    --ink: #ecebe4;
-    --muted: #a7ab9f;
-    --line: #3b433e;
-    --accent: #8fb4ea;
-    --accent-ink: #13181a;
-    --margin: #e07a6f;
-    --rule: rgba(143, 180, 234, 0.12);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
-    color-scheme: dark;
-  }
 }
 
 * {
