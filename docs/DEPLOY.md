@@ -166,9 +166,20 @@ reach your mailbox and give the site its address, contact@circuitnotebook.com.
      ```
 
    - `deploy/update.sh --force`, then send yourself a message from the homepage.
-3. **Answer as contact@ from Gmail** (optional): Gmail → Settings → _Accounts and Import_ →
-   _Send mail as_ → add `contact@circuitnotebook.com` with the Brevo SMTP server, login and key
-   (port 587). When you reply to a message of the form, choose it as the sender.
+3. **Answer as contact@ from Gmail** (optional)
+   - Gmail → ⚙ → _See all settings_ → **Accounts and Import** → _Send mail as_ → _Add another
+     email address_: name `Circuit Notebook`, address `contact@circuitnotebook.com` (keep _Treat
+     as an alias_) → SMTP server `smtp-relay.brevo.com`, port `587`, the Brevo SMTP login and
+     key, _TLS_ → Gmail e-mails a code to contact@ (it comes back to your Gmail): enter it.
+   - Same page, _When replying to a message_: choose **Reply from the same address the message
+     was sent to**. Your answers to contact@ (and to the form) then leave as contact@.
+4. **Sort them** (optional): search `to:contact@circuitnotebook.com` in Gmail → the settings
+   icon at the right of the search box → _Create filter_ → _Apply the label_ → new label
+   `Circuit Notebook` (and _Skip the Inbox_ if you want them out of it).
+
+Each person writing through the form gets their own conversation in the mailbox: the subject
+holds their address, the sender shows their name ("Léa via Circuit Notebook"), and _Reply_
+answers them (Reply-To). Their answers to your reply come to contact@, in the same conversation.
 
 ## 5. Updates
 

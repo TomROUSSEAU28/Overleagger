@@ -6,7 +6,15 @@ import { testClient } from './helpers';
 
 let srv: App;
 let c: ReturnType<typeof testClient>;
-const sent: { to?: unknown; replyTo?: unknown; subject?: unknown; text?: unknown }[] = [];
+const sent: {
+  from?: unknown;
+  to?: unknown;
+  replyTo?: unknown;
+  subject?: unknown;
+  text?: unknown;
+  messageId?: string;
+  references?: string;
+}[] = [];
 
 beforeAll(async () => {
   // Messages go to a fake mail server.
@@ -44,8 +52,10 @@ it('receives messages from the homepage and e-mails them', async () => {
   expect(ok.status).toBe(200);
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({
+    from: { name: 'Léa via Circuit Notebook', address: 'contact@circuitnotebook.com' },
     to: 'contact@circuitnotebook.com',
-    replyTo: '"Léa" <lea@univ.fr>',
+    replyTo: { name: 'Léa', address: 'lea@univ.fr' },
+    subject: '[Circuit Notebook] Message from lea@univ.fr',
   });
   expect(String(sent[0]!.text)).toContain('Great tool');
 
@@ -58,6 +68,13 @@ it('receives messages from the homepage and e-mails them', async () => {
   // At most 5 messages an hour from one place.
   for (let i = 0; i < 4; i++) await send({ email: 'a@b.fr', message: `message ${i}` });
   expect((await send({ email: 'a@b.fr', message: 'one too many' })).status).toBe(429);
+
+  // One conversation per person: the messages of one address refer to the same thread.
+  const [a1, a2] = sent.filter((m) => m.subject === '[Circuit Notebook] Message from a@b.fr');
+  expect(a1!.references).toBe(a2!.references);
+  expect(a1!.messageId).not.toBe(a2!.messageId);
+  expect(a1!.references).not.toBe(sent[0]!.references);
+  expect(a1!.references).toMatch(/^<contact\.[0-9a-f]{16}@circuitnotebook\.com>$/);
 
   // The administrator reads them in the admin page.
   const user = await c.signup('Visitor');
