@@ -2,6 +2,7 @@ import {
   addComponent,
   createBlock,
   makeContext,
+  type Anim,
   type Project,
   type Trace,
   type TraceKind,
@@ -40,6 +41,10 @@ function pencilPts(pts: number[], seed = 1): number[] {
   return out;
 }
 
+/** Presentation animations, with fresh ids. */
+let animN = 0;
+const anim = (a: Omit<Anim, 'id'>): Anim => ({ id: `ex${++animN}`, ...a });
+
 /**
  * Example project: a synchronous buck converter on the main sheet with its waveforms, design
  * notes and pencil annotations, and its PI voltage controller inside a hierarchical block.
@@ -64,6 +69,8 @@ export function seedBuckExample(p: Project) {
       text: 'Synchronous buck converter — $V_{out} = D\\,V_{in}$',
       size: 20,
       align: 'start',
+      // Presentation: the title rises as the slide opens.
+      anims: [anim({ kind: 'appear', step: 0, effect: 'rise', dur: 600 })],
     });
 
     const v1 = addComponent(p, root, 'vsource-dc', 0, 100, ctx);
@@ -71,23 +78,37 @@ export function seedBuckExample(p: Project) {
     const hb = addComponent(p, root, 'half-bridge', 150, 100, ctx);
     p.updateElement(root, hb.id, { ref: 'Q1' });
     const l1 = addComponent(p, root, 'inductor', 240, 100, ctx);
-    p.updateElement(root, l1.id, { params: { value: '$L$' } });
+    // Click 1: the inductor current comes in (and the inductor pulses).
+    p.updateElement(root, l1.id, {
+      params: { value: '$L$' },
+      anims: [anim({ kind: 'emphasis', step: 1, effect: 'pulse' })],
+    });
     const c1 = addComponent(p, root, 'capacitor', 320, 145, ctx, { rot: 1 });
     p.updateElement(root, c1.id, { params: { value: '$C$' } });
     const r1 = addComponent(p, root, 'resistor', 400, 145, ctx, { rot: 1 });
     p.updateElement(root, r1.id, { params: { value: '$R$' } });
     addComponent(p, root, 'ground', 80, 210, ctx);
     const iL = addComponent(p, root, 'current-arrow', 292, 100, ctx);
-    p.updateElement(root, iL.id, { params: { value: 'i_L' } });
+    p.updateElement(root, iL.id, {
+      params: { value: 'i_L' },
+      anims: [anim({ kind: 'appear', step: 1, effect: 'pop', delay: 150 })],
+    });
     const vo = addComponent(p, root, 'voltage-arrow', 450, 145, ctx, { rot: 1, mirror: true });
-    p.updateElement(root, vo.id, { params: { value: 'v_{out}' }, style: { color: '@blue' } });
+    // Click 2: the output voltage.
+    p.updateElement(root, vo.id, {
+      params: { value: 'v_{out}' },
+      style: { color: '@blue' },
+      anims: [anim({ kind: 'appear', step: 2, effect: 'wipe', delay: 300 })],
+    });
 
     wire(root, [0, 70, 0, 20, 160, 20]);
     wire(root, [0, 130, 0, 190, 400, 190]);
     wire(root, [160, 180, 160, 190]);
     wire(root, [80, 190, 80, 210]);
     wire(root, [180, 100, 210, 100]);
-    wire(root, [270, 100, 450, 100]);
+    const out = wire(root, [270, 100, 450, 100]);
+    // Click 2: the output node turns blue, like its voltage arrow.
+    p.updateElement(root, out.id, { anims: [anim({ kind: 'color', step: 2, color: '@blue' })] });
     wire(root, [320, 125, 320, 100]);
     wire(root, [320, 165, 320, 190]);
     wire(root, [400, 115, 400, 100]);
@@ -110,6 +131,19 @@ export function seedBuckExample(p: Project) {
       yLabel: '',
       grid: true,
       axes: true,
+      // Click 4: the duty cycle moves, and the chronogram follows it.
+      anims: (['qh', 'vl', 'il'] as const).map((t) =>
+        anim({
+          kind: 'wave',
+          step: 4,
+          trace: t,
+          key: 'duty',
+          from: 0.25,
+          to: 0.5,
+          loop: true,
+          dur: 1800,
+        }),
+      ),
       traces: [
         trace('qh', 'pwm', { label: 'q_H' }),
         trace('vl', 'square', { amp: 0.8, offset: 0.2, label: 'v_L', color: '@pencil' }),
@@ -119,18 +153,28 @@ export function seedBuckExample(p: Project) {
     });
     // ΔiL between the top and the bottom of the current ripple (y 142…168 in the i_L band).
     const red = { style: { color: '@red' } };
-    p.addElement(root, { type: 'stroke', size: 2.2, pts: pencilPts([918, 142, 944, 142]), ...red });
+    // Click 1: the pencil marks are drawn one after the other, then ΔiL pops in.
+    const drawn = (delay: number) => [anim({ kind: 'appear', step: 1, effect: 'wipe', delay })];
+    p.addElement(root, {
+      type: 'stroke',
+      size: 2.2,
+      pts: pencilPts([918, 142, 944, 142]),
+      ...red,
+      anims: drawn(0),
+    });
     p.addElement(root, {
       type: 'stroke',
       size: 2.2,
       pts: pencilPts([918, 168, 944, 168], 3),
       ...red,
+      anims: drawn(250),
     });
     p.addElement(root, {
       type: 'stroke',
       size: 2.2,
       pts: pencilPts([936, 146, 936, 164], 5),
       ...red,
+      anims: drawn(500),
     });
     p.addElement(root, {
       type: 'text',
@@ -140,6 +184,7 @@ export function seedBuckExample(p: Project) {
       size: 16,
       align: 'start',
       ...red,
+      anims: [anim({ kind: 'appear', step: 1, effect: 'pop', delay: 750 })],
     });
     p.addElement(root, {
       type: 'text',
@@ -148,12 +193,15 @@ export function seedBuckExample(p: Project) {
       text: '$\\Delta i_L = \\dfrac{(V_{in} - V_{out})\\,D}{L\\,f_s}$',
       size: 18,
       align: 'start',
+      // Click 2: the formula, then its underline.
+      anims: [anim({ kind: 'appear', step: 2, effect: 'rise' })],
     });
     p.addElement(root, {
       type: 'stroke',
       size: 2,
       pts: pencilPts([578, 372, 640, 369, 700, 373, 770, 370], 7),
       ...red,
+      anims: [anim({ kind: 'appear', step: 2, effect: 'wipe', delay: 500, dur: 700 })],
     });
     p.addElement(root, {
       type: 'note',
@@ -163,6 +211,8 @@ export function seedBuckExample(p: Project) {
       h: 118,
       color: '@yellow',
       text: 'Specs\n$V_{in}$ = 48 V → $V_{out}$ = 12 V\n$f_s$ = 100 kHz, D = 0.25\n$\\Delta i_L$ ≤ 30 % of $I_{out}$',
+      // Click 3: the specs.
+      anims: [anim({ kind: 'appear', step: 3, effect: 'pop' })],
     });
     // Two frames: the slides of the presentation.
     p.addElement(root, { type: 'frame', x: -60, y: -90, w: 560, h: 480, name: 'Power stage' });
@@ -170,7 +220,11 @@ export function seedBuckExample(p: Project) {
 
     // Controller block and its sub-sheet.
     const block = createBlock(p, root, { x: 120, y: 260, w: 200, h: 100 }, 'Voltage controller');
-    p.updateElement(root, block.id, { tex: 'K_p + \\frac{K_i}{s}' });
+    // Click 3 of the power stage: the controller lights up (click it to go inside).
+    p.updateElement(root, block.id, {
+      tex: 'K_p + \\frac{K_i}{s}',
+      anims: [anim({ kind: 'emphasis', step: 3, effect: 'glow', dur: 1200 })],
+    });
     const sub = block.childSheetId;
     p.addElement(sub, {
       type: 'text',
@@ -179,6 +233,7 @@ export function seedBuckExample(p: Project) {
       text: 'PI voltage loop with PWM: $C(s) = K_p + \\frac{K_i}{s}$',
       size: 18,
       align: 'start',
+      anims: [anim({ kind: 'appear', step: 0, effect: 'rise', dur: 600 })],
     });
     p.addElement(sub, { type: 'port', x: 60, y: 40, name: '$v_{out}$', dir: 'in' });
     p.addElement(sub, { type: 'port', x: 460, y: -40, name: '$q_H$', dir: 'out' });
@@ -208,6 +263,19 @@ export function seedBuckExample(p: Project) {
       yLabel: 'v',
       grid: true,
       axes: true,
+      // As the slide opens: tuning the PI tames the overshoot, then the gains show up.
+      anims: [
+        anim({
+          kind: 'wave',
+          step: 0,
+          trace: 'out',
+          key: 'zeta',
+          from: 0.15,
+          to: 0.45,
+          dur: 1800,
+          delay: 700,
+        }),
+      ],
       traces: [
         trace('ref', 'dc', { amp: 0.8, color: '@pencil', dashed: true }),
         trace('out', 'step2', {
@@ -236,6 +304,7 @@ export function seedBuckExample(p: Project) {
       h: 100,
       color: '@blue',
       text: 'Tuning\n$K_p$ = 0.05, $K_i$ = 400\novershoot ≈ 20 %',
+      anims: [anim({ kind: 'appear', step: 0, effect: 'pop', delay: 2500 })],
     });
 
     // Block pins: v_out on the left (y = 310), q_H / q_L on the right (y = 300 / 320).

@@ -224,6 +224,11 @@ test('presentation mode: slides, drill into a block, laser and pen', async ({ pa
   await expect(count).toContainText('3 / 3');
   await page.keyboard.press('Backspace');
   await expect(count).toContainText('1 / 3');
+  // The power stage builds up in 3 clicks (current, output, controller), then the next slide.
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(count).toContainText('1 / 3');
+  }
   await page.keyboard.press('ArrowRight');
   await expect(count).toContainText('2 / 3');
   await expect(count).toContainText('Waveforms');

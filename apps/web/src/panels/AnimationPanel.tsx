@@ -62,6 +62,9 @@ const WAVE_KEYS: [NonNullable<Anim['key']>, string, number, number][] = [
   ['phase', 'Phase (°)', -360, 360],
   ['periods', 'Periods shown', 0.5, 20],
   ['offset', 'Offset', -1, 1],
+  ['zeta', 'Damping (2nd order)', 0, 2],
+  ['tau', 'Time constant', 0.01, 1],
+  ['ripple', 'Ripple', 0, 1],
 ];
 
 /** What can be animated on an element. */

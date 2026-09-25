@@ -68,7 +68,7 @@ export interface Anim {
   opts?: Record<string, OptionValue>;
   /** `wave`: which trace (id; the first one when missing) and which parameter. */
   trace?: string;
-  key?: 'duty' | 'amp' | 'phase' | 'periods' | 'offset';
+  key?: 'duty' | 'amp' | 'phase' | 'periods' | 'offset' | 'tau' | 'zeta' | 'ripple';
   from?: number;
   to?: number;
   /** `wave`: keep going back and forth between `from` and `to` (period = 2 × dur). */
