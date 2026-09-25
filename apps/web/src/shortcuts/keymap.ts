@@ -37,6 +37,8 @@ export type ActionId =
   | 'edit.ungroup'
   | 'edit.front'
   | 'edit.back'
+  | 'edit.forward'
+  | 'edit.backward'
   | 'edit.nudgeLeft'
   | 'edit.nudgeRight'
   | 'edit.nudgeUp'
@@ -106,8 +108,31 @@ export const ACTIONS: ActionDef[] = [
   { id: 'edit.selectAll', label: 'Select all', category: 'Edit', keys: ['mod+a'] },
   { id: 'edit.group', label: 'Group', category: 'Edit', keys: ['mod+g'] },
   { id: 'edit.ungroup', label: 'Ungroup', category: 'Edit', keys: ['mod+shift+g'] },
-  { id: 'edit.front', label: 'Bring to front', category: 'Edit', keys: ['mod+]'] },
-  { id: 'edit.back', label: 'Send to back', category: 'Edit', keys: ['mod+['] },
+  // Shift+] types "}" (and Shift+[ types "{"): the shifted symbol is the key.
+  {
+    id: 'edit.front',
+    label: 'Bring to front',
+    category: 'Edit',
+    keys: ['mod+}', 'mod+shift+arrowup'],
+  },
+  {
+    id: 'edit.back',
+    label: 'Send to back',
+    category: 'Edit',
+    keys: ['mod+{', 'mod+shift+arrowdown'],
+  },
+  {
+    id: 'edit.forward',
+    label: 'Bring forward (one step)',
+    category: 'Edit',
+    keys: ['mod+]', 'mod+arrowup'],
+  },
+  {
+    id: 'edit.backward',
+    label: 'Send backward (one step)',
+    category: 'Edit',
+    keys: ['mod+[', 'mod+arrowdown'],
+  },
   { id: 'edit.nudgeLeft', label: 'Nudge left', category: 'Edit', keys: ['arrowleft'] },
   { id: 'edit.nudgeRight', label: 'Nudge right', category: 'Edit', keys: ['arrowright'] },
   { id: 'edit.nudgeUp', label: 'Nudge up', category: 'Edit', keys: ['arrowup'] },

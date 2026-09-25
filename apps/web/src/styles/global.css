@@ -3354,3 +3354,27 @@ body.resizing-panel {
   min-width: 0;
   padding: 0;
 }
+
+/* Blank screen: say so, faintly, so the presenter knows why it is black. */
+.present-blank-note {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  pointer-events: none;
+  animation: blank-note 3s ease-out forwards;
+}
+@keyframes blank-note {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}

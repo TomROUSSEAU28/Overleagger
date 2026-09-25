@@ -381,6 +381,71 @@ export const passives: SymbolDef[] = [
     ['centre tap', 'push-pull', 'magnetic', 'secondary'],
     { s1: 'ct' },
   ),
+  // One winding on its own: place the primary and the secondaries apart in the schematic
+  // (e.g. on each side of an isolation barrier); the same designator (T1…) ties them together.
+  {
+    id: 'transformer-winding',
+    name: 'Transformer winding (separate)',
+    category: CAT,
+    keywords: [
+      'winding',
+      'separate windings',
+      'split transformer',
+      'coupled',
+      'primary',
+      'secondary',
+      'auxiliary',
+      'flyback',
+      'enroulement',
+    ],
+    refPrefix: 'T',
+    options: [
+      { ...coreOption, default: 'iron' },
+      {
+        key: 'coreSide',
+        label: 'Core side',
+        type: 'enum',
+        default: 'right',
+        choices: [
+          { value: 'right', label: 'Right' },
+          { value: 'left', label: 'Left' },
+        ],
+      },
+      {
+        key: 'turns',
+        label: 'Length',
+        type: 'enum',
+        default: '4',
+        choices: [
+          { value: '4', label: 'Short' },
+          { value: '6', label: 'Medium' },
+          { value: '8', label: 'Long' },
+        ],
+      },
+      ...windingOptions('w', 'Winding'),
+    ],
+    build: ({ opts }) => {
+      const side = opts.coreSide === 'left' ? -1 : 1;
+      const arcs = [4, 6, 8].includes(Number(opts.turns)) ? Number(opts.turns) : 4;
+      const half = arcs * COIL_R;
+      const end = Math.ceil(half + 0.5);
+      const prims: Primitive[] = [
+        L(0, -end, 0, -half),
+        L(0, half, 0, end),
+        ...vCoil(0, -half, arcs, COIL_R, side),
+        ...coreLines(String(opts.core), -half - 0.1, half + 0.1, side, true),
+      ];
+      const pins: PinDef[] = [pin('1', 0, -end, 'Start'), pin('2', 0, end, 'End')];
+      if (opts.w === 'ct') {
+        prims.push(L(0, 0, -2 * side, 0));
+        pins.splice(1, 0, pin('ct', -2 * side, 0, 'Center tap'));
+      }
+      // The polarity dot sits on the outer side of the coil, away from the core.
+      const dotY = opts.wDot === 'bottom' ? half - 0.3 : -half + 0.3;
+      if (opts.wDot !== 'none') prims.push(dot(-0.7 * side, dotY, 0.18));
+      return { prims, pins };
+    },
+  },
   // Old three-winding model: same drawing as a transformer with two secondaries.
   {
     ...transformerDef('transformer-3w', 'Transformer, 3 windings', [], { secondaries: 2 }),

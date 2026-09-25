@@ -25,6 +25,8 @@ import {
   ArrowLeftRight,
   ArrowUpDown,
   BookmarkPlus,
+  ArrowDown,
+  ArrowUp,
   BringToFront,
   Group,
   LogIn,
@@ -374,12 +376,6 @@ function ArrangeButtons() {
       <IconButton title="Mirror vertically (Y)" onClick={() => ed.mirror('y')}>
         <ArrowUpDown size={16} />
       </IconButton>
-      <IconButton title="Bring to front" onClick={() => ed.reorder('front')}>
-        <BringToFront size={16} />
-      </IconButton>
-      <IconButton title="Send to back" onClick={() => ed.reorder('back')}>
-        <SendToBack size={16} />
-      </IconButton>
       <IconButton
         title="Move into a new hierarchical block (Ctrl Shift B)"
         onClick={() => ed.selectionToBlock()}
@@ -393,6 +389,46 @@ function ArrangeButtons() {
         <BookmarkPlus size={16} />
       </IconButton>
     </div>
+  );
+}
+
+/** Drawing order: all the way to the front / back, or one step past what overlaps. */
+function OrderButtons() {
+  const ed = useEditor();
+  return (
+    <>
+      <h3>Order</h3>
+      <div className="button-row" data-testid="order-buttons">
+        <IconButton
+          title="Bring to front: over everything (Ctrl Shift ])"
+          onClick={() => ed.reorder('front')}
+          testId="order-front"
+        >
+          <BringToFront size={16} />
+        </IconButton>
+        <IconButton
+          title="Bring forward: one step, over the next thing it overlaps (Ctrl ])"
+          onClick={() => ed.reorder('forward')}
+          testId="order-forward"
+        >
+          <ArrowUp size={16} />
+        </IconButton>
+        <IconButton
+          title="Send backward: one step, under the next thing it overlaps (Ctrl [)"
+          onClick={() => ed.reorder('backward')}
+          testId="order-backward"
+        >
+          <ArrowDown size={16} />
+        </IconButton>
+        <IconButton
+          title="Send to back: under everything, as a background (Ctrl Shift [)"
+          onClick={() => ed.reorder('back')}
+          testId="order-back"
+        >
+          <SendToBack size={16} />
+        </IconButton>
+      </div>
+    </>
   );
 }
 
@@ -485,6 +521,7 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
         </>
       )}
       <ArrangeButtons />
+      <OrderButtons />
       <StyleEditor els={members} />
       <label className="check">
         <input
@@ -559,6 +596,7 @@ function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) 
         )}
       </div>
       <ArrangeButtons />
+      <OrderButtons />
       <AlignButtons count={sel.length} />
       <StyleEditor els={all} />
       <ShowIn els={sel} />

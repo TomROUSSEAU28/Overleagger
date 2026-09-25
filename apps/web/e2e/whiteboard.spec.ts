@@ -233,8 +233,55 @@ test('presentation mode: slides, drill into a block, laser and pen', async ({ pa
   await page.mouse.move(500, 360, { steps: 5 });
   await page.mouse.up();
   await expect(page.locator('.present-ink path')).toHaveCount(1);
+  // Blank screen: the button shows it is on, and so does a note; a click brings the slide back.
+  await page.keyboard.press('p');
+  await page.keyboard.press('b');
+  await expect(page.getByTestId('present-blank')).toHaveClass(/on/);
+  await expect(page.getByTestId('present-blank-note')).toBeVisible();
+  await page.mouse.click(400, 300);
+  await expect(page.getByTestId('present-blank-note')).toBeHidden();
+  await expect(count).toContainText('2 / 3');
   await page.keyboard.press('Escape');
   await expect(show).toBeHidden();
+});
+
+test('drawing order: to the back, one step forward, to the front', async ({ page }) => {
+  await newProject(page, 'Order');
+  const ids = await page.evaluate(() => {
+    const ed = (
+      window as unknown as {
+        __overleagger: { ed: { addElement(e: object): { id: string } } };
+      }
+    ).__overleagger.ed;
+    const box = (x: number) =>
+      ed.addElement({ type: 'shape', kind: 'rect', x, y: 0, w: 60, h: 60 });
+    return [box(0).id, box(30).id, box(60).id];
+  });
+  const order = () =>
+    page.evaluate(() =>
+      (
+        window as unknown as { __overleagger: { ed: { elements(): { id: string }[] } } }
+      ).__overleagger.ed
+        .elements()
+        .map((e) => e.id),
+    );
+  const [a, b, c] = ids as [string, string, string];
+  // Select the top one and send it to the back, then bring it one step forward.
+  await page.evaluate((id) => {
+    (
+      window as unknown as { __overleagger: { ed: { select(ids: string[]): void } } }
+    ).__overleagger.ed.select([id]);
+  }, c);
+  await page.getByTestId('order-back').click();
+  expect(await order()).toEqual([c, a, b]);
+  await page.getByTestId('order-forward').click();
+  expect(await order()).toEqual([a, c, b]);
+  await page.keyboard.press('Control+]');
+  expect(await order()).toEqual([a, b, c]);
+  await page.keyboard.press('Control+[');
+  expect(await order()).toEqual([a, c, b]);
+  await page.getByTestId('order-front').click();
+  expect(await order()).toEqual([a, b, c]);
 });
 
 test('links on images/shapes and CircuiTikZ export', async ({ page }) => {

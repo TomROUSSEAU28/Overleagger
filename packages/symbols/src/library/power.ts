@@ -1,4 +1,4 @@
-import { L, R, T, dot, pin, sine, tf, tfPins, plus, minus } from '../prims';
+import { L, PC, R, T, dot, pin, sine, tf, tfPins, plus, minus } from '../prims';
 import type {
   OptionDef,
   PinDef,
@@ -271,11 +271,17 @@ export const power: SymbolDef[] = [
     hideValueLabel: true,
     build: () => ({
       prims: [
-        L(-4, 0, -2, 0),
-        L(2, 0, 4, 0),
-        L(2, 1, 4, 1),
-        R(-2, -1.5, 4, 3),
-        T(0, 0, '{value}', { size: 0.9 }),
+        // A buffer inside a box: the name on top, the output and its return named on the right
+        // (same pins as before).
+        L(-4, 0, -2.5, 0),
+        L(2.5, 0, 4, 0),
+        L(2.5, 1, 4, 1),
+        R(-2.5, -2, 5, 4),
+        T(0, -1.25, '{value}', { size: 0.8 }),
+        PC([-2, -0.7, -2, 0.7, -0.6, 0]),
+        L(-2.5, 0, -2, 0),
+        T(2.2, 0, 'OUT', { size: 0.6, anchor: 'end' }),
+        T(2.2, 1, 'COM', { size: 0.6, anchor: 'end' }),
       ],
       pins: [pin('in', -4, 0, 'Input'), pin('out', 4, 0, 'Output'), pin('ref', 4, 1, 'Reference')],
     }),

@@ -14,6 +14,7 @@ import {
   pasteClip,
   rectUnion,
   reorder,
+  type ReorderWhere,
   rotateElements,
   snap,
   topLevelUnit,
@@ -459,9 +460,9 @@ export class EditorController {
     this.select(freed);
   }
 
-  reorder(where: 'front' | 'back') {
+  reorder(where: ReorderWhere) {
     const ids = this.selection();
-    if (ids.length) this.commit(() => reorder(this.project, this.sheetId, ids, where));
+    if (ids.length) this.commit(() => reorder(this.project, this.sheetId, ids, where, this.ctx));
   }
 
   updateElement(id: Id, patch: Partial<Element>) {

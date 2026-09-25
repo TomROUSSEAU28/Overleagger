@@ -90,17 +90,25 @@ export function Presentation() {
     useUI.getState().set({ presenting: false, presentFollow: null });
   }, []);
 
-  // Full screen while presenting; leaving full screen (Esc) ends the presentation.
-  useEffect(() => {
-    const el = rootRef.current;
-    let wasFull = false;
-    el?.requestFullscreen?.().then(
-      () => (wasFull = true),
+  // Full screen while presenting; leaving full screen (Esc) ends the presentation. Opening a
+  // link in a new tab also leaves full screen: then the presentation goes on, and the next click
+  // brings full screen back.
+  const full = useRef(false);
+  const linkOpened = useRef(-Infinity);
+  const refull = useRef(false);
+  const enterFullscreen = useCallback(() => {
+    rootRef.current?.requestFullscreen?.().then(
+      () => (full.current = true),
       () => undefined,
     );
+  }, []);
+  useEffect(() => {
+    enterFullscreen();
     const onChange = () => {
-      if (wasFull && !document.fullscreenElement)
-        useUI.getState().set({ presenting: false, presentFollow: null });
+      if (!full.current || document.fullscreenElement) return;
+      full.current = false;
+      if (document.hidden || performance.now() - linkOpened.current < 3000) refull.current = true;
+      else useUI.getState().set({ presenting: false, presentFollow: null });
     };
     const onResize = () => setScreen({ w: window.innerWidth, h: window.innerHeight });
     document.addEventListener('fullscreenchange', onChange);
@@ -110,7 +118,7 @@ export function Presentation() {
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(anim.current);
     };
-  }, []);
+  }, [enterFullscreen]);
 
   const animateTo = useCallback((to: Box, ms: number, done?: () => void, start?: Box) => {
     cancelAnimationFrame(anim.current);
@@ -267,6 +275,16 @@ export function Presentation() {
   const drawing = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // Back from a link opened in another tab: full screen again.
+    if (refull.current && !document.fullscreenElement) {
+      refull.current = false;
+      enterFullscreen();
+    }
+    // A click on the blank screen shows the slide again (and does not move on).
+    if (blank && e.button === 0) {
+      setBlank(false);
+      return;
+    }
     if (mode === 'pen') {
       drawing.current = true;
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -287,7 +305,10 @@ export function Presentation() {
     }
     if (el?.link) {
       if (el.link.kind === 'url') {
-        if (/^(https?:|mailto:)/i.test(el.link.url)) window.open(el.link.url, '_blank', 'noopener');
+        if (/^(https?:|mailto:)/i.test(el.link.url)) {
+          linkOpened.current = performance.now();
+          window.open(el.link.url, '_blank', 'noopener');
+        }
       } else {
         const sid = el.link.sheetId;
         const i = slides.findIndex((s) => s.sheetId === sid);
@@ -348,6 +369,11 @@ export function Presentation() {
         prev();
       }}
     >
+      {blank && (
+        <div className="present-blank-note" data-testid="present-blank-note">
+          Screen blanked · press B or click the square to show the slide
+        </div>
+      )}
       {!slides.length && (
         <div className="present-empty">This project has nothing to present yet.</div>
       )}
@@ -436,8 +462,15 @@ export function Presentation() {
         <button type="button" onClick={() => setInk([])} title="Clear the pen (C)">
           <Eraser size={17} />
         </button>
-        <button type="button" onClick={() => setBlank((b) => !b)} title="Blank screen (B)">
-          <Square size={17} />
+        <button
+          type="button"
+          className={blank ? 'on' : ''}
+          aria-pressed={blank}
+          onClick={() => setBlank((b) => !b)}
+          title={blank ? 'Show the slide again (B)' : 'Blank screen (B)'}
+          data-testid="present-blank"
+        >
+          <Square size={17} fill={blank ? 'currentColor' : 'none'} />
         </button>
         <span className="sep" />
         <button

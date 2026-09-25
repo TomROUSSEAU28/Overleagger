@@ -13,6 +13,7 @@ import {
   computeMove,
   computeSegmentDrag,
   removeSegment,
+  reorder,
   copyElements,
   createBlock,
   createUndoManager,
@@ -324,6 +325,31 @@ describe('moving', () => {
     expect((turned as WireElement).pts).toEqual([50, -50, 50, 50]);
     expect(nt.pts.slice(0, 2)).toEqual([50, -10]);
     expect(nt.pts.slice(-2)).toEqual([40, 80]);
+  });
+
+  it('changes the drawing order one step at a time, past what overlaps', () => {
+    const { p, sheet, ctx } = setup();
+    const box = (x: number) =>
+      p.addElement(sheet, { type: 'shape', kind: 'rect', x, y: 0, w: 40, h: 40 });
+    const a = box(0);
+    const far = box(500); // overlaps nothing
+    const b = box(20);
+    const c = box(30);
+    const order = () => p.getElements(sheet).map((e) => e.id);
+    expect(order()).toEqual([a.id, far.id, b.id, c.id]);
+    reorder(p, sheet, [a.id], 'forward', ctx());
+    // Past b (the next one it overlaps), not just past `far`.
+    expect(order()).toEqual([far.id, b.id, a.id, c.id]);
+    reorder(p, sheet, [a.id], 'forward', ctx());
+    expect(order()).toEqual([far.id, b.id, c.id, a.id]);
+    reorder(p, sheet, [a.id], 'forward', ctx());
+    expect(order()).toEqual([far.id, b.id, c.id, a.id]);
+    reorder(p, sheet, [c.id], 'backward', ctx());
+    expect(order()).toEqual([far.id, c.id, b.id, a.id]);
+    reorder(p, sheet, [a.id], 'back', ctx());
+    expect(order()[0]).toBe(a.id);
+    reorder(p, sheet, [a.id], 'front', ctx());
+    expect(order().at(-1)).toBe(a.id);
   });
 
   it('removes one segment of a wire', () => {

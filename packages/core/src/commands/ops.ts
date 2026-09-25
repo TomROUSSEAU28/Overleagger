@@ -1,7 +1,8 @@
 import { defaultOptions, defaultParams, type OptionValue } from '@overleagger/symbols';
 import { descendantSheets } from '../hierarchy';
 import { newId } from '../ids';
-import type { SheetContext } from '../geometry/elements';
+import { elementBBox, type SheetContext } from '../geometry/elements';
+import { rectsIntersect, rectUnion } from '../geometry/geom';
 import type { Project } from '../model/project';
 import type {
   BlockElement,
@@ -177,13 +178,66 @@ export function ungroupElements(project: Project, sheetId: Id, groupIds: Id[]): 
 // Z-order
 // ---------------------------------------------------------------------------
 
-export function reorder(project: Project, sheetId: Id, ids: Id[], where: 'front' | 'back'): void {
+/** Drawing layer: frames at the back, then blocks, then everything else (in z order). */
+export const drawLayer = (e: Element) => (e.type === 'frame' ? 0 : e.type === 'block' ? 1 : 2);
+
+export type ReorderWhere = 'front' | 'back' | 'forward' | 'backward';
+
+/**
+ * Change the drawing order of elements:
+ *  - `front` / `back`: in front of / behind everything;
+ *  - `forward` / `backward`: one step, just past the next element that overlaps them (so each
+ *    press has a visible effect), or the next one in the drawing order when none overlaps.
+ */
+export function reorder(
+  project: Project,
+  sheetId: Id,
+  ids: Id[],
+  where: ReorderWhere,
+  ctx?: SheetContext,
+): void {
   const all = project.getElements(sheetId);
   const set = expandSelection(all, ids);
   const moving = all.filter((e) => set.has(e.id));
-  const zs = all.map((e) => e.z);
-  const base = where === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - moving.length - 1;
+  if (!moving.length) return;
+  if (where === 'front' || where === 'back') {
+    const zs = all.map((e) => e.z);
+    const base =
+      where === 'front' ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - moving.length - 1;
+    project.transact(() => {
+      moving.forEach((e, i) => project.updateElement(sheetId, e.id, { z: base + i }));
+    });
+    return;
+  }
+  // The order things are drawn in (frames and blocks always stay behind the rest).
+  const order = [...all].sort((a, b) => drawLayer(a) - drawLayer(b) || a.z - b.z);
+  const box = ctx
+    ? rectUnion(moving.filter((e) => e.type !== 'group').map((e) => elementBBox(e, ctx, all)))
+    : undefined;
+  const overlaps = (e: Element) =>
+    !box || (e.type !== 'group' && rectsIntersect(box, elementBBox(e, ctx!, all)));
+  const layer = Math.max(...moving.map(drawLayer));
+  const pos = order.map((e) => set.has(e.id));
+  const rest = order.filter((e) => !set.has(e.id));
+  let target: Element | undefined;
+  if (where === 'forward') {
+    const top = pos.lastIndexOf(true);
+    const above = order.slice(top + 1).filter((e) => !set.has(e.id) && e.type !== 'group');
+    target = above.find(overlaps) ?? (box ? undefined : above[0]);
+  } else {
+    const bottom = pos.indexOf(true);
+    const below = order
+      .slice(0, bottom)
+      .filter((e) => !set.has(e.id) && e.type !== 'group' && drawLayer(e) === layer)
+      .reverse();
+    target = below.find(overlaps) ?? (box ? undefined : below[0]);
+  }
+  if (!target) return;
+  const at = rest.indexOf(target) + (where === 'forward' ? 1 : 0);
+  const next = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
   project.transact(() => {
-    moving.forEach((e, i) => project.updateElement(sheetId, e.id, { z: base + i }));
+    next.forEach((e, i) => {
+      if (e.z !== i) project.updateElement(sheetId, e.id, { z: i });
+    });
   });
 }

@@ -344,7 +344,7 @@ export const control: SymbolDef[] = [
     'Rate limiter',
     [
       P([-1.5, 1.1, -0.6, 1.1, 0.6, -1.1, 1.5, -1.1], { sw: 1.2 }),
-      T(0.9, 0.7, 'd/dt', { size: 0.55 }),
+      T(0.9, 1.25, 'd/dt', { size: 0.7 }),
     ],
     ['slew rate', 'ramp limiter'],
   ),
@@ -409,7 +409,7 @@ export const control: SymbolDef[] = [
           L(-2, 0, -0.9, 0),
           L(-0.9, 0, 0.6, -0.8),
           L(0.8, 0, 2, 0),
-          T(0, 1.2, 'S/H', { size: 0.7 }),
+          T(0, 1.2, 'S/H', { size: 0.8 }),
         ],
         pins: f.pins,
       };

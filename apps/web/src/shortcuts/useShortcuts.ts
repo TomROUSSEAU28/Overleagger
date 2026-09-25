@@ -145,6 +145,12 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
     case 'edit.back':
       ed.reorder('back');
       return true;
+    case 'edit.forward':
+      ed.reorder('forward');
+      return true;
+    case 'edit.backward':
+      ed.reorder('backward');
+      return true;
     case 'edit.nudgeLeft':
       ed.nudge(-1, 0);
       return true;
