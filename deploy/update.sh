@@ -40,9 +40,10 @@ docker compose up -d --build
 
 echo "→ Removing old images and build cache"
 docker image prune -f >/dev/null
-# Each build leaves layers in Docker's cache (several GB over a few updates): drop those not
-# used for a week (the recent ones keep the next build fast).
-docker builder prune -f --filter until=168h >/dev/null || true
+# Each build leaves ~1 GB in Docker's build cache: keep 3 GB of it, the most recently used
+# (the next build stays fast). Older Docker versions: drop what was not used for a day.
+docker builder prune -f --keep-storage 3gb >/dev/null 2>&1 ||
+  docker builder prune -f --filter until=24h >/dev/null || true
 
 echo "→ Checking"
 for _ in $(seq 1 30); do
