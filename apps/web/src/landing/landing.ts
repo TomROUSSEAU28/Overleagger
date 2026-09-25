@@ -70,6 +70,8 @@ if (nb && !reduce && CSS.supports('transform-style', 'preserve-3d')) {
   /** Scroll position where page `i` is open, its pencil notes written. */
   const pageTop = (i: number) => scrollFor(i + 0.25);
 
+  /** Filming the page (`?video`): the pages follow the scroll exactly, frame by frame. */
+  const filming = new URLSearchParams(location.search).has('video');
   /** What is drawn: it follows the scroll with a little lag, so a wheel notch glides. */
   let shown = target();
   const draw = () => {
@@ -99,6 +101,12 @@ if (nb && !reduce && CSS.supports('transform-style', 'preserve-3d')) {
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
     last = now;
     const goal = target();
+    if (filming) {
+      shown = goal;
+      draw();
+      frame = 0;
+      return;
+    }
     // Follow the scroll smoothly (~0.16 s to catch up, whatever the frame rate)…
     const free = shown + (goal - shown) * (1 - Math.exp(-dt / 0.16));
     // …but a page never turns faster than in ~0.5 s, even after a big flick of the wheel: the
@@ -126,6 +134,7 @@ if (nb && !reduce && CSS.supports('transform-style', 'preserve-3d')) {
   let settleTimer = 0;
   let settling = false;
   const settle = () => {
+    if (filming) return;
     const s = target();
     if (s <= 0 || s >= n - 1) return;
     const i = Math.floor(s);
