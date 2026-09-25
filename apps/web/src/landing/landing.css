@@ -809,7 +809,7 @@ main > section {
 
 /* ---- With the script: the notebook turns its pages ---- */
 .nb.nb-on {
-  --per: 90svh;
+  --per: 130svh;
   height: calc(var(--pages) * var(--per) + 100svh);
   padding: 0 !important;
 }
@@ -1040,7 +1040,7 @@ main > section {
     grid-template-columns: 1fr;
   }
   .nb.nb-on {
-    --per: 80svh;
+    --per: 110svh;
   }
   .nb-on .nb-stage {
     padding: 62px 8px 12px;
