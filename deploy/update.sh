@@ -38,8 +38,11 @@ fi
 echo "→ Building and restarting"
 docker compose up -d --build
 
-echo "→ Removing old images"
+echo "→ Removing old images and build cache"
 docker image prune -f >/dev/null
+# Each build leaves layers in Docker's cache (several GB over a few updates): drop those not
+# used for a week (the recent ones keep the next build fast).
+docker builder prune -f --filter until=168h >/dev/null || true
 
 echo "→ Checking"
 for _ in $(seq 1 30); do
