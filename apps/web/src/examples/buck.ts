@@ -360,8 +360,8 @@ export function seedBuckExample(p: Project) {
     });
 
     // ---------------------------------------------------------------------------------------
-    // Slide 5, the design steps: a flowchart walked through click by click (its links drawn, a
-    // marker moving on, the boxes in turn), ending with the build.
+    // Slide 5, the design steps: a flowchart walked through click by click (a marker moving on,
+    // the boxes in turn, the way back when the losses are too high), ending with the build.
     const Y = 590;
     const shape = (
       kind: ShapeElement['kind'],
@@ -421,12 +421,13 @@ export function seedBuckExample(p: Project) {
       ],
       { style: { color: '@green' } },
     );
+    /** A connector between two boxes: always there, or drawn at click `step`. */
     const link = (
       a: ShapeElement,
       aa: Anchor,
       b: ShapeElement,
       ba: Anchor,
-      step: number,
+      step?: number,
       text?: string,
     ) =>
       p.addElement(root, {
@@ -437,13 +438,17 @@ export function seedBuckExample(p: Project) {
         from: { id: a.id, anchor: aa },
         to: { id: b.id, anchor: ba },
         ...(text ? { text } : {}),
-        anims: [anim({ kind: 'appear', step, effect: 'wipe' })],
+        ...(step !== undefined
+          ? { anims: [anim({ kind: 'appear', step, effect: 'wipe', delay: 300 })] }
+          : {}),
       });
-    link(specs, 'e', chooseL, 'w', 1);
-    link(chooseL, 'e', chooseC, 'w', 2);
-    link(chooseC, 'e', losses, 'w', 3);
+    link(specs, 'e', chooseL, 'w');
+    link(chooseL, 'e', chooseC, 'w');
+    link(chooseC, 'e', losses, 'w');
+    link(losses, 'e', tune, 'w', undefined, 'yes');
+    // Click 4: the losses are too high — the way back to the inductor is drawn.
     link(losses, 's', chooseL, 's', 4, 'no: bigger $L$, better FETs');
-    link(losses, 'e', tune, 'w', 5, 'yes');
+    // Click 5: then on to the build.
     link(tune, 's', build, 'n', 5);
     // "You are here": moves on at each click.
     p.addElement(root, {
