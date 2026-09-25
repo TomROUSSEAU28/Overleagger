@@ -1,8 +1,48 @@
-import { addComponent, createBlock, makeContext, type Project } from '@overleagger/core';
+import {
+  addComponent,
+  createBlock,
+  makeContext,
+  type Project,
+  type Trace,
+  type TraceKind,
+} from '@overleagger/core';
+
+/** A waveform trace with the usual defaults. */
+const trace = (id: string, kind: TraceKind, patch: Partial<Trace> = {}): Trace => ({
+  id,
+  kind,
+  amp: 1,
+  offset: 0,
+  periods: 3,
+  phase: 0,
+  duty: 0.25,
+  tau: 0.15,
+  zeta: 0.3,
+  ripple: 0.3,
+  ...patch,
+});
 
 /**
- * Example project: a synchronous buck converter on the main sheet, and its PI voltage
- * controller inside a hierarchical block.
+ * A pencil stroke through `pts` ([x, y, …]): the path is resampled and wobbles very slightly,
+ * like a hand-drawn line.
+ */
+function pencilPts(pts: number[], seed = 1): number[] {
+  const out: number[] = [];
+  for (let i = 2; i < pts.length; i += 2) {
+    const [ax, ay, bx, by] = [pts[i - 2]!, pts[i - 1]!, pts[i]!, pts[i + 1]!];
+    const n = Math.max(2, Math.round(Math.hypot(bx - ax, by - ay) / 6));
+    for (let k = i === 2 ? 0 : 1; k <= n; k++) {
+      const t = k / n;
+      const w = Math.sin((out.length / 3 + seed) * 1.7) * 0.6;
+      out.push(ax + (bx - ax) * t + w, ay + (by - ay) * t - w, 0.45 + 0.15 * Math.sin(t * Math.PI));
+    }
+  }
+  return out;
+}
+
+/**
+ * Example project: a synchronous buck converter on the main sheet with its waveforms, design
+ * notes and pencil annotations, and its PI voltage controller inside a hierarchical block.
  */
 export function seedBuckExample(p: Project) {
   const ctx = makeContext(p);
@@ -58,6 +98,76 @@ export function seedBuckExample(p: Project) {
     p.addElement(root, { type: 'label', x: 90, y: 150, text: '$q_L$' });
     p.addElement(root, { type: 'label', x: 450, y: 100, text: '$v_{out}$' });
 
+    // Waveforms of the power stage (chronogram), annotated with the pencil.
+    p.addElement(root, {
+      type: 'waveform',
+      x: 560,
+      y: -20,
+      w: 380,
+      h: 320,
+      layout: 'stacked',
+      xLabel: 't',
+      yLabel: '',
+      grid: true,
+      axes: true,
+      traces: [
+        trace('qh', 'pwm', { label: 'q_H' }),
+        trace('vl', 'square', { amp: 0.8, offset: 0.2, label: 'v_L', color: '@pencil' }),
+        trace('il', 'ripple', { label: 'i_L', color: '@blue' }),
+        trace('vo', 'sine', { amp: 0.04, offset: 0.96, phase: -60, label: 'v_{out}' }),
+      ],
+    });
+    // ΔiL between the top and the bottom of the current ripple (y 142…168 in the i_L band).
+    const red = { style: { color: '@red' } };
+    p.addElement(root, { type: 'stroke', size: 2.2, pts: pencilPts([918, 142, 944, 142]), ...red });
+    p.addElement(root, {
+      type: 'stroke',
+      size: 2.2,
+      pts: pencilPts([918, 168, 944, 168], 3),
+      ...red,
+    });
+    p.addElement(root, {
+      type: 'stroke',
+      size: 2.2,
+      pts: pencilPts([936, 146, 936, 164], 5),
+      ...red,
+    });
+    p.addElement(root, {
+      type: 'text',
+      x: 952,
+      y: 156,
+      text: '$\\Delta i_L$',
+      size: 16,
+      align: 'start',
+      ...red,
+    });
+    p.addElement(root, {
+      type: 'text',
+      x: 580,
+      y: 340,
+      text: '$\\Delta i_L = \\dfrac{(V_{in} - V_{out})\\,D}{L\\,f_s}$',
+      size: 18,
+      align: 'start',
+    });
+    p.addElement(root, {
+      type: 'stroke',
+      size: 2,
+      pts: pencilPts([578, 372, 640, 369, 700, 373, 770, 370], 7),
+      ...red,
+    });
+    p.addElement(root, {
+      type: 'note',
+      x: 790,
+      y: 320,
+      w: 226,
+      h: 118,
+      color: '@yellow',
+      text: 'Specs\n$V_{in}$ = 48 V → $V_{out}$ = 12 V\n$f_s$ = 100 kHz, D = 0.25\n$\\Delta i_L$ ≤ 30 % of $I_{out}$',
+    });
+    // Two frames: the slides of the presentation.
+    p.addElement(root, { type: 'frame', x: -60, y: -90, w: 560, h: 480, name: 'Power stage' });
+    p.addElement(root, { type: 'frame', x: 530, y: -90, w: 490, h: 560, name: 'Waveforms' });
+
     // Controller block and its sub-sheet.
     const block = createBlock(p, root, { x: 120, y: 260, w: 200, h: 100 }, 'Voltage controller');
     p.updateElement(root, block.id, { tex: 'K_p + \\frac{K_i}{s}' });
@@ -86,6 +196,47 @@ export function seedBuckExample(p: Project) {
     wire(sub, [380, -40, 460, -40], true);
     wire(sub, [420, -40, 420, 20, 440, 20], true);
     wire(sub, [500, 20, 540, 20], true);
+    // Tuning: the closed-loop step response, and the chosen gains.
+    p.addElement(sub, {
+      type: 'waveform',
+      x: 60,
+      y: 110,
+      w: 360,
+      h: 180,
+      layout: 'overlay',
+      xLabel: 't',
+      yLabel: 'v',
+      grid: true,
+      axes: true,
+      traces: [
+        trace('ref', 'dc', { amp: 0.8, color: '@pencil', dashed: true }),
+        trace('out', 'step2', {
+          amp: 0.8,
+          tau: 0.06,
+          zeta: 0.45,
+          label: 'v_{out}',
+          color: '@blue',
+        }),
+      ],
+    });
+    p.addElement(sub, {
+      type: 'text',
+      x: 100,
+      y: 141,
+      text: '$V_{ref}$',
+      size: 14,
+      align: 'start',
+      style: { color: '@pencil' },
+    });
+    p.addElement(sub, {
+      type: 'note',
+      x: 450,
+      y: 120,
+      w: 180,
+      h: 100,
+      color: '@blue',
+      text: 'Tuning\n$K_p$ = 0.05, $K_i$ = 400\novershoot ≈ 20 %',
+    });
 
     // Block pins: v_out on the left (y = 310), q_H / q_L on the right (y = 300 / 320).
     wire(root, [80, 310, 120, 310]);

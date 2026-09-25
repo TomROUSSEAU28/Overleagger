@@ -216,14 +216,17 @@ test('presentation mode: slides, drill into a block, laser and pen', async ({ pa
   const show = page.getByTestId('presentation');
   await expect(show).toBeVisible();
   const count = page.getByTestId('present-count');
-  await expect(count).toContainText('1 / 2');
+  // The two frames of the example, then the controller's sheet.
+  await expect(count).toContainText('1 / 3');
+  await expect(count).toContainText('Power stage');
   // Clicking the block zooms into its sub-sheet.
   await page.locator('.present-stage .el.block').first().click();
-  await expect(count).toContainText('2 / 2');
+  await expect(count).toContainText('3 / 3');
   await page.keyboard.press('Backspace');
-  await expect(count).toContainText('1 / 2');
+  await expect(count).toContainText('1 / 3');
   await page.keyboard.press('ArrowRight');
-  await expect(count).toContainText('2 / 2');
+  await expect(count).toContainText('2 / 3');
+  await expect(count).toContainText('Waveforms');
   await page.keyboard.press('p');
   await page.mouse.move(400, 300);
   await page.mouse.down();

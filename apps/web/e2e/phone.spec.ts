@@ -97,6 +97,23 @@ test('editor on a phone: whole-screen drawing, drawers, fingers', async ({ page 
     // The inductor: a thin symbol, easy to miss with a finger.
     return ed.elements().find((e) => (e as { symbolId?: string }).symbolId === 'inductor')!.id;
   });
+  // Zoom in on it first, as one would with two fingers.
+  await page.evaluate((id) => {
+    const ed = (
+      window as unknown as {
+        __overleagger: {
+          ed: {
+            elements(): { id: string; x?: number; y?: number }[];
+            setViewport(v: Vp): void;
+          };
+        };
+      }
+    ).__overleagger.ed;
+    const el = ed.elements().find((e) => e.id === id)!;
+    const c = document.querySelector('[data-testid=canvas]')!.getBoundingClientRect();
+    ed.setViewport({ x: c.width / 2 - el.x! * 1.5, y: c.height / 2 - el.y! * 1.5, zoom: 1.5 });
+  }, id);
+  await page.waitForTimeout(300);
   const pb = (await page.locator(`[data-id="${id}"]`).first().boundingBox())!;
   await page.touchscreen.tap(pb.x + pb.width / 2, pb.y + pb.height / 2);
   await expect(page.getByTestId('phone-selection')).toBeVisible();

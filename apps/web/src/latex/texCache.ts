@@ -60,8 +60,27 @@ export function renderTex(tex: string, display: boolean): TexSvg | undefined {
 /** Convert "text with $math$" into a single TeX string. */
 export function mixedToTex(s: string): string {
   const parts = s.split('$');
-  return parts
-    .map((p, i) => (i % 2 === 1 ? p : p ? `\\text{${p.replace(/([{}\\#%&_^~])/g, '\\$1')}}` : ''))
+  return parts.map((p, i) => (i % 2 === 1 ? p : plainToTex(p))).join('');
+}
+
+/** LaTeX special characters, written outside \text{} (inside it, MathJax shows them as typed). */
+const SPECIAL: Record<string, string> = {
+  '{': '\\{',
+  '}': '\\}',
+  '\\': '\\backslash ',
+  '#': '\\#',
+  '%': '\\%',
+  '&': '\\&',
+  _: '\\_',
+  '^': '\\hat{}',
+  '~': '\\sim ',
+};
+
+/** Plain text as LaTeX: `\text{…}` runs, and the special characters between them. */
+function plainToTex(p: string): string {
+  return p
+    .split(/([{}\\#%&_^~])/)
+    .map((c, i) => (i % 2 === 1 ? SPECIAL[c] : c ? `\\text{${c}}` : ''))
     .join('');
 }
 

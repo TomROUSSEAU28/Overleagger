@@ -80,7 +80,7 @@
       </a>
       <nav aria-label="Sections">
         <a href="#features">Features</a>
-        <a href="#together">Collaboration</a>
+        <a href="#p-together">Collaboration</a>
         <a href="#beta">Beta</a>
         <a href="#faq">FAQ</a>
         <a href="#contact">Contact</a>
@@ -118,9 +118,9 @@
         <figure class="shot hero-shot">
           <img
             src="/landing/hero.webp"
-            width="2400"
-            height="1447"
-            alt="The Circuit Notebook editor with a synchronous buck converter: MOSFETs with body diodes, LC filter, a hierarchical voltage-controller block and LaTeX labels."
+            width="2720"
+            height="1640"
+            alt="The Circuit Notebook editor with the buck converter example: the power stage with a hierarchical voltage-controller block, and next to it the chronogram of the converter annotated in red pencil, the ripple formula and a sticky note."
             fetchpriority="high"
           />
           <figcaption class="margin-note note-1">
@@ -138,243 +138,540 @@
         </figure>
       </section>
 
-      <!-- Three promises -->
-      <section class="promises" aria-label="Highlights">
-        <div>
-          <h2>Symbols done right</h2>
-          <p>
-            152 parts in 12 families — MOSFETs with body diode, IGBTs, GaN, thyristors, bridges,
-            transformers with any number of secondaries, machines, sensors, control blocks — in
-            IEC&nbsp;60617 or IEEE&nbsp;315 style.
-          </p>
-        </div>
-        <div>
-          <h2>Sheets inside blocks</h2>
-          <p>
-            A block is a whole sheet: open it, draw the controller, add ports — they become the
-            block's pins. Nest as deep as your design goes.
-          </p>
-        </div>
-        <div>
-          <h2>Made for your report</h2>
-          <p>
-            LaTeX in every label, a clickable PDF with one page per sheet, SVG and PNG, and
-            <b>CircuiTikZ</b> code you paste straight into your thesis.
-          </p>
-        </div>
-      </section>
-
-      <!-- Feature stories -->
-      <section id="features" class="story">
-        <div class="story-text">
-          <p class="kicker">Hierarchy</p>
-          <h2>From the power stage to the PI controller</h2>
-          <p>
-            Double-click a block to go inside. The Sheets tab shows the whole tree, breadcrumbs
-            bring you back up, and sheet ports stay connected to the pins of their block — even in
-            the exported PDF, where every block is a link to its page.
-          </p>
-          <ul class="ticks">
-            <li>Wires snap to the grid and follow parts when you move or rotate them</li>
-            <li>Labels turn with the part, like in LTspice</li>
-            <li>Your own symbols and templates, in categories you choose</li>
-          </ul>
-        </div>
-        <figure class="shot">
-          <img
-            src="/landing/hierarchy.webp"
-            width="1800"
-            height="1125"
-            loading="lazy"
-            alt="Inside the voltage-controller block: reference, summing junction, PI controller, PWM comparator and sheet ports."
-          />
-        </figure>
-      </section>
-
-      <section class="story reverse">
-        <div class="story-text">
-          <p class="kicker">Whiteboard</p>
-          <h2>A whiteboard that knows electronics</h2>
-          <p>
-            Pencil with pen pressure, shapes, arrows, sticky notes, images and waveforms (PWM,
-            ripple, step responses, three-phase…) next to your schematic. Flowcharts are built in:
-            ISO&nbsp;5807 shapes and connectors that stay attached when you move things.
-          </p>
-          <ul class="ticks">
-            <li>Right-angle connectors with <i>Yes / No</i> labels</li>
-            <li>Hand-drawn look for sketches, crisp lines for reports</li>
-            <li>Cream notebook, white whiteboard or blackboard theme</li>
-          </ul>
-        </div>
-        <figure class="shot">
-          <img
-            src="/landing/whiteboard.webp"
-            width="1800"
-            height="1125"
-            loading="lazy"
-            alt="A perturb-and-observe MPPT flowchart with a power curve and a sticky note, on the whiteboard theme."
-          />
-        </figure>
-      </section>
-
-      <section id="together" class="story">
-        <div class="story-text">
-          <p class="kicker">Collaboration</p>
-          <h2>Work on it together, live</h2>
-          <p>
-            Share a project with a friend, a whole team or a link: see each other's cursors and
-            selections, comment right on the drawing, follow what someone is looking at, and go back
-            to any earlier version.
-          </p>
-          <ul class="ticks">
-            <li>Keeps working offline, syncs when you are back</li>
-            <li>Lock a sheet so only you can change it</li>
-            <li>Host it yourself for your lab or your team</li>
-          </ul>
-        </div>
-        <figure class="shot">
-          <img
-            src="/landing/collab.webp"
-            width="1800"
-            height="1074"
-            loading="lazy"
-            alt="Two people on the same project: a comment thread about the inductor and a teammate's cursor on the capacitor."
-          />
-        </figure>
-      </section>
-
-      <section id="access" class="story reverse">
-        <div class="story-text">
-          <p class="kicker">Rights per sheet</p>
-          <h2>Decide who sees what, sheet by sheet</h2>
-          <p>
-            Add friends by their @username, gather them in teams, then give each person or team
-            <i>Can edit</i>, <i>Can comment</i> or <i>Can view</i> — on the whole project or on a
-            single sheet. A sheet can even be <b>hidden</b>: it never leaves the server for that
-            person, who only sees its block, with a padlock.
-          </p>
-          <ul class="ticks">
-            <li>A student edits the controller, the power stage stays read-only</li>
-            <li>Keep the solution sheet hidden until the lab is over</li>
-            <li>Share with a team: people who join it later get access too</li>
-          </ul>
-        </div>
-        <figure class="shot stack">
-          <img
-            src="/landing/access.webp"
-            width="1800"
-            height="1074"
-            loading="lazy"
-            alt="Tom's view of the project: the voltage-controller block shows a padlock and the sheet is marked hidden in the Sheets tab."
-          />
-          <img
-            class="inset"
-            src="/landing/access-dialog.webp"
-            width="760"
-            height="768"
-            loading="lazy"
-            alt="The Share window: Tom can edit the project, but the Voltage controller sheet is hidden from him."
-          />
-          <figcaption class="margin-note note-3">
-            <svg viewBox="0 0 60 40" aria-hidden="true">
-              <path d="M58 36C38 32 18 22 6 6M6 6l9 3M6 6l1 10" />
-            </svg>
-            Tom only gets the padlock
-          </figcaption>
-        </figure>
-      </section>
-
-      <section class="story">
-        <div class="story-text">
-          <p class="kicker">Presentation</p>
-          <h2>Present straight from your drawing</h2>
-          <p>
-            Frames become slides. Click a block to dive into its sheet, point with the laser, write
-            with the pen, and let your classmates follow along on their own screens.
-          </p>
-        </div>
-        <figure class="shot dark">
-          <img
-            src="/landing/present.webp"
-            width="1800"
-            height="1125"
-            loading="lazy"
-            alt="Presentation mode on the blackboard theme with a laser pointer on the buck converter."
-          />
-        </figure>
-      </section>
-
-      <section id="latex" class="story reverse">
-        <div class="story-text">
-          <p class="kicker">LaTeX</p>
-          <h2>Straight into your thesis</h2>
-          <p>
-            Export a sheet as CircuiTikZ code: resistors, capacitors, inductors and diodes use
-            native CircuiTikZ symbols, every other part is drawn exactly as on screen, and your
-            <code>$...$</code> formulas stay formulas.
-          </p>
-          <pre class="code"><code>\begin{circuitikz}[european]
-  \draw (0,0) to[R] (1,0);
-  \draw (1,0) to[cute inductor] (2.5,0);
-  \node at (3,-1) {$K_p + \frac{K_i}{s}$};
-\end{circuitikz}</code></pre>
-        </div>
-        <figure class="shot paper">
-          <img
-            src="/landing/latex.webp"
-            width="801"
-            height="672"
-            loading="lazy"
-            alt="The buck converter compiled with pdflatex from the CircuiTikZ export."
-          />
-          <figcaption class="caption">Compiled with pdflatex, untouched.</figcaption>
-        </figure>
-      </section>
-
-      <!-- Everything else -->
-      <section class="grid-section" aria-labelledby="more">
-        <h2 id="more">And the small things that save your evening</h2>
-        <div class="cards">
-          <article>
-            <h3>Automatic junction dots</h3>
-            <p>Three connections meet, a dot appears. Crossing wires stay apart.</p>
-          </article>
-          <article>
-            <h3>Symbol editor</h3>
-            <p>Start from any part or from scratch, place the pins, save it to your library.</p>
-          </article>
-          <article>
-            <h3>Your templates</h3>
-            <p>
-              Save any selection — a half-bridge with its driver, a cascade loop — and reuse it
-              everywhere.
-            </p>
-          </article>
-          <article>
-            <h3>Smart PDF</h3>
-            <p>One page per sheet, bookmarks, clickable blocks and ports, links and comments.</p>
-          </article>
-          <article>
-            <h3>Links everywhere</h3>
-            <p>Link a part to its datasheet or a shape to another sheet; Ctrl+click to follow.</p>
-          </article>
-          <article>
-            <h3>Keyboard first</h3>
-            <p>
-              A shortcut for everything, and you can change them. Press <kbd>?</kbd> to see them
-              all.
-            </p>
-          </article>
-          <article>
-            <h3>Private by default</h3>
-            <p>
-              Projects live in your browser; share only what you choose. Export a file any time.
-            </p>
-          </article>
-          <article>
-            <h3>Version history</h3>
-            <p>Save a version before a big change, and go back to it in one click.</p>
-          </article>
+      <!-- The notebook: one page per feature; the pages turn as you scroll. -->
+      <section id="features" class="nb" aria-label="What's inside" style="--pages: 6">
+        <div class="nb-stage">
+          <div class="nb-book">
+            <div class="nb-pages">
+              <article class="nb-page" id="p-schematics" aria-labelledby="p-schematics-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 01</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">Schematics</p>
+                      <h2 id="p-schematics-title">Symbols done right</h2>
+                      <p>
+                        152 parts in 12 families, in IEC&nbsp;60617 or IEEE&nbsp;315 style — the
+                        whole drawing switches in one click. Wires snap to the grid and follow the
+                        parts; junction dots place themselves.
+                      </p>
+                      <ul class="ticks">
+                        <li style="--at: 0.45">
+                          MOSFETs with body diode, IGBTs, GaN, bridges, transformers, machines
+                        </li>
+                        <li style="--at: 0.55">
+                          LaTeX in every label, like <i>V<sub>out</sub> = D·V<sub>in</sub></i>
+                        </li>
+                        <li style="--at: 0.65">Labels turn with the part, like in LTspice</li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/schematic.webp"
+                          width="2080"
+                          height="1300"
+                          loading="lazy"
+                          alt="The power stage of the buck converter: half-bridge with body diodes, LC filter, load, the voltage-controller block, and the options of the selected half-bridge."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 625" aria-hidden="true">
+                          <path
+                            class="ink red"
+                            pathLength="1"
+                            style="--at: 0.3"
+                            d="M502.5 266.9L508.6 265L514.8 266.2L519.8 269.5L523.9 273L528 277L530.2 282.1L528.7 287.4L525 291.7L521.2 295.5L516.7 299.1L510.7 301L504.4 299.7L499.3 296.8L494.6 293.9L490 290.1L488 284.9L489.5 279.6L492.6 275.2L495.7 270.9L500 267L506.1 265.3L512.3 266.6"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.26"
+                            d="M455 668C430 560 470 380 500 306"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.38"
+                            d="M500 306l-11.2 10M500 306l1 15"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.52"
+                            d="M262 -30C300 -42 350 -30 384 4"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.64"
+                            d="M384 4l-4.9 -14.2M384 4l-14.2 -4.9"
+                          />
+                          <path
+                            class="ink red nb-wide"
+                            pathLength="1"
+                            style="--at: 0.74"
+                            d="M700 700C761.5 696 843.5 704 905 699"
+                          />
+                        </svg>
+                        <span
+                          class="hw"
+                          style="left: 36%; top: 106.5%; --at: 0.18"
+                          aria-hidden="true"
+                          >dots place themselves</span
+                        ><span class="hw" style="left: 2%; top: -9%; --at: 0.46" aria-hidden="true"
+                          >EU ⇄ US: one click</span
+                        ><span
+                          class="hw red nb-wide"
+                          style="left: 70%; top: 104%; --at: 0.66"
+                          aria-hidden="true"
+                          >D = 12/48 = 0.25</span
+                        >
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+              <article class="nb-page" id="p-hierarchy" aria-labelledby="p-hierarchy-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 02</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">Hierarchy</p>
+                      <h2 id="p-hierarchy-title">Sheets inside blocks</h2>
+                      <p>
+                        A block is a whole sheet: double-click it to go inside, draw the controller,
+                        add ports — they become the pins of the block. In the PDF, every block is a
+                        link to its page.
+                      </p>
+                      <ul class="ticks">
+                        <li style="--at: 0.45">The Sheets tab shows the whole tree</li>
+                        <li style="--at: 0.55">Ports stay connected to the pins of their block</li>
+                        <li style="--at: 0.65">Nest as deep as your design goes</li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/hierarchy.webp"
+                          width="2080"
+                          height="1300"
+                          loading="lazy"
+                          alt="Inside the voltage-controller block: reference, summing junction, PI controller, PWM and sheet ports, with the closed-loop step response and a tuning note."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 625" aria-hidden="true">
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.26"
+                            d="M100 662C70 560 120 330 136 252"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.38"
+                            d="M136 252l-9.2 11.9M136 252l3.7 14.5"
+                          />
+                          <path
+                            class="ink red"
+                            pathLength="1"
+                            style="--at: 0.52"
+                            d="M481 348.2L491.2 345.7L501.9 347.3L510.3 351.5L517.3 356.1L524.3 361.2L528 367.8L525.5 374.7L519.3 380.2L512.8 385.1L505.2 389.9L494.8 392.2L484.2 390.6L475.6 386.8L467.5 383.1L459.8 378.2L456.3 371.5L458.9 364.7L464.1 358.9L469.3 353.4L476.7 348.2L487.1 346.1L497.7 347.7"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.56"
+                            d="M560 660C560 560 520 450 500 398"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.68"
+                            d="M500 398l-1.3 14.9M500 398l11 10.2"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.72"
+                            d="M420 -30C380 -40 320 -30 292 4"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.84"
+                            d="M292 4l13.6 -6.2M292 4l3.5 -14.6"
+                          />
+                        </svg>
+                        <span
+                          class="hw"
+                          style="left: 1%; top: 106.5%; --at: 0.18"
+                          aria-hidden="true"
+                          >the tree of your sheets</span
+                        ><span
+                          class="hw red"
+                          style="left: 50%; top: 106.5%; --at: 0.46"
+                          aria-hidden="true"
+                          >≈ 20 % overshoot, fine</span
+                        ><span class="hw" style="left: 43%; top: -9%; --at: 0.66" aria-hidden="true"
+                          >double-click a block → its sheet</span
+                        >
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+              <article class="nb-page" id="p-waveforms" aria-labelledby="p-waveforms-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 03</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">Waveforms &amp; sketches</p>
+                      <h2 id="p-waveforms-title">The waveforms, next to the circuit</h2>
+                      <p>
+                        Chronograms and oscillograms from presets — PWM, inductor ripple, step
+                        responses, three-phase — with your duty cycle, periods and phase. Annotate
+                        them with the pencil, pin a sticky note, draw a flowchart.
+                      </p>
+                      <ul class="ticks">
+                        <li style="--at: 0.45">Pencil with pen pressure, shapes, arrows, images</li>
+                        <li style="--at: 0.55">
+                          Flowcharts with ISO&nbsp;5807 shapes and attached connectors
+                        </li>
+                        <li style="--at: 0.65">Cream notebook, whiteboard or blackboard</li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/waves.webp"
+                          width="2080"
+                          height="1300"
+                          loading="lazy"
+                          alt="The chronogram of the buck converter — gate signal, inductor voltage, inductor current and output voltage — annotated in red pencil, with the ripple formula, a sticky note and the waveform settings."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 625" aria-hidden="true">
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.26"
+                            d="M808 -24C850 -24 876 40 876 104"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.38"
+                            d="M876 104l6.6 -13.5M876 104l-6.6 -13.5"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.5"
+                            d="M790 660C800 640 815 625 824 604"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.62"
+                            d="M824 604l-11.4 9.8M824 604l0.7 15"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.72"
+                            d="M190 662C200 600 250 540 290 502"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.84"
+                            d="M290 502l-14.3 4.5M290 502l-5.2 14.1"
+                          />
+                        </svg>
+                        <span class="hw" style="left: 38%; top: -9%; --at: 0.18" aria-hidden="true"
+                          >presets: PWM, ripple, step, 3-phase…</span
+                        ><span
+                          class="hw"
+                          style="left: 60%; top: 106.5%; --at: 0.42"
+                          aria-hidden="true"
+                          >move D, every curve follows</span
+                        ><span
+                          class="hw red"
+                          style="left: 1%; top: 106.5%; --at: 0.64"
+                          aria-hidden="true"
+                          >pencil + LaTeX, side by side</span
+                        >
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+              <article class="nb-page" id="p-together" aria-labelledby="p-together-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 04</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">Collaboration</p>
+                      <h2 id="p-together-title">Work on it together, live</h2>
+                      <p>
+                        Share with a friend, a team or a link: see each other&#39;s cursors, comment
+                        right on the drawing, go back to any version. And decide sheet by sheet who
+                        can edit, comment, view — or not even see it.
+                      </p>
+                      <ul class="ticks">
+                        <li style="--at: 0.45">Keeps working offline, syncs when you are back</li>
+                        <li style="--at: 0.55">Hide the solution sheet until the lab is over</li>
+                        <li style="--at: 0.65">Lock a sheet so only you can change it</li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/collab.webp"
+                          width="2280"
+                          height="1360"
+                          loading="lazy"
+                          alt="Two people on the same project: a comment thread about the inductor, and a teammate&#39;s cursor on the capacitor."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 596" aria-hidden="true">
+                          <path
+                            class="ink nb-wide"
+                            pathLength="1"
+                            style="--at: 0.26"
+                            d="M250 -26C300 -36 340 -20 356 6"
+                          />
+                          <path
+                            class="ink nb-wide"
+                            pathLength="1"
+                            style="--at: 0.38"
+                            d="M356 6l-1.5 -14.9M356 6l-12.7 -8"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.5"
+                            d="M640 -22C620 -30 610 120 615 196"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.62"
+                            d="M615 196l5.7 -13.9M615 196l-7.4 -13"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.72"
+                            d="M755 628C770 560 790 420 792 372"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.84"
+                            d="M792 372l-7.1 13.2M792 372l6 13.7"
+                          />
+                        </svg>
+                        <span
+                          class="hw nb-wide"
+                          style="left: 0%; top: -9.5%; --at: 0.18"
+                          aria-hidden="true"
+                          >share: a friend, a team, a link</span
+                        ><span
+                          class="hw"
+                          style="left: 52%; top: -9.5%; --at: 0.42"
+                          aria-hidden="true"
+                          >comment right on the part</span
+                        ><span
+                          class="hw red"
+                          style="left: 70%; top: 106.5%; --at: 0.64"
+                          aria-hidden="true"
+                          >Tom, live</span
+                        >
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+              <article class="nb-page" id="p-present" aria-labelledby="p-present-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 05</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">Present &amp; export</p>
+                      <h2 id="p-present-title">Present it, then put it in your report</h2>
+                      <p>
+                        Frames become slides: click a block to dive into its sheet, point with the
+                        laser, write with the pen. Then export a clickable PDF, SVG, PNG — or
+                        CircuiTikZ code that compiles straight into your thesis.
+                      </p>
+                      <ul class="ticks">
+                        <li style="--at: 0.45">One PDF page per sheet, with bookmarks and links</li>
+                        <li style="--at: 0.55">CircuiTikZ with native symbols and your formulas</li>
+                        <li style="--at: 0.65">
+                          Classmates follow your slides on their own screen
+                        </li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/present.webp"
+                          width="2080"
+                          height="1300"
+                          loading="lazy"
+                          alt="Presentation mode on the blackboard theme: the waveforms slide, with the laser pointer on the inductor current."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 625" aria-hidden="true">
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.26"
+                            d="M190 660C230 640 330 630 392 604"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.38"
+                            d="M392 604l-15 -0.9M392 604l-9.9 11.3"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.5"
+                            d="M560 -22C600 -30 610 150 594 226"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.62"
+                            d="M594 226l9.2 -11.8M594 226l-3.7 -14.5"
+                          />
+                        </svg>
+                        <span
+                          class="hw"
+                          style="left: 1%; top: 106.5%; --at: 0.18"
+                          aria-hidden="true"
+                          >frames → slides</span
+                        ><span class="hw" style="left: 36%; top: -9%; --at: 0.42" aria-hidden="true"
+                          >laser, pen, eraser</span
+                        ><span
+                          class="hw red"
+                          style="left: 68%; top: 112%; --at: 0.7"
+                          aria-hidden="true"
+                          >pdflatex, untouched ✓</span
+                        >
+                        <img
+                          class="nb-inset"
+                          src="/landing/latex.webp"
+                          width="801"
+                          height="672"
+                          loading="lazy"
+                          alt="The buck converter compiled with pdflatex from the CircuiTikZ export."
+                        />
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+              <article class="nb-page nb-last" id="p-more" aria-labelledby="p-more-title">
+                <div class="nb-sheet">
+                  <header class="nb-head" aria-hidden="true">
+                    <span><span class="nb-wide">Circuit Notebook · </span>p. 06</span>
+                    <span class="hw-field"
+                      ><span class="nb-wide">Project: </span><b>buck 48&nbsp;V → 12&nbsp;V</b></span
+                    >
+                  </header>
+                  <div class="nb-body">
+                    <div class="nb-text">
+                      <p class="kicker">And more</p>
+                      <h2 id="p-more-title">The small things that save your evening</h2>
+                      <ul class="nb-check">
+                        <li style="--at: 0.12"><b>Symbol editor</b> — draw your own parts</li>
+                        <li style="--at: 0.19">
+                          <b>Templates</b> — reuse a half-bridge with its driver
+                        </li>
+                        <li style="--at: 0.26">
+                          <b>Links</b> — to a datasheet, or to another sheet
+                        </li>
+                        <li style="--at: 0.33"><b>Version history</b> — go back any time</li>
+                        <li style="--at: 0.4"><b>Offline</b> — keeps working, syncs later</li>
+                        <li style="--at: 0.47"><b>On your phone</b> — look, zoom, fix a label</li>
+                        <li style="--at: 0.54">
+                          <b>Keyboard first</b> — press ? to see every shortcut
+                        </li>
+                        <li style="--at: 0.61">
+                          <b>Private by default</b> — projects stay in your browser
+                        </li>
+                      </ul>
+                    </div>
+                    <figure class="nb-fig nb-phone">
+                      <div class="nb-shot">
+                        <img
+                          src="/landing/phone.webp"
+                          width="780"
+                          height="1688"
+                          loading="lazy"
+                          alt="The buck converter example on a phone: the drawing fills the screen, with a bar of actions for the selected inductor."
+                        />
+                        <svg class="nb-ink" viewBox="0 0 1000 2164" aria-hidden="true">
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.5"
+                            d="M-470 930C-380 1010 -160 1020 -40 960"
+                          />
+                          <path
+                            class="ink"
+                            pathLength="1"
+                            style="--at: 0.62"
+                            d="M-40 960l-15 0.1M-40 960l-9.1 11.9"
+                          />
+                        </svg>
+                        <span
+                          class="hw"
+                          style="left: -100%; top: 38%; --at: 0.42"
+                          aria-hidden="true"
+                          >on your phone too</span
+                        >
+                      </div>
+                    </figure>
+                  </div>
+                </div>
+              </article>
+            </div>
+            <div class="nb-rings" aria-hidden="true"></div>
+          </div>
+          <ol class="nb-tabs" aria-label="Pages">
+            <li><a class="nb-tab" href="#p-schematics" style="--tab: #f3d36b">Schematics</a></li>
+            <li><a class="nb-tab" href="#p-hierarchy" style="--tab: #9fc6e8">Hierarchy</a></li>
+            <li><a class="nb-tab" href="#p-waveforms" style="--tab: #b8dca4">Waveforms</a></li>
+            <li><a class="nb-tab" href="#p-together" style="--tab: #f2b6c3">Together</a></li>
+            <li><a class="nb-tab" href="#p-present" style="--tab: #c9b6ea">Present</a></li>
+            <li><a class="nb-tab" href="#p-more" style="--tab: #f4c28a">And more</a></li>
+          </ol>
         </div>
       </section>
 

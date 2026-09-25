@@ -80,3 +80,44 @@ test('the privacy policy is one click away from the homepage', async ({ page }) 
   await page.locator('header').getByRole('link', { name: 'Home', exact: true }).click();
   await expect(page.locator('.beta-pill')).toBeVisible();
 });
+
+test('homepage: the notebook turns its pages as you scroll', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('.nb')).toHaveClass(/nb-on/);
+  await expect(page.locator('.nb-page')).toHaveCount(6);
+  const tab = (name: string) => page.locator('.nb-tab', { hasText: name });
+  const written = (id: string) =>
+    page.locator(id).evaluate((e) => Number(getComputedStyle(e).getPropertyValue('--q')));
+  // The tab of the third page opens it: the first two are turned over the spiral.
+  await tab('Waveforms').click();
+  await expect(tab('Waveforms')).toHaveClass(/on/);
+  await expect(page.locator('#p-schematics')).toBeHidden();
+  await expect(page.locator('#p-hierarchy')).toBeHidden();
+  await expect(page.locator('#p-waveforms h2')).toBeInViewport();
+  // Its pencil notes are written.
+  await expect.poll(() => written('#p-waveforms')).toBeGreaterThan(0.9);
+  // Scrolling on turns the next page.
+  await page.mouse.wheel(0, 1200);
+  await expect(tab('Together')).toHaveClass(/on/);
+  await expect(page.locator('#p-waveforms')).toBeHidden();
+  // A link to a page lands on it.
+  await page.goto('/#p-present');
+  await expect(tab('Present')).toHaveClass(/on/);
+  expect(errors).toEqual([]);
+});
+
+test('homepage: with reduced motion, the pages are simply one under the other', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expect(page.locator('.nb')).not.toHaveClass(/nb-on/);
+  const pages = page.locator('.nb-page');
+  await pages.nth(3).scrollIntoViewIfNeeded();
+  await expect(pages.nth(3)).toBeInViewport();
+  // Nothing is left half written.
+  const hw = page.locator('#p-together .hw').first();
+  expect(await hw.evaluate((e) => getComputedStyle(e).clipPath)).not.toContain('100%');
+});

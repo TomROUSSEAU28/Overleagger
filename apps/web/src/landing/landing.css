@@ -21,6 +21,18 @@
   src: url('/fonts/cmu-serif-700-roman.woff2') format('woff2');
 }
 @font-face {
+  font-family: 'Caveat';
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/caveat-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Caveat';
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/caveat-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
   font-family: 'CMU Typewriter Text';
   font-display: swap;
   src: url('/fonts/cmu-typewriter-text-500-roman.woff2') format('woff2');
@@ -40,6 +52,10 @@
   --shadow: 0 1px 2px rgba(40, 32, 20, 0.08), 0 12px 32px rgba(40, 32, 20, 0.12);
   --serif: 'CMU Serif', 'Latin Modern Roman', Georgia, serif;
   --mono: 'CMU Typewriter Text', ui-monospace, Menlo, monospace;
+  /* Handwriting: the pencil notes of the notebook. */
+  --hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --pen: #2b4f93;
+  --pen-red: #c8412f;
   color-scheme: light;
 }
 
@@ -271,9 +287,10 @@ main > section {
 /* Handwritten notes in the margin, pointing at the screenshot */
 .margin-note {
   position: absolute;
-  font-style: italic;
-  color: var(--muted);
-  font-size: 18px;
+  font-family: var(--hand);
+  font-weight: 500;
+  color: var(--pen);
+  font-size: 23px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -296,29 +313,6 @@ main > section {
 .note-2 {
   left: 33%;
   bottom: -46px;
-}
-.note-3 {
-  right: 20%;
-  bottom: -40px;
-  flex-direction: row-reverse;
-}
-
-/* A second screenshot laid over the first one (a window of the app). */
-.shot.stack {
-  margin-bottom: 40px;
-}
-.shot .inset {
-  position: absolute;
-  left: -34px;
-  bottom: -44px;
-  width: 36%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  box-shadow:
-    0 2px 4px rgba(40, 32, 20, 0.1),
-    0 18px 40px rgba(40, 32, 20, 0.22);
-  transform: rotate(-1.5deg);
 }
 
 /* Screenshots open in full size. */
@@ -509,46 +503,7 @@ main > section {
   margin: 0;
 }
 
-/* Three promises */
-.promises {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 56px;
-  padding-top: 88px !important;
-  padding-bottom: 88px !important;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: var(--paper-2);
-}
-.promises h2 {
-  font-size: 24px;
-  font-variant: small-caps;
-  letter-spacing: 0.03em;
-}
-.promises p {
-  margin: 0;
-  color: var(--muted);
-}
-
-/* Stories: text + screenshot */
-.story {
-  display: grid;
-  grid-template-columns: 5fr 8fr;
-  gap: 72px;
-  align-items: center;
-}
-.story + .story {
-  padding-top: 40px;
-}
-.story-text > p {
-  max-width: 34em;
-}
-.story.reverse {
-  grid-template-columns: 8fr 5fr;
-}
-.story.reverse .story-text {
-  order: 2;
-}
+/* Lists with graphite check marks */
 .ticks {
   list-style: none;
   padding: 0;
@@ -571,56 +526,556 @@ main > section {
   border-bottom: 2px solid var(--ink);
   transform: rotate(-45deg);
 }
-.code {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--margin);
-  border-radius: 6px;
-  padding: 12px 16px;
-  overflow-x: auto;
-  font-size: 15px;
-  line-height: 1.5;
+/* ---- The notebook: one page per feature ------------------------------------------------ */
+
+/*
+ * Without script (or with reduced motion) the pages are simply one under the other. With the
+ * script, `.nb-on`: the notebook stays on screen while the section scrolls by, and each page
+ * turns up over the spiral (--f: 0 → 1). Pencil marks are drawn as the page is read (--q).
+ */
+.nb {
+  --paper-nb: #fffdf6;
+  --cover: #26344a;
+  padding: 72px max(12px, calc((100vw - 1180px) / 2)) !important;
+  background: linear-gradient(to bottom, var(--paper) 0, var(--paper-2) 40%, var(--paper) 100%);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.nb-pages {
+  display: grid;
+  gap: 48px;
+}
+.nb-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 30px clamp(18px, 3vw, 40px) 24px clamp(52px, 6.4vw, 92px);
+  background-color: var(--paper-nb);
+  /* Punched holes for the spiral, the red margin and the blue rules. */
+  background-image:
+    radial-gradient(circle, #3b3a36 0 3.6px, rgba(0, 0, 0, 0.18) 4.4px, transparent 5.2px),
+    linear-gradient(
+      to right,
+      transparent clamp(34px, 4.6vw, 64px),
+      color-mix(in srgb, var(--margin) 70%, transparent) clamp(34px, 4.6vw, 64px),
+      color-mix(in srgb, var(--margin) 70%, transparent) calc(clamp(34px, 4.6vw, 64px) + 1.5px),
+      transparent calc(clamp(34px, 4.6vw, 64px) + 1.5px)
+    ),
+    repeating-linear-gradient(to bottom, transparent 0 29px, var(--rule) 29px 30px);
+  background-size:
+    26px 24px,
+    auto,
+    auto;
+  background-position:
+    30px 0,
+    0 0,
+    0 44px;
+  background-repeat: repeat-x, no-repeat, repeat;
+  border-radius: 3px 3px 6px 6px;
+  box-shadow:
+    0 1px 2px rgba(40, 32, 20, 0.08),
+    0 12px 32px rgba(40, 32, 20, 0.1);
+}
+.nb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: 14px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.hw-field {
+  font-variant: normal;
+  letter-spacing: 0;
+}
+.hw-field b {
+  font-family: var(--hand);
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--pen);
+  margin-left: 4px;
+}
+.nb-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 37fr) minmax(0, 63fr);
+  gap: clamp(20px, 3vw, 44px);
+  align-items: center;
+}
+.nb-text h2 {
+  font-size: clamp(26px, 2.7vw, 38px);
+  margin-bottom: 0.4em;
+}
+.nb-text > p:not(.kicker) {
+  margin: 0;
+  font-size: clamp(16px, 1.3vw, 18px);
+  line-height: 1.55;
+}
+.nb-text .ticks {
+  margin-top: 14px;
+  font-size: clamp(15px, 1.2vw, 16.5px);
+  color: var(--muted);
+}
+.nb-text .ticks li {
+  margin: 6px 0;
+}
+.nb-text .ticks li::before {
+  --k: clamp(0, (var(--q, 1) - var(--at)) * 6, 1);
+  transform: rotate(-45deg) scale(var(--k));
+  border-color: var(--pen);
 }
 
-/* Cards */
-.grid-section h2 {
-  text-align: center;
-  margin-bottom: 56px;
+/* The screenshot, taped on the page. The pencil marks around it use its width as a unit. */
+.nb-fig {
+  container-type: inline-size;
+  margin: 0;
+  min-width: 0;
 }
-.cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 26px;
+.nb-shot {
+  position: relative;
+  margin: 7cqw 1cqw 11cqw;
+  transform: rotate(-0.7deg);
 }
-.cards article {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 22px 22px 14px;
+.nb-page:nth-child(even) .nb-shot {
+  transform: rotate(0.6deg);
+}
+.nb-shot > img:not(.nb-inset) {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 0.9cqw #fff,
+    0 0 0 calc(0.9cqw + 1px) rgba(40, 32, 20, 0.12),
+    0 14px 30px rgba(40, 32, 20, 0.18);
+  cursor: zoom-in;
+}
+/* Two strips of paper tape, at the top corners. */
+.nb-shot::before,
+.nb-shot::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: -2.4cqw;
+  width: 14cqw;
+  height: 4.4cqw;
+  background: rgba(238, 222, 160, 0.78);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  clip-path: polygon(0 8%, 4% 0, 9% 10%, 14% 0, 19% 9%, 24% 0, 100% 0, 100% 100%, 0 100%);
+}
+.nb-shot::before {
+  left: -4cqw;
+  transform: rotate(-32deg);
+}
+.nb-shot::after {
+  right: -4cqw;
+  transform: rotate(30deg);
+}
+.nb-inset {
+  position: absolute;
+  z-index: 3;
+  right: -3%;
+  bottom: -8%;
+  width: 36%;
+  height: auto;
+  border: 0.8cqw solid #fff;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  transform: rotate(3deg);
+  cursor: zoom-in;
+}
+
+/* Pencil marks: drawn stroke by stroke, then the words are written. */
+.nb-ink {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ink {
+  --k: clamp(0, (var(--q, 1) - var(--at)) * 5, 1);
+  fill: none;
+  stroke: var(--pen);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: calc(1 - var(--k));
+}
+.ink.red {
+  stroke: var(--pen-red);
+  stroke-width: 4;
+}
+.hw {
+  --k: clamp(0, (var(--q, 1) - var(--at)) * 3.5, 1);
+  position: absolute;
+  z-index: 4;
+  font-family: var(--hand);
+  font-weight: 500;
+  font-size: 3.7cqw;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--pen);
+  transform: rotate(-1.5deg);
+  clip-path: inset(-30% calc(100% - var(--k) * 104%) -30% -4%);
+  pointer-events: none;
+}
+.hw.red {
+  color: var(--pen-red);
+  font-weight: 700;
+}
+
+/* The last page: a checklist, and the phone. */
+.nb-check {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  font-family: var(--hand);
+  font-size: clamp(19px, 1.75vw, 24px);
+  line-height: 1.25;
+  color: var(--pen);
+}
+.nb-check li {
+  --k: clamp(0, (var(--q, 1) - var(--at)) * 5, 1);
+  position: relative;
+  padding-left: 34px;
+  margin: 5px 0;
+  clip-path: inset(-20% calc(100% - var(--k) * 104%) -20% -10%);
+}
+.nb-check li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.22em;
+  width: 15px;
+  height: 15px;
+  border: 1.8px solid var(--pen);
+  border-radius: 2px;
+  transform: rotate(-3deg);
+}
+.nb-check li::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 0.1em;
+  width: 16px;
+  height: 8px;
+  border-left: 2.6px solid var(--pen-red);
+  border-bottom: 2.6px solid var(--pen-red);
+  transform: rotate(-48deg);
+}
+.nb-check b {
+  font-weight: 700;
+}
+.nb-last .nb-body {
+  grid-template-columns: minmax(0, 56fr) minmax(0, 44fr);
+}
+.nb-phone {
+  display: flex;
+  justify-content: center;
+}
+.nb-phone .nb-shot {
+  width: fit-content;
+  margin: 3cqw 0 3cqw 10cqw;
+  transform: rotate(2deg);
+}
+.nb-phone .nb-shot > img {
+  width: auto;
+  height: min(58vh, 520px);
+  border-radius: 4.6cqw;
+  box-shadow:
+    0 0 0 1.6cqw #1d1f22,
+    0 0 0 calc(1.6cqw + 1px) #000,
+    0 18px 36px rgba(40, 32, 20, 0.28);
+}
+.nb-phone .nb-shot::before,
+.nb-phone .nb-shot::after {
+  display: none;
+}
+.nb-phone .hw {
+  font-size: 5.4cqw;
+}
+
+/* Index tabs on the side of the notebook. */
+.nb-tabs {
+  display: none;
+}
+
+/* ---- With the script: the notebook turns its pages ---- */
+.nb.nb-on {
+  --per: 90svh;
+  height: calc(var(--pages) * var(--per) + 100svh);
+  padding: 0 !important;
+}
+.nb-on .nb-stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  padding: 64px 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nb-on .nb-book {
+  position: relative;
+  width: min(1120px, 100vw - 190px);
+  height: min(720px, 100svh - 110px);
+}
+/* The cardboard cover behind the pages. */
+.nb-on .nb-book::before {
+  content: '';
+  position: absolute;
+  inset: -12px -12px -24px;
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.07), transparent 60%), var(--cover);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.2),
+    0 28px 60px rgba(30, 24, 16, 0.3);
+}
+.nb-on .nb-pages {
+  position: absolute;
+  inset: 0;
+  display: block;
+  perspective: 3400px;
+  perspective-origin: 50% -20%;
+}
+/* The pages under the current one: their edges show at the bottom. */
+.nb-on .nb-pages::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 3px 3px 6px 6px;
+  background: var(--paper-nb);
+  box-shadow:
+    0 3px 0 -1px #efe8d6,
+    0 5px 0 -1px #f8f3e6,
+    0 7px 0 -2px #e9e1cd,
+    0 9px 0 -2px #f5efdf,
+    0 11px 0 -3px #e4dbc5;
+}
+.nb-on .nb-page {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0;
+  transform: rotateX(calc(var(--f, 0) * 178deg));
+  /* No opacity here: it would flatten the page, and its front would show through its back. */
+  transform-style: preserve-3d;
+}
+.nb-on .nb-page.turning {
+  will-change: transform, opacity;
+}
+.nb-on .nb-sheet {
+  height: 100%;
+  /* The front is shown until the page stands upright (90°, --f ≈ 0.505), then its back. */
+  opacity: clamp(0, (0.505 - var(--f, 0)) * 2000, 1);
+  backface-visibility: hidden;
+  overflow: hidden;
+  /* The spiral draws its own holes. */
+  background-image:
+    linear-gradient(
+      to right,
+      transparent clamp(34px, 4.6vw, 64px),
+      color-mix(in srgb, var(--margin) 70%, transparent) clamp(34px, 4.6vw, 64px),
+      color-mix(in srgb, var(--margin) 70%, transparent) calc(clamp(34px, 4.6vw, 64px) + 1.5px),
+      transparent calc(clamp(34px, 4.6vw, 64px) + 1.5px)
+    ),
+    repeating-linear-gradient(to bottom, transparent 0 29px, var(--rule) 29px 30px);
+  background-size: auto;
+  background-position:
+    0 0,
+    0 44px;
+  background-repeat: no-repeat, repeat;
+}
+/* The back of a page, seen as it goes over the spiral; and the shadow it casts on the next. */
+.nb-on .nb-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 3px 3px 6px 6px;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.06), transparent 40%),
+    repeating-linear-gradient(to bottom, #f6f1e3 0 29px, #e9e4d6 29px 30px);
+  transform: rotateX(180deg);
+  backface-visibility: hidden;
+  opacity: calc(
+    clamp(0, (var(--f, 0) - 0.505) * 2000, 1) * (1 - clamp(0, (var(--f, 0) - 0.62) * 3, 1))
+  );
+}
+.nb-on .nb-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 3px 3px 6px 6px;
+  background: linear-gradient(to bottom, rgba(38, 30, 18, 0.34), rgba(38, 30, 18, 0.08) 70%);
+  opacity: var(--shade, 0);
+  pointer-events: none;
+}
+/* The spiral, through the holes of every page. */
+.nb-on .nb-rings {
+  position: absolute;
+  z-index: 60;
+  top: -21px;
+  left: 18px;
+  right: 18px;
+  height: 40px;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23596170'/%3E%3Cstop offset='.42' stop-color='%23f1f3f6'/%3E%3Cstop offset='1' stop-color='%23434953'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cellipse cx='13' cy='33.5' rx='4.6' ry='2.6' fill='%23000' opacity='.35'/%3E%3Crect x='9.2' y='2' width='7.6' height='32' rx='3.8' fill='url(%23g)' stroke='%23353a42' stroke-width='.8'/%3E%3C/svg%3E")
+    0 0 / 26px 40px space no-repeat;
+}
+.nb-on .nb-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 0 4px;
+  padding: 0;
+  align-self: center;
+}
+.nb-tab {
+  display: block;
+  width: 118px;
+  padding: 7px 12px 7px 16px;
+  border-radius: 0 8px 8px 0;
+  background: var(--tab);
+  color: #2a2620;
+  text-decoration: none;
+  font-size: 15px;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  box-shadow: inset 6px 0 6px -4px rgba(0, 0, 0, 0.18);
+  opacity: 0.72;
+  transform: translateX(-14px);
   transition:
-    transform 0.2s cubic-bezier(0.3, 1.4, 0.6, 1),
-    box-shadow 0.2s;
+    transform 0.25s cubic-bezier(0.3, 1.4, 0.6, 1),
+    opacity 0.2s;
 }
-/* Index cards: they tilt a little when you pick them up. */
-.cards article:hover {
-  transform: translateY(-4px) rotate(-0.8deg);
-  box-shadow: var(--shadow);
+.nb-tab:hover,
+.nb-tab.on {
+  opacity: 1;
+  transform: translateX(0);
 }
-.cards article:nth-child(even):hover {
-  transform: translateY(-4px) rotate(0.8deg);
+.nb-tab.on {
+  box-shadow:
+    inset 6px 0 6px -4px rgba(0, 0, 0, 0.18),
+    0 3px 8px rgba(0, 0, 0, 0.14);
 }
-.cards article.reveal:not(.settled) {
-  transition:
-    opacity 0.6s ease var(--delay, 0s),
-    transform 0.6s ease var(--delay, 0s);
+
+/* Narrow windows: no tabs, the page number says where you are. */
+@media (max-width: 1100px) {
+  .nb-on .nb-tabs {
+    display: none;
+  }
+  .nb-on .nb-book {
+    width: min(1120px, 100vw - 44px);
+  }
 }
-.cards h3 {
-  margin-bottom: 6px;
+/* Phones and small tablets: text above, screenshot below. */
+@media (max-width: 760px) {
+  .nb-wide {
+    display: none;
+  }
+  .nb-body {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 6px;
+  }
+  .nb-sheet {
+    padding: 26px 14px 14px 40px;
+    background-size:
+      22px 20px,
+      auto,
+      auto;
+    background-position:
+      18px 0,
+      -18px 0,
+      0 40px;
+  }
+  .nb-head {
+    font-size: 12px;
+  }
+  .hw-field b {
+    font-size: 18px;
+  }
+  .nb-text h2 {
+    font-size: 25px;
+  }
+  .nb-text > p:not(.kicker) {
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+  .nb-text .ticks,
+  .nb-inset {
+    display: none;
+  }
+  .nb-check {
+    font-size: 17.5px;
+  }
+  .hw {
+    font-size: 4.3cqw;
+  }
+  .nb-shot {
+    margin: 8cqw 2cqw 12cqw;
+  }
+  .nb-check li {
+    margin: 1px 0;
+  }
+  .nb-phone .nb-shot {
+    margin: 2cqw 0 2cqw 30cqw;
+  }
+  .nb-phone .nb-shot > img {
+    height: min(24svh, 220px);
+  }
+  .nb-phone .hw {
+    font-size: 4.6cqw;
+  }
+  .nb-last .nb-body {
+    grid-template-columns: 1fr;
+  }
+  .nb.nb-on {
+    --per: 80svh;
+  }
+  .nb-on .nb-stage {
+    padding: 62px 8px 12px;
+  }
+  .nb-on .nb-book {
+    width: calc(100vw - 20px);
+    height: calc(100svh - 96px);
+  }
+  .nb-on .nb-rings {
+    left: 12px;
+    right: 12px;
+    background-size: 22px 34px;
+    top: -17px;
+    height: 34px;
+  }
 }
-.cards p {
-  margin: 0 0 8px;
-  font-size: 16px;
-  color: var(--muted);
+/* Tall phones have room for the check marks. */
+@media (max-width: 760px) and (min-height: 800px) {
+  .nb-text .ticks {
+    display: block;
+    margin-top: 8px;
+    font-size: 14.5px;
+  }
+  .nb-text .ticks li {
+    margin: 3px 0;
+    padding-left: 26px;
+  }
+}
+@media (max-width: 760px) and (max-height: 700px) {
+  .nb-text > p:not(.kicker) {
+    font-size: 14.5px;
+  }
+  .nb-text h2 {
+    font-size: 22px;
+  }
 }
 
 /* FAQ: the title on the left, like a heading in the margin; the questions on the right. */
@@ -881,8 +1336,7 @@ main > section {
   clip-path: inset(0 100% 0 0);
   animation: write 0.9s 1.6s steps(24, end) forwards;
 }
-.note-1,
-.note-3 {
+.note-1 {
   clip-path: inset(0 0 0 100%);
 }
 .reveal .margin-note,
@@ -905,13 +1359,6 @@ main > section {
     transform 0.35s cubic-bezier(0.3, 1.3, 0.6, 1),
     box-shadow 0.35s;
 }
-.story .shot {
-  transform: rotate(0.5deg);
-}
-.story.reverse .shot {
-  transform: rotate(-0.5deg);
-}
-.story .shot:hover,
 .hero-shot:hover {
   transform: translateY(-4px) rotate(0deg);
   box-shadow:
@@ -961,18 +1408,10 @@ main > section {
 
 /* Tablets and phones */
 @media (max-width: 960px) {
-  .story,
-  .story.reverse,
   .beta,
   .contact {
     grid-template-columns: 1fr;
     gap: 28px;
-  }
-  .story.reverse .story-text {
-    order: 0;
-  }
-  .story {
-    gap: 40px;
   }
   .faq {
     grid-template-columns: 1fr;
@@ -984,20 +1423,8 @@ main > section {
   .final-arrow {
     display: none;
   }
-  .promises {
-    grid-template-columns: 1fr;
-    gap: 22px;
-  }
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .margin-note {
     display: none;
-  }
-  .shot .inset {
-    left: -8px;
-    bottom: -32px;
-    width: 44%;
   }
 }
 @media (max-width: 640px) {
@@ -1039,13 +1466,6 @@ main > section {
     padding-top: 56px !important;
     padding-bottom: 88px !important;
   }
-  .promises {
-    padding-top: 64px !important;
-    padding-bottom: 64px !important;
-  }
-  .cards {
-    grid-template-columns: 1fr;
-  }
   .foot p {
     margin-left: 0;
   }
@@ -1071,8 +1491,7 @@ main > section {
   .reveal .ticks li::before {
     transform: rotate(-45deg);
   }
-  .shot,
-  .cards article {
+  .shot {
     transition: none;
   }
   .zoom[open] img {
