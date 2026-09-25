@@ -342,7 +342,7 @@ export function FrameProps({ el }: { el: FrameElement }) {
         <input value={el.name} onChange={(e) => upd({ name: e.target.value })} />
       </Field>
       <p className="muted small">
-        Frames group a region of the board (slides in the presentation mode, coming next).
+        A frame is a slide of the presentation: it shows what is inside it, in reading order.
       </p>
     </>
   );

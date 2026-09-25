@@ -35,7 +35,7 @@ export interface Presence {
   viewport?: { x: number; y: number; zoom: number; w: number; h: number };
   selection?: Id[];
   /** Presenting: index of the slide shown. */
-  presenting?: { index: number } | null;
+  presenting?: { index: number; step?: number } | null;
 }
 
 export interface SessionState {

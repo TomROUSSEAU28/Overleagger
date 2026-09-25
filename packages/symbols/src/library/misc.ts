@@ -41,8 +41,23 @@ const ncOpt: OptionDef = {
   ],
 };
 
-function blade(nc: boolean): Primitive[] {
-  return nc ? [L(-0.8, 0, 1.05, 0.45), L(0.8, 0, 0.8, 0.7)] : [L(-0.8, 0, 0.75, -0.9)];
+/** Position of a switch: at rest (as its contact type says) or actuated (e.g. to animate it). */
+export const stateOpt = {
+  key: 'state',
+  label: 'Position',
+  type: 'enum' as const,
+  default: 'rest',
+  choices: [
+    { value: 'rest', label: 'At rest' },
+    { value: 'on', label: 'Actuated' },
+  ],
+};
+
+/** The blade: a normally-open contact closes when actuated, a normally-closed one opens. */
+function blade(nc: boolean, on = false): Primitive[] {
+  const closed = nc !== on;
+  if (nc) return [closed ? L(-0.8, 0, 1.05, 0.45) : L(-0.8, 0, 0.75, -0.9), L(0.8, 0, 0.8, 0.7)];
+  return closed ? [L(-0.8, 0, 1.0, -0.25), L(0.8, 0, 0.8, -0.45)] : [L(-0.8, 0, 0.75, -0.9)];
 }
 
 export const switches: SymbolDef[] = [
@@ -52,12 +67,12 @@ export const switches: SymbolDef[] = [
     category: SWITCHES,
     keywords: ['spst', 'interrupteur', 'ideal switch', 'contact'],
     refPrefix: 'S',
-    options: [ncOpt],
+    options: [ncOpt, stateOpt],
     build: ({ standard, opts }) => ({
       prims: [
         L(-2, 0, -0.8, 0),
         L(0.8, 0, 2, 0),
-        ...blade(opts.contact === 'nc'),
+        ...blade(opts.contact === 'nc', opts.state === 'on'),
         ...contactDots(standard, [
           [-0.8, 0],
           [0.8, 0],
@@ -72,10 +87,11 @@ export const switches: SymbolDef[] = [
     category: SWITCHES,
     keywords: ['spdt', 'changeover', 'inverseur', 'selector'],
     refPrefix: 'S',
-    build: ({ standard }) => ({
+    options: [{ ...stateOpt, label: 'Position (actuated = B)' }],
+    build: ({ standard, opts }) => ({
       prims: [
         L(-2, 0, -0.8, 0),
-        L(-0.8, 0, 0.85, -0.85),
+        L(-0.8, 0, 0.85, opts.state === 'on' ? 0.85 : -0.85),
         P([0.8, -1, 1.2, -1, 2, -1]),
         P([0.8, 1, 2, 1]),
         ...contactDots(standard, [
@@ -93,15 +109,21 @@ export const switches: SymbolDef[] = [
     category: SWITCHES,
     keywords: ['button', 'momentary', 'bouton poussoir'],
     refPrefix: 'S',
-    options: [ncOpt],
+    options: [
+      ncOpt,
+      { ...stateOpt, choices: [stateOpt.choices[0]!, { value: 'on', label: 'Pressed' }] },
+    ],
     build: ({ standard, opts }) => {
       const nc = opts.contact === 'nc';
+      // The bar: on the contacts when closed, away from them when open.
+      const pressed = opts.state === 'on';
+      const bar = nc ? (pressed ? 0.9 : 0.35) : pressed ? -0.05 : -0.5;
       return {
         prims: [
           L(-2, 0, -0.8, 0),
           L(0.8, 0, 2, 0),
-          ...(nc ? [L(-0.9, 0.35, 0.9, 0.35)] : [L(-0.9, -0.5, 0.9, -0.5)]),
-          L(0, nc ? 0.35 : -0.5, 0, -1.4),
+          L(-0.9, bar, 0.9, bar),
+          L(0, bar, 0, -1.4),
           L(-0.6, -1.4, 0.6, -1.4),
           ...contactDots(standard, [
             [-0.8, 0],
@@ -118,12 +140,12 @@ export const switches: SymbolDef[] = [
     category: SWITCHES,
     keywords: ['relay contact', 'kontaktor', 'contacteur'],
     refPrefix: 'K',
-    options: [ncOpt],
+    options: [ncOpt, stateOpt],
     build: ({ opts }) => ({
       prims: [
         L(-2, 0, -0.8, 0),
         L(0.8, 0, 2, 0),
-        ...blade(opts.contact === 'nc'),
+        ...blade(opts.contact === 'nc', opts.state === 'on'),
         A(1.1, 0, 0.3, 180, 360),
       ],
       pins: [pin('1', -2, 0), pin('2', 2, 0)],

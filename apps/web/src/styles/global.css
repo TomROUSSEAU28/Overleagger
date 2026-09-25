@@ -3378,3 +3378,177 @@ body.resizing-panel {
     opacity: 0.35;
   }
 }
+
+/* ------------------------------------------------------------ animations (presentation) */
+
+.anim-section {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.anim-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.anim-toggle:hover {
+  color: var(--accent);
+}
+.anim-count {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-style: normal;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.anim-body {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.anim-card {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  animation: anim-card-in 0.25s ease-out;
+}
+@keyframes anim-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.anim-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.anim-card-head b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.anim-card-head select {
+  flex: 1;
+  min-width: 0;
+}
+.anim-card .field {
+  margin: 0;
+}
+.anim-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.anim-times input {
+  width: 100%;
+}
+.anim-actions {
+  display: flex;
+  gap: 6px;
+}
+.anim-add {
+  position: relative;
+}
+.anim-menu {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  min-width: 170px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  animation: anim-card-in 0.15s ease-out;
+}
+.anim-menu button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.anim-menu button:hover {
+  background: var(--hover);
+}
+.build-order {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.build-order li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+.build-when {
+  min-width: 52px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.build-item {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.build-item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Step numbers on the canvas, while the Animation section is open. */
+.anim-badge text {
+  font-family: var(--sans, system-ui);
+  font-weight: 600;
+}
+.anim-card {
+  min-width: 0;
+}
+.anim-card .row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.anim-card input,
+.anim-card select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.anim-card .check input {
+  width: auto;
+}
+.anim-card-head .icon-btn {
+  flex: none;
+}

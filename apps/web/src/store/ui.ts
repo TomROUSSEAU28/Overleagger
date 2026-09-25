@@ -167,6 +167,10 @@ export interface UIState extends Settings {
   phoneSheet: PhoneSheet;
   /** Following someone else's presentation (their user id). */
   presentFollow: string | null;
+  /** Start the presentation on this frame (Preview). */
+  presentAt: Id | null;
+  /** The Animation section of the properties panel is open (and the step badges shown). */
+  animOpen: boolean;
   spaceDown: boolean;
 
   set: (patch: Partial<UIState>) => void;
@@ -234,6 +238,8 @@ const transient = {
   presenting: false,
   phoneSheet: null as PhoneSheet,
   presentFollow: null,
+  presentAt: null,
+  animOpen: false,
   commentDraft: null,
   openThread: null,
   commentDrag: null,

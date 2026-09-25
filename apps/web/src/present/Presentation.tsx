@@ -1,10 +1,13 @@
 import {
   buildSlides,
+  elementBBox,
   visibleFor,
   type Element,
+  type FrameElement,
   type Id,
   type Rect,
   type Slide,
+  type Transition,
 } from '@overleagger/core';
 import {
   ChevronLeft,
@@ -21,7 +24,8 @@ import { SheetRenderer } from '../canvas/render/SheetRenderer';
 import { strokePath } from '../canvas/render/shapes';
 import { useEditor, useSheetElements } from '../editor/context';
 import { useUI } from '../store/ui';
-import { THEMES } from '../theme';
+import { resolveColor, THEMES } from '../theme';
+import { evaluate, slideElements, slideSteps, type AnimFrame, type Clock, type ElFx } from './anim';
 
 type Mode = 'point' | 'laser' | 'pen';
 type Box = { x: number; y: number; w: number; h: number };
@@ -62,7 +66,11 @@ export function Presentation() {
 
   const slides = useMemo(() => buildSlides(ed.project, ed.ctx), [ed]);
   const [index, setIndex] = useState(() => {
-    // Start on the selected frame, else on the first slide of the current sheet.
+    // Start on the frame asked for (Preview), the selected frame, else on the first slide of
+    // the current sheet.
+    const at = useUI.getState().presentAt;
+    const k = at ? slides.findIndex((s) => s.frameId === at) : -1;
+    if (k >= 0) return k;
     const sel = ed.selection();
     const i = slides.findIndex((s) => s.frameId && sel.includes(s.frameId));
     if (i >= 0) return i;
@@ -71,6 +79,22 @@ export function Presentation() {
   });
   const slide: Slide | undefined = slides[index];
   const [sheetId, setSheetId] = useState<Id | undefined>(slide?.sheetId);
+  const sheetElements = useSheetElements(sheetId ?? ed.project.rootSheetId);
+  // Elements hidden from the presentation are neither drawn nor clickable.
+  const elements = useMemo(() => visibleFor(sheetElements, 'present'), [sheetElements]);
+  /** Elements of a slide (those touching its frame, or the whole sheet). */
+  const slideOf = (sl: Slide) =>
+    slideElements(
+      visibleFor(ed.project.getElements(sl.sheetId), 'present'),
+      sl.frameId ? sl.rect : null,
+      ed.ctx,
+    );
+  // Click steps of the slide on screen (it is only animated once the camera shows its sheet).
+  const steps = useMemo(
+    () => (slide && slide.sheetId === sheetId ? slideSteps(slideOf(slide)) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slide, sheetId, elements],
+  );
   const [box, setBox] = useState<Box>(() =>
     slide ? fitBox(slide.rect, screen) : { x: 0, y: 0, w: 800, h: 600 },
   );
@@ -87,7 +111,7 @@ export function Presentation() {
 
   const close = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-    useUI.getState().set({ presenting: false, presentFollow: null });
+    useUI.getState().set({ presenting: false, presentFollow: null, presentAt: null });
   }, []);
 
   // Full screen while presenting; leaving full screen (Esc) ends the presentation. Opening a
@@ -108,7 +132,7 @@ export function Presentation() {
       if (!full.current || document.fullscreenElement) return;
       full.current = false;
       if (document.hidden || performance.now() - linkOpened.current < 3000) refull.current = true;
-      else useUI.getState().set({ presenting: false, presentFollow: null });
+      else useUI.getState().set({ presenting: false, presentFollow: null, presentAt: null });
     };
     const onResize = () => setScreen({ w: window.innerWidth, h: window.innerHeight });
     document.addEventListener('fullscreenchange', onChange);
@@ -141,16 +165,94 @@ export function Presentation() {
     anim.current = requestAnimationFrame(step);
   }, []);
 
-  /** Show slide `i`: glide inside the same sheet, cross-fade to another sheet. */
+  // Build steps of the current slide: 0 = as it opens, then one per click.
+  const [level, setLevel] = useState(0);
+  const started = useRef(new Map<number, number>([[0, performance.now() + 150]]));
+  const [now, setNow] = useState(() => performance.now());
+
+  /** A tween driven by requestAnimationFrame (skipped when animations are off). */
+  const tween = useCallback((ms: number, frame: (k: number) => void, done?: () => void) => {
+    cancelAnimationFrame(anim.current);
+    const reduce =
+      !useUI.getState().animations ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || ms <= 0) {
+      frame(1);
+      done?.();
+      return;
+    }
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      frame(easeInOut(k));
+      if (k < 1) anim.current = requestAnimationFrame(step);
+      else done?.();
+    };
+    anim.current = requestAnimationFrame(step);
+  }, []);
+
+  /**
+   * Show slide `i` with the transition of its frame (the camera glides by default, and
+   * cross-fades to another sheet). `atEnd`: with all its steps played (going back).
+   */
   const go = useCallback(
-    (i: number, via?: Rect) => {
+    (i: number, via?: Rect, atEnd = false) => {
       const target = slides[i];
       if (!target) return;
       setInk([]);
       setIndex(i);
       const to = fitBox(target.rect, screen);
-      if (target.sheetId === sheetId) {
-        animateTo(to, 520);
+      const frame = target.frameId
+        ? (ed.project.getElement(target.sheetId, target.frameId) as FrameElement | undefined)
+        : undefined;
+      const kind: Transition = via ? 'move' : (frame?.transition ?? 'move');
+      const ms = frame?.transitionMs ?? (kind === 'move' ? 520 : 600);
+      // The slide's own animations start once it has arrived.
+      const lastLevel = atEnd ? slideSteps(slideOf(target)).length : 0;
+      setLevel(lastLevel);
+      started.current = new Map(atEnd ? [] : [[0, performance.now() + (kind === 'none' ? 0 : ms)]]);
+      setNow(performance.now());
+      const sameSheet = target.sheetId === sheetId;
+      const from = boxRef.current;
+      const shift = (b: Box, dx: number, k = 1): Box => ({
+        x: b.x + b.w * dx + (b.w * (1 - k)) / 2,
+        y: b.y + (b.h * (1 - k)) / 2,
+        w: b.w * k,
+        h: b.h * k,
+      });
+      /** Out with `outBox`, then in from `inBox`, fading between them. */
+      const outIn = (outBox: Box, inBox: Box) =>
+        tween(
+          ms * 0.45,
+          (k) => {
+            setBox(lerpBox(from, outBox, k));
+            setFade(1 - k);
+          },
+          () => {
+            setSheetId(target.sheetId);
+            setBox(inBox);
+            tween(
+              ms * 0.55,
+              (k) => {
+                setBox(lerpBox(inBox, to, k));
+                setFade(k);
+              },
+              () => setFade(1),
+            );
+          },
+        );
+      if (kind === 'none') {
+        cancelAnimationFrame(anim.current);
+        setSheetId(target.sheetId);
+        setBox(to);
+        setFade(1);
+        return;
+      }
+      if (kind === 'fade') return outIn(from, to);
+      if (kind === 'slide') return outIn(shift(from, 0.3), shift(to, -0.3));
+      if (kind === 'zoom') return outIn(shift(from, 0, 1.5), shift(to, 0, 0.6));
+      if (sameSheet) {
+        animateTo(to, ms);
         return;
       }
       const swap = () => {
@@ -161,30 +263,54 @@ export function Presentation() {
           if (!via) return setBox(to);
           // Arrive in the sub-sheet from slightly further away, like diving into the block.
           const k = 1.35;
-          const from = {
+          const start = {
             x: to.x - (to.w * (k - 1)) / 2,
             y: to.y - (to.h * (k - 1)) / 2,
             w: to.w * k,
             h: to.h * k,
           };
-          setBox(from);
-          animateTo(to, 380, undefined, from);
+          setBox(start);
+          animateTo(to, 380, undefined, start);
         }, 140);
       };
       // Drilling into a block: first zoom onto the block, then open its sheet.
       if (via) animateTo(fitBox(via, screen), 420, swap);
       else swap();
     },
-    [slides, screen, sheetId, animateTo],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slides, screen, sheetId, animateTo, tween, ed],
   );
 
   const indexRef = useRef(index);
   indexRef.current = index;
+  const levelRef = useRef(level);
+  levelRef.current = level;
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
   const goRef = useRef(go);
   goRef.current = go;
 
-  const next = useCallback(() => index < slides.length - 1 && go(index + 1), [index, slides, go]);
-  const prev = useCallback(() => index > 0 && go(index - 1), [index, go]);
+  // Next: the next build step of the slide, or the next slide.
+  const next = useCallback(() => {
+    if (level < steps.length) {
+      const l = level + 1;
+      started.current.set(steps[l - 1]!, performance.now());
+      setLevel(l);
+      setNow(performance.now());
+      return;
+    }
+    if (index < slides.length - 1) go(index + 1);
+  }, [index, slides, go, level, steps]);
+  // Back: undo the last step at once, or show the previous slide with all its steps played.
+  const prev = useCallback(() => {
+    if (level > 0) {
+      started.current.delete(steps[level - 1]!);
+      setLevel(level - 1);
+      setNow(performance.now());
+      return;
+    }
+    if (index > 0) go(index - 1, undefined, true);
+  }, [index, go, level, steps]);
   const up = useCallback(() => {
     const back = history.current.pop();
     if (back !== undefined) return go(back);
@@ -198,8 +324,8 @@ export function Presentation() {
   useEffect(() => {
     const session = ed.session;
     if (!session || follow) return;
-    session.setPresence({ presenting: { index } });
-  }, [ed, index, follow]);
+    session.setPresence({ presenting: { index, step: level } });
+  }, [ed, index, level, follow]);
   useEffect(() => () => ed.session?.setPresence({ presenting: null }), [ed]);
   useEffect(() => {
     const session = ed.session;
@@ -208,10 +334,18 @@ export function Presentation() {
       const p = session.state.getState().peers.find((x) => x.user.id === follow);
       if (!p?.presenting) {
         // The presenter stopped.
-        useUI.getState().set({ presenting: false, presentFollow: null });
+        useUI.getState().set({ presenting: false, presentFollow: null, presentAt: null });
         return;
       }
       if (p.presenting.index !== indexRef.current) goRef.current(p.presenting.index);
+      // The presenter's build steps too.
+      const step = p.presenting.step ?? 0;
+      if (step !== levelRef.current) {
+        if (step > levelRef.current)
+          started.current.set(stepsRef.current[step - 1] ?? 0, performance.now());
+        setLevel(step);
+        setNow(performance.now());
+      }
     };
     sync();
     return session.state.subscribe((a, b) => {
@@ -269,9 +403,6 @@ export function Presentation() {
     return () => window.clearTimeout(t);
   }, [laser, mode]);
 
-  const sheetElements = useSheetElements(sheetId ?? ed.project.rootSheetId);
-  // Elements hidden from the presentation are neither drawn nor clickable.
-  const elements = useMemo(() => visibleFor(sheetElements, 'present'), [sheetElements]);
   const drawing = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -349,6 +480,71 @@ export function Presentation() {
 
   // Frames only define the slides: their dashed outline and name tab are not shown.
   const drawn = useMemo(() => elements.filter((e) => e.type !== 'frame'), [elements]);
+
+  // Which slide of this sheet each element belongs to (the first frame it touches).
+  const slideOfEl = useMemo(() => {
+    const m = new Map<Id, number>();
+    slides.forEach((sl, i) => {
+      if (sl.sheetId !== sheetId) return;
+      for (const e of slideElements(elements, sl.frameId ? sl.rect : null, ed.ctx))
+        if (!m.has(e.id)) m.set(e.id, i);
+    });
+    return m;
+  }, [slides, sheetId, elements, ed.ctx]);
+
+  // The animations: the current slide at its step, the slides before all played, the ones after
+  // not started yet (seen while the camera glides past them).
+  const played: AnimFrame = useMemo(() => {
+    const animated = drawn.filter((e) => e.anims?.length);
+    if (!animated.length) return { elements: drawn, fx: new Map(), rings: [], busy: false };
+    const reached = level === 0 ? 0 : (steps[level - 1] ?? 0);
+    const onScreen = slide?.sheetId === sheetId;
+    const clocks: Record<'cur' | 'before' | 'after', Clock> = {
+      cur: { reached: onScreen ? reached : -1, started: started.current, now },
+      before: { reached: Infinity, started: new Map(), now },
+      after: { reached: -1, started: new Map(), now },
+    };
+    const groups: Record<'cur' | 'before' | 'after', Element[]> = {
+      cur: [],
+      before: [],
+      after: [],
+    };
+    for (const e of animated) {
+      const i = slideOfEl.get(e.id);
+      groups[i === undefined || i === index ? 'cur' : i < index ? 'before' : 'after'].push(e);
+    }
+    const byId = new Map<Id, Element>();
+    const fx = new Map<Id, ElFx>();
+    const rings: AnimFrame['rings'] = [];
+    let busy = false;
+    const resolve = (c: string | undefined) => resolveColor(c, theme);
+    const box = (e: Element) => elementBBox(e, ed.ctx, elements);
+    for (const k of ['cur', 'before', 'after'] as const) {
+      if (!groups[k].length) continue;
+      const f = evaluate(groups[k], clocks[k], resolve, box);
+      f.elements.forEach((e) => byId.set(e.id, e));
+      f.fx.forEach((v, id) => fx.set(id, v));
+      if (k === 'cur') {
+        rings.push(...f.rings);
+        busy = f.busy;
+      }
+    }
+    return { elements: drawn.map((e) => byId.get(e.id) ?? e), fx, rings, busy };
+  }, [drawn, level, steps, slide, sheetId, now, slideOfEl, index, theme, ed.ctx, elements]);
+  // Keep drawing while something moves.
+  useEffect(() => {
+    if (!played.busy) return;
+    const id = requestAnimationFrame(() => setNow(performance.now()));
+    return () => cancelAnimationFrame(id);
+  }, [played]);
+  // Elements not there (yet): not drawn at all, so their junction dots go too.
+  const gone = useMemo(() => {
+    const out = new Set<string>();
+    played.fx.forEach((f, id) => {
+      if (f.opacity === 0) out.add(id);
+    });
+    return out;
+  }, [played]);
   // On a frame slide, what lies outside the frame is covered, so the slide is just the frame.
   const spot = slide?.frameId && slide.sheetId === sheetId ? slide.rect : null;
 
@@ -385,7 +581,22 @@ export function Presentation() {
           viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
           style={{ opacity: fade }}
         >
-          <SheetRenderer elements={drawn} o={o} />
+          <SheetRenderer elements={played.elements} o={o} fx={played.fx} hidden={gone} />
+          {played.rings.map((r, i) => (
+            <rect
+              key={i}
+              x={r.x}
+              y={r.y}
+              width={r.w}
+              height={r.h}
+              rx={Math.min(14, r.h / 2)}
+              fill="none"
+              stroke={theme.select}
+              strokeWidth={2.5}
+              opacity={r.opacity}
+              pointerEvents="none"
+            />
+          ))}
           {spot && (
             <path
               className="present-spot"

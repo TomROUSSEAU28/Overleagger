@@ -1,4 +1,5 @@
 import { MathTextarea } from '../latex/MathBar';
+import { AnimationSection, FrameAnimation } from './AnimationPanel';
 import {
   GRID,
   ROLE_LABELS,
@@ -534,6 +535,11 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
         Lock position
       </label>
       <ShowIn els={[el]} />
+      {el.type === 'frame' ? (
+        <FrameAnimation el={el} />
+      ) : (
+        el.type !== 'group' && <AnimationSection el={el} />
+      )}
     </>
   );
 }

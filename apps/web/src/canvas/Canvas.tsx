@@ -16,6 +16,7 @@ import {
   snap,
   type ComponentElement,
   type Element,
+  type FrameElement,
   type Pt,
   type Rect,
 } from '@overleagger/core';
@@ -38,6 +39,7 @@ import { useUserLib } from '../storage/userLibrary';
 import { useUI } from '../store/ui';
 import { THEMES, resolveColor, type Theme } from '../theme';
 import { MAX_ZOOM, MIN_ZOOM } from '../editor/controller';
+import { slideElements, slideSteps } from '../present/anim';
 import { InlineEditor } from './InlineEditor';
 import { ComponentView, type RenderOptions } from './render/ElementViews';
 import { SheetRenderer } from './render/SheetRenderer';
@@ -647,6 +649,64 @@ function PickedSegment({
   );
 }
 
+/**
+ * Click numbers of the presentation animations (▶ = as the slide opens), shown next to the
+ * animated elements while the Animation section of the properties panel is open.
+ */
+function AnimBadges({
+  elements,
+  o,
+  zoom,
+}: {
+  elements: Element[];
+  o: RenderOptions;
+  zoom: number;
+}) {
+  const labels = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!elements.some((e) => e.anims?.length)) return out;
+    const frames = elements.filter((e): e is FrameElement => e.type === 'frame');
+    const groups = frames.length
+      ? frames.map((f) => slideElements(elements, { x: f.x, y: f.y, w: f.w, h: f.h }, o.ctx))
+      : [slideElements(elements, null, o.ctx)];
+    for (const els of groups) {
+      const steps = slideSteps(els);
+      for (const e of els) {
+        if (!e.anims?.length || out.has(e.id)) continue;
+        const marks = [...new Set(e.anims.map((a) => a.step))]
+          .sort((a, b) => a - b)
+          .map((s) => (s === 0 ? '▶' : String(steps.indexOf(s) + 1)));
+        out.set(e.id, marks.join(' '));
+      }
+    }
+    return out;
+  }, [elements, o.ctx]);
+  const k = 1 / zoom;
+  return (
+    <>
+      {[...labels].map(([id, label]) => {
+        const e = elements.find((x) => x.id === id);
+        if (!e) return null;
+        const b = elementBBox(e, o.ctx, elements);
+        const w = (label.length * 6.5 + 10) * k;
+        return (
+          <g
+            key={id}
+            className="anim-badge"
+            transform={`translate(${b.x - 4 * k} ${b.y - 4 * k})`}
+            data-testid="anim-badge"
+          >
+            <rect x={-w} y={-8 * k} width={w} height={16 * k} rx={8 * k} fill={o.theme.select} />
+            <text x={-w / 2} y={4 * k} fontSize={11 * k} textAnchor="middle" fill={o.theme.paper}>
+              {label}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
 /** Small "↗" tag on the corner of elements that carry a link (Ctrl+click follows it). */
 function LinkBadges({
   elements,
@@ -738,6 +798,7 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   const ed = useEditor();
   const selection = useUI((s) => s.selection);
   const wireSegment = useUI((s) => s.wireSegment);
+  const animOpen = useUI((s) => s.animOpen);
   const marquee = useUI((s) => s.marquee);
   const wireDraft = useUI((s) => s.wireDraft);
   const ghost = useUI((s) => s.ghost);
@@ -804,6 +865,7 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
     <g className="overlay">
       <g pointerEvents="none">
         <LinkBadges elements={elements} o={o} zoom={zoom} />
+        {animOpen && <AnimBadges elements={elements} o={o} zoom={zoom} />}
         <HiddenBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (

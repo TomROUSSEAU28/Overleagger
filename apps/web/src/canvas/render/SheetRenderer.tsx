@@ -1,5 +1,6 @@
 import { analyzeConnectivity, type Element, type Pt } from '@overleagger/core';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import type { ElFx } from '../../present/anim';
 import { useUI } from '../../store/ui';
 import { resolveColor } from '../../theme';
 import {
@@ -99,16 +100,31 @@ export const Junctions = memo(function Junctions({
 /** Draw order layer: frames at the back, then blocks, then everything else in z order. */
 const layer = (e: Element) => (e.type === 'frame' ? 0 : e.type === 'block' ? 1 : 2);
 
+/** CSS for an animated element (presentation): fade, move / scale around its centre, wipe, glow. */
+function fxStyle(f: ElFx | undefined): CSSProperties | undefined {
+  if (!f) return undefined;
+  const style: CSSProperties = { transformBox: 'fill-box', transformOrigin: 'center' };
+  if (f.opacity !== undefined) style.opacity = f.opacity;
+  if (f.transform) style.transform = f.transform;
+  if (f.reveal !== undefined) style.clipPath = `inset(-40px ${(1 - f.reveal) * 100}% -40px -40px)`;
+  if (f.glow)
+    style.filter = `drop-shadow(0 0 ${2 + 7 * f.glow}px rgba(214, 40, 40, ${0.9 * f.glow}))`;
+  return style;
+}
+
 /** Draws every element of a sheet plus the automatic junction dots. */
 export const SheetRenderer = memo(function SheetRenderer({
   elements,
   o,
   hidden,
+  fx,
 }: {
   elements: Element[];
   o: RenderOptions;
   /** Elements not drawn (e.g. being erased). */
   hidden?: ReadonlySet<string>;
+  /** Presentation: how the animated elements are drawn right now. */
+  fx?: ReadonlyMap<string, ElFx>;
 }) {
   const visible = useMemo(
     () => (hidden?.size ? elements.filter((e) => !hidden.has(e.id)) : elements),
@@ -126,9 +142,16 @@ export const SheetRenderer = memo(function SheetRenderer({
   }, [conn, visible, o.theme]);
   return (
     <g className="sheet" strokeLinecap="round" strokeLinejoin="round">
-      {ordered.map((el) => (
-        <ElementView key={el.id} el={el} o={o} />
-      ))}
+      {ordered.map((el) =>
+        // Animated elements get a wrapper (always the same, so they are not re-created).
+        fx && el.anims?.length ? (
+          <g key={el.id} className="anim-el" style={fxStyle(fx.get(el.id))}>
+            <ElementView el={el} o={o} />
+          </g>
+        ) : (
+          <ElementView key={el.id} el={el} o={o} />
+        ),
+      )}
       <Junctions points={conn.junctions} colors={colors} interactive={o.interactive} />
     </g>
   );

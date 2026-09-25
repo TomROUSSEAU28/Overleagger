@@ -485,3 +485,54 @@ test('comments: Enter posts, resolve and delete can be undone; panels resize and
   await page.getByTestId('show-left').click();
   expect(await width()).toBe(wide);
 });
+
+test('presentation animations: appear on a click, then the next slide', async ({ page }) => {
+  await newProject(page, 'Animations');
+  const id = await page.evaluate(() => {
+    const ed = (
+      window as unknown as {
+        __overleagger: {
+          ed: { addElement(e: object): { id: string }; select(ids: string[]): void };
+        };
+      }
+    ).__overleagger.ed;
+    ed.addElement({ type: 'frame', x: 0, y: 0, w: 400, h: 240, name: 'One' });
+    ed.addElement({ type: 'frame', x: 500, y: 0, w: 400, h: 240, name: 'Two' });
+    const t = ed.addElement({
+      type: 'text',
+      x: 40,
+      y: 100,
+      text: 'Hello',
+      size: 20,
+      align: 'start',
+    });
+    ed.select([t.id]);
+    return t.id;
+  });
+  // Folded until opened; then add an entrance.
+  await expect(page.getByTestId('anim-add')).toHaveCount(0);
+  await page.getByTestId('anim-toggle').click();
+  await page.getByTestId('anim-add').click();
+  await page.getByTestId('anim-add-appear').click();
+  await expect(page.getByTestId('anim-card')).toHaveCount(1);
+  await expect(page.getByTestId('anim-badge')).toHaveText('1');
+
+  await page.getByTestId('anim-preview').click();
+  const count = page.getByTestId('present-count');
+  await expect(count).toContainText('1 / 2');
+  const text = page.locator(`.present-stage [data-id="${id}"]`);
+  await expect(text).toHaveCount(0);
+  // First click: the text comes in, still on slide 1. Second click: slide 2.
+  await page.keyboard.press('ArrowRight');
+  await expect(text).toHaveCount(1);
+  await expect(count).toContainText('1 / 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('2 / 2');
+  // Back: slide 1 with its steps played.
+  await page.keyboard.press('ArrowLeft');
+  await expect(count).toContainText('1 / 2');
+  await expect(text).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await expect(text).toHaveCount(0);
+  await page.keyboard.press('Escape');
+});

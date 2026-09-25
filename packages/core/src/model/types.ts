@@ -34,7 +34,51 @@ interface BaseElement {
   noPresent?: boolean;
   /** Left out of the exports (PDF, SVG, PNG, CircuiTikZ). */
   noExport?: boolean;
+  /** Animations played in the presentation (build steps, automations). */
+  anims?: Anim[];
 }
+
+/**
+ * What an animation does:
+ *  - `appear` / `disappear`: comes in / goes away (effect: fade, pop, rise, wipe, zoom);
+ *  - `emphasis`: draws the eye once (effect: pulse, shake, glow);
+ *  - `color`: the ink turns to `color`;
+ *  - `move`: slides by (dx, dy);
+ *  - `set`: a part changes (symbol options, e.g. a switch closes);
+ *  - `wave`: a waveform trace parameter goes from → to (or keeps going back and forth: `loop`);
+ *  - `text`: the text is typed (`typewriter`), or replaced by `text`.
+ */
+export type AnimKind =
+  'appear' | 'disappear' | 'emphasis' | 'color' | 'move' | 'set' | 'wave' | 'text';
+
+export interface Anim {
+  id: string;
+  kind: AnimKind;
+  /** When: 0 = as the slide opens; n ≥ 1 = at the n-th click on the slide. */
+  step: number;
+  /** Wait before starting (ms, after the step starts). */
+  delay?: number;
+  /** Duration (ms). */
+  dur?: number;
+  effect?: string;
+  color?: string;
+  dx?: number;
+  dy?: number;
+  /** `set`: symbol options to apply. */
+  opts?: Record<string, OptionValue>;
+  /** `wave`: which trace (id; the first one when missing) and which parameter. */
+  trace?: string;
+  key?: 'duty' | 'amp' | 'phase' | 'periods' | 'offset';
+  from?: number;
+  to?: number;
+  /** `wave`: keep going back and forth between `from` and `to` (period = 2 × dur). */
+  loop?: boolean;
+  /** `text`: the new text (replace), or nothing to type the current text. */
+  text?: string;
+}
+
+/** How the presentation arrives on a frame. */
+export type Transition = 'move' | 'fade' | 'slide' | 'zoom' | 'none';
 
 export interface ComponentElement extends BaseElement {
   type: 'component';
@@ -277,6 +321,10 @@ export interface WaveformElement extends BaseElement, BoxFields {
 export interface FrameElement extends BaseElement, BoxFields {
   type: 'frame';
   name: string;
+  /** How the presentation arrives on this frame (default: the camera moves). */
+  transition?: Transition;
+  /** Duration of the transition (ms). */
+  transitionMs?: number;
 }
 
 export type Element =

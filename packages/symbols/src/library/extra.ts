@@ -5,6 +5,7 @@
 import { A, C, L, M, PC, R, T, arrow, arrowHead, dot, pin, sine, tf } from '../prims';
 import type { OptionDef, PinDef, Primitive, SymbolDef } from '../types';
 import { inductorBody, leads, resistorBody, twoPins } from './passives';
+import { stateOpt } from './misc';
 import { diodeBody, diodeFill } from './semiconductors';
 
 const intOpt = (key: string, label: string, def: number, min: number, max: number): OptionDef => ({
@@ -277,11 +278,21 @@ export const extraPower: SymbolDef[] = [
     category: 'Switches & protection',
     keywords: ['ideal', 'controlled switch', 'plecs', 'simulation'],
     refPrefix: 'S',
-    build: () => ({
+    options: [
+      {
+        ...stateOpt,
+        label: 'Position',
+        choices: [
+          { value: 'rest', label: 'Open' },
+          { value: 'on', label: 'Closed' },
+        ],
+      },
+    ],
+    build: ({ opts }) => ({
       prims: [
         L(-3, 0, -1, 0),
         L(1, 0, 3, 0),
-        L(-1, 0, 1, -1),
+        L(-1, 0, 1, opts.state === 'on' ? -0.2 : -1),
         dot(-1, 0, 0.18),
         dot(1, 0, 0.18),
         L(0, -0.5, 0, -2, { dash: 'dashed', sw: 0.8 }),
