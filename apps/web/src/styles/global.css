@@ -3514,21 +3514,29 @@ body.resizing-panel {
   border-color: var(--border);
 }
 .flow-preview {
-  display: block;
+  position: relative;
   margin: 2px 0 8px;
+  padding: 4px 6px 2px 30px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
 }
+.flow-preview svg {
+  display: block;
+}
 .flow-preview .flow-zero {
   stroke: var(--muted);
-  stroke-opacity: 0.4;
+  stroke-opacity: 0.45;
   stroke-dasharray: 3 3;
 }
 .flow-preview .flow-axis {
-  font-size: 10px;
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
   font-style: italic;
-  fill: var(--muted);
+  color: var(--muted);
 }
 .flow-reverse {
   align-self: flex-end;

@@ -126,7 +126,9 @@ export function FlowProps({ el }: { el: FlowElement }) {
           />
         </Field>
       )}
-      <Field label="What flows">
+      {/* (Not a <label>: it would tie the whole row to its first button.) */}
+      <div className="field">
+        <span className="field-label">What flows</span>
         <div className="flow-symbols">
           {SYMBOLS.map(([s, l]) => (
             <button
@@ -150,7 +152,7 @@ export function FlowProps({ el }: { el: FlowElement }) {
             </button>
           ))}
         </div>
-      </Field>
+      </div>
       <Field label={`Size: ${size} px`}>
         <input
           type="range"
@@ -202,30 +204,47 @@ export function FlowProps({ el }: { el: FlowElement }) {
   );
 }
 
-/** i(t) over two periods (or the start of a ramp), with the zero line. */
+/**
+ * i(t) over two periods (or the start of a ramp): scaled to its own range, zero included, so a
+ * DC current is a flat line above its zero line.
+ */
 function SignalPreview({ el, color }: { el: FlowElement; color: string }) {
-  const W = 220;
-  const H = 46;
+  const W = 240;
+  const H = 44;
+  const pad = 6;
   const span = 2 * (el.period ?? FLOW_DEFAULTS.period) * (el.signal === 'dc' ? 1 : 1.2);
   const n = 160;
   const vals = Array.from({ length: n + 1 }, (_, i) => flowCurrent(el, (i / n) * span));
-  const max = Math.max(1e-6, ...vals.map(Math.abs));
-  const y = (v: number) => H / 2 - (v / max) * (H / 2 - 4);
+  let lo = Math.min(0, ...vals);
+  let hi = Math.max(0, ...vals);
+  if (hi - lo < 1e-6) {
+    hi += 1;
+    lo -= 1;
+  }
+  const y = (v: number) => pad + ((hi - v) / (hi - lo)) * (H - 2 * pad);
   const d = vals.map((v, i) => `${i ? 'L' : 'M'} ${((i / n) * W).toFixed(1)} ${y(v).toFixed(1)}`);
   return (
-    <svg
-      className="flow-preview"
-      viewBox={`0 0 ${W} ${H}`}
-      width="100%"
-      height={H}
-      aria-label="The current in time"
-    >
-      <line x1={0} x2={W} y1={H / 2} y2={H / 2} className="flow-zero" />
-      <path d={d.join(' ')} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
-      <text x={4} y={11} className="flow-axis">
-        i(t)
-      </text>
-    </svg>
+    <div className="flow-preview" aria-label="The current in time">
+      <span className="flow-axis">i(t)</span>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}>
+        <line
+          x1={0}
+          x2={W}
+          y1={y(0)}
+          y2={y(0)}
+          className="flow-zero"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d={d.join(' ')}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
   );
 }
 
