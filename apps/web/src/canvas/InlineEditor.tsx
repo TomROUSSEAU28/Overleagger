@@ -1,7 +1,12 @@
 import { blockLayout, portTextPos, type Element } from '@overleagger/core';
 import { useEffect, useRef, useState } from 'react';
 import { useEditor, useSheetElements } from '../editor/context';
+import { MathBar } from '../latex/MathBar';
+import { useToggleDollars } from '../latex/useMathEdit';
 import { useUI, type Viewport } from '../store/ui';
+
+/** Texts drawn with `$…$` math: their editor gets the math bar. */
+const MATH_TYPES: Element['type'][] = ['text', 'note', 'shape', 'line', 'label', 'block', 'port'];
 
 function anchorOf(el: Element, ed: ReturnType<typeof useEditor>): { x: number; y: number } | null {
   switch (el.type) {
@@ -40,6 +45,7 @@ export function InlineEditor({ vp }: { vp: Viewport }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const initial = el ? String((el as unknown as Record<string, unknown>)[edit!.field] ?? '') : '';
   const [value, setValue] = useState(initial);
+  const toggleDollars = useToggleDollars(ref, setValue);
 
   useEffect(() => {
     setValue(initial);
@@ -65,25 +71,33 @@ export function InlineEditor({ vp }: { vp: Viewport }) {
     useUI.getState().set({ inlineEdit: null });
   };
   return (
-    <textarea
-      ref={ref}
-      className="inline-editor"
-      data-testid="inline-editor"
-      style={{ left: a.x * vp.zoom + vp.x, top: a.y * vp.zoom + vp.y }}
-      value={value}
-      rows={multiline ? Math.max(2, value.split('\n').length) : 1}
-      spellCheck={false}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => close(true)}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === 'Escape') close(false);
-        if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          close(true);
-        }
-      }}
-      placeholder={multiline ? 'Text — use $…$ for LaTeX, Ctrl+Enter to finish' : ''}
-    />
+    <div className="inline-edit" style={{ left: a.x * vp.zoom + vp.x, top: a.y * vp.zoom + vp.y }}>
+      {MATH_TYPES.includes(el.type) && (
+        <MathBar input={ref} onChange={setValue} compact={!multiline} />
+      )}
+      <textarea
+        ref={ref}
+        className="inline-editor"
+        data-testid="inline-editor"
+        value={value}
+        rows={multiline ? Math.max(2, value.split('\n').length) : 1}
+        spellCheck={false}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => close(true)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Escape') close(false);
+          if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            close(true);
+          }
+          if (e.key.toLowerCase() === 'm' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            toggleDollars();
+          }
+        }}
+        placeholder={multiline ? 'Text — use $…$ for LaTeX, Ctrl+Enter to finish' : ''}
+      />
+    </div>
   );
 }

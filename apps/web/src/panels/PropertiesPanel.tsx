@@ -1,3 +1,4 @@
+import { MathTextarea } from '../latex/MathBar';
 import {
   GRID,
   ROLE_LABELS,
@@ -791,8 +792,9 @@ function WireProps({ el }: { el: WireElement }) {
         </select>
       </Field>
       <p className="muted small">
-        Drag a segment to move it. Junction dots appear automatically where 3 or more connections
-        meet.
+        Drag the wire to move it: what is attached to it follows. Click it again to pick one
+        segment, then drag it or press Delete. Junction dots appear automatically where 3 or more
+        connections meet.
       </p>
     </>
   );
@@ -974,7 +976,7 @@ function TextProps({ el }: { el: TextElement }) {
     <>
       <h3>Text</h3>
       <Field label="Content ($…$ = LaTeX)">
-        <textarea rows={4} value={el.text} onChange={(e) => upd({ text: e.target.value })} />
+        <MathTextarea value={el.text} onChange={(text) => upd({ text })} />
       </Field>
       <div className="row">
         <Field label="Size">

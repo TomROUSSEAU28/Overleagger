@@ -3262,3 +3262,95 @@ body.resizing-panel {
   max-width: none;
   max-height: calc(100dvh - 24px);
 }
+
+/* In-place text editor, with the math bar above it. */
+.inline-edit {
+  position: absolute;
+  z-index: 5;
+}
+.inline-edit .inline-editor {
+  position: static;
+  display: block;
+}
+.inline-edit .math-bar {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  box-shadow: var(--shadow);
+}
+
+/* Math bar: $…$ and the usual LaTeX pieces. */
+.math-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: max-content;
+  max-width: min(420px, 92vw);
+}
+.math-field .math-bar {
+  margin-bottom: 4px;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.math-field textarea {
+  width: 100%;
+}
+.math-btn {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 5px;
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+}
+.math-btn:hover,
+.math-btn.active {
+  background: var(--hover);
+  border-color: var(--border);
+}
+.math-btn.dollars {
+  font-family: var(--mono, monospace);
+  font-size: 12.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.math-more {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 6;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  width: max-content;
+}
+.math-group-name {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.math-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 2px;
+}
+.math-grid .math-btn {
+  width: 30px;
+  min-width: 0;
+  padding: 0;
+}

@@ -5,7 +5,7 @@ import {
   GRID,
   HANDLES,
   computeMove,
-  dragSegment,
+  computeSegmentDrag,
   elementBBox,
   expandSelection,
   handlePos,
@@ -122,9 +122,14 @@ export function Canvas() {
     let changed: Element[] = [];
     if (drag && (drag.dx || drag.dy)) {
       if (drag.segment) {
-        const w = elements.find((e) => e.id === drag.segment!.wireId);
-        if (w?.type === 'wire')
-          changed = [{ ...w, pts: dragSegment(w, drag.segment.index, drag.dx, drag.dy) }];
+        changed = computeSegmentDrag(
+          elements,
+          drag.segment.wireId,
+          drag.segment.index,
+          drag.dx,
+          drag.dy,
+          ed.ctx,
+        );
       } else {
         changed = computeMove(
           elements,
@@ -595,6 +600,53 @@ function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; l
   );
 }
 
+/** The picked segment of a selected wire: drawn strong, with a square at each end. */
+function PickedSegment({
+  pts,
+  index,
+  color,
+  paper,
+  sw,
+}: {
+  pts: number[];
+  index: number;
+  color: string;
+  paper: string;
+  sw: number;
+}) {
+  const [ax, ay, bx, by] = pts.slice(2 * index, 2 * index + 4) as [number, number, number, number];
+  const h = 3.5 * sw;
+  return (
+    <g data-testid="picked-segment">
+      <line
+        x1={ax}
+        y1={ay}
+        x2={bx}
+        y2={by}
+        stroke={color}
+        strokeOpacity={0.7}
+        strokeWidth={7}
+        strokeLinecap="round"
+      />
+      {[
+        [ax, ay],
+        [bx, by],
+      ].map(([x, y]) => (
+        <rect
+          key={`${x},${y}`}
+          x={x! - h}
+          y={y! - h}
+          width={2 * h}
+          height={2 * h}
+          fill={paper}
+          stroke={color}
+          strokeWidth={1.2 * sw}
+        />
+      ))}
+    </g>
+  );
+}
+
 /** Small "↗" tag on the corner of elements that carry a link (Ctrl+click follows it). */
 function LinkBadges({
   elements,
@@ -685,6 +737,7 @@ function HiddenBadges({
 function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions; zoom: number }) {
   const ed = useEditor();
   const selection = useUI((s) => s.selection);
+  const wireSegment = useUI((s) => s.wireSegment);
   const marquee = useUI((s) => s.marquee);
   const wireDraft = useUI((s) => s.wireDraft);
   const ghost = useUI((s) => s.ghost);
@@ -754,16 +807,26 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
         <HiddenBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (
-            <polyline
-              key={b.el.id}
-              points={b.wire.join(' ')}
-              fill="none"
-              stroke={sel}
-              strokeOpacity={0.45}
-              strokeWidth={6}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <g key={b.el.id}>
+              <polyline
+                points={b.wire.join(' ')}
+                fill="none"
+                stroke={sel}
+                strokeOpacity={wireSegment?.wireId === b.el.id ? 0.18 : 0.45}
+                strokeWidth={6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {wireSegment?.wireId === b.el.id && 2 * wireSegment.index + 3 < b.wire.length && (
+                <PickedSegment
+                  pts={b.wire}
+                  index={wireSegment.index}
+                  color={sel}
+                  paper={t.paper}
+                  sw={sw}
+                />
+              )}
+            </g>
           ) : (
             <g key={b.el.id}>
               <rect

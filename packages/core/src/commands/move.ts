@@ -1,7 +1,15 @@
 import { followConnectors } from '../geometry/connectors';
 import { elementPins, elementBBox, type SheetContext } from '../geometry/elements';
-import { normalizeWire, ptKey, rectUnion, snap, samePt } from '../geometry/geom';
-import type { Element, Id, Rot, Side, WireElement } from '../model/types';
+import {
+  EPS,
+  normalizeWire,
+  onSegmentInterior,
+  ptKey,
+  rectUnion,
+  snap,
+  samePt,
+} from '../geometry/geom';
+import type { Element, Id, Pt, Rot, Side, WireElement } from '../model/types';
 import { GRID } from '../model/types';
 
 /** Shift a flat point list whose points have `stride` numbers (x, y, …). */
@@ -60,9 +68,130 @@ function reversePts(pts: number[]): number[] {
   return out;
 }
 
+/** True when (x, y) is on the wire: one of its vertices or a point of one of its segments. */
+export function onWire(pts: number[], x: number, y: number): boolean {
+  for (let i = 0; i < pts.length; i += 2) if (samePt(pts[i]!, pts[i + 1]!, x, y)) return true;
+  for (let i = 2; i < pts.length; i += 2)
+    if (onSegmentInterior(x, y, pts[i - 2]!, pts[i - 1]!, pts[i]!, pts[i + 1]!)) return true;
+  return false;
+}
+
+/** On the wire, but not at one of its two end points (a bend, or the middle of a segment). */
+function throughWire(pts: number[], x: number, y: number): boolean {
+  const n = pts.length;
+  return (
+    onWire(pts, x, y) && !samePt(pts[0]!, pts[1]!, x, y) && !samePt(pts[n - 2]!, pts[n - 1]!, x, y)
+  );
+}
+
 /**
- * Compute the result of moving `ids` by (dx, dy): moved elements are translated, and wires that
- * are attached to them (by an end point) are stretched so they stay connected and orthogonal.
+ * Bring the start of a (translated) wire back to (x, y): its first segment stretches, and a short
+ * leg joins it to (x, y) when the move went across it.
+ */
+function holdStart(pts: number[], x: number, y: number): number[] {
+  const sx = pts[0]!;
+  const sy = pts[1]!;
+  const ax = pts[2]!;
+  const ay = pts[3]!;
+  if (samePt(sx, sy, x, y)) return pts;
+  const horizontal = Math.abs(sy - ay) < EPS && Math.abs(sx - ax) > EPS;
+  const vertical = Math.abs(sx - ax) < EPS && Math.abs(sy - ay) > EPS;
+  let head = [x, y];
+  if (horizontal && Math.abs(sy - y) > EPS) head = [x, y, x, sy];
+  else if (vertical && Math.abs(sx - x) > EPS) head = [x, y, sx, y];
+  return normalizeWire([...head, ...pts.slice(2)]);
+}
+
+const holdEnd = (pts: number[], x: number, y: number) =>
+  reversePts(holdStart(reversePts(pts), x, y));
+
+/**
+ * A wire that changed shape: where a point that was on it (a wire end, a net label) goes. Points
+ * on the part that moved (`moving`) go with it by `d`; the others stay, as long as they are still
+ * on the wire.
+ */
+interface WireEdit {
+  old: number[];
+  pts: number[];
+  d: Pt;
+  moving: (x: number, y: number) => boolean;
+}
+
+function relocate(e: WireEdit, x: number, y: number): Pt {
+  const moved = { x: x + e.d.x, y: y + e.d.y };
+  const here = { x, y };
+  const [a, b] = e.moving(x, y) ? [moved, here] : [here, moved];
+  if (onWire(e.pts, a.x, a.y)) return a;
+  if (onWire(e.pts, b.x, b.y)) return b;
+  return a;
+}
+
+/**
+ * The wires and net labels (not in `skip`) that are attached to what moved follow it: a wire end
+ * or a label on a moved pin (`pinTarget`) or anywhere on a changed wire (`edits`), including the
+ * middle of its segments (T junctions).
+ */
+function attachedFollow(
+  elements: Element[],
+  skip: Set<Id>,
+  pinTarget: (x: number, y: number) => Pt | null,
+  edits: WireEdit[],
+): Element[] {
+  const target = (x: number, y: number): Pt | null => {
+    let t = pinTarget(x, y);
+    if (!t) {
+      const e = edits.find((e) => onWire(e.old, x, y));
+      if (e) t = relocate(e, x, y);
+    }
+    return t && !samePt(t.x, t.y, x, y) ? t : null;
+  };
+  const out: Element[] = [];
+  for (const el of elements) {
+    if (skip.has(el.id)) continue;
+    if (el.type === 'wire' && el.pts.length >= 4) {
+      const n = el.pts.length;
+      const s = target(el.pts[0]!, el.pts[1]!);
+      const e = target(el.pts[n - 2]!, el.pts[n - 1]!);
+      if (!s && !e) continue;
+      if (s && e) {
+        const [sdx, sdy] = [s.x - el.pts[0]!, s.y - el.pts[1]!];
+        if (samePt(sdx, sdy, e.x - el.pts[n - 2]!, e.y - el.pts[n - 1]!)) {
+          out.push(translated(el, sdx, sdy));
+          continue;
+        }
+      }
+      let pts = el.pts;
+      if (e) pts = moveWireEnd(pts, e.x - pts[n - 2]!, e.y - pts[n - 1]!);
+      if (s) {
+        const r = reversePts(pts);
+        const m = r.length;
+        pts = reversePts(moveWireEnd(r, s.x - r[m - 2]!, s.y - r[m - 1]!));
+      }
+      out.push({ ...el, pts });
+    } else if (el.type === 'label') {
+      const t = target(el.x, el.y);
+      if (t) out.push({ ...el, x: t.x, y: t.y });
+    }
+  }
+  return out;
+}
+
+/** Keys of the pins of `els`. */
+function pinKeys(els: Element[], ctx: SheetContext): Set<string> {
+  const out = new Set<string>();
+  for (const el of els)
+    if (el.type !== 'wire' && el.type !== 'group')
+      for (const p of elementPins(el, ctx)) out.add(ptKey(p.x, p.y));
+  return out;
+}
+
+/**
+ * Compute the result of moving `ids` by (dx, dy). Moved elements are translated, and what is
+ * attached to them follows:
+ *  - wires ending on a moved pin, or anywhere on a moved wire (T junctions too), are stretched
+ *    so they stay connected and orthogonal; net labels on them go along;
+ *  - a moved wire whose end is on something that stays (the pin of a part that stays, the
+ *    middle of a wire that stays) keeps that end in place and stretches instead.
  * Returns only the changed elements.
  */
 export function computeMove(
@@ -73,10 +202,45 @@ export function computeMove(
   ctx: SheetContext,
 ): Element[] {
   if (dx === 0 && dy === 0) return [];
-  const out: Element[] = [];
-  const anchors = new Set<string>();
+  const out = new Map<Id, Element>();
+  const movedPins = pinKeys(
+    elements.filter((e) => ids.has(e.id)),
+    ctx,
+  );
+  // Net labels only name a wire: they go with it rather than hold it.
+  const stayingPins = pinKeys(
+    elements.filter((e) => !ids.has(e.id) && e.type !== 'label'),
+    ctx,
+  );
+  const stayingWires = elements.filter(
+    (e): e is WireElement => e.type === 'wire' && !ids.has(e.id) && e.pts.length >= 4,
+  );
+  const held = (x: number, y: number) => {
+    const k = ptKey(x, y);
+    if (movedPins.has(k)) return false;
+    return stayingPins.has(k) || stayingWires.some((w) => throughWire(w.pts, x, y));
+  };
+  const d = { x: dx, y: dy };
+  const edits: WireEdit[] = [];
   for (const el of elements) {
     if (!ids.has(el.id)) continue;
+    if (el.type === 'wire' && el.pts.length >= 4) {
+      const n = el.pts.length;
+      const [sx, sy, ex, ey] = [el.pts[0]!, el.pts[1]!, el.pts[n - 2]!, el.pts[n - 1]!];
+      const hs = held(sx, sy);
+      const he = held(ex, ey);
+      let pts = shiftPts(el.pts, dx, dy);
+      if (hs) pts = holdStart(pts, sx, sy);
+      if (he) pts = holdEnd(pts, ex, ey);
+      out.set(el.id, { ...el, pts });
+      edits.push({
+        old: el.pts,
+        pts,
+        d,
+        moving: (x, y) => !((hs && samePt(x, y, sx, sy)) || (he && samePt(x, y, ex, ey))),
+      });
+      continue;
+    }
     let moved = translated(el, dx, dy);
     // A connector moved without its shape lets go of it.
     if (moved.type === 'line') {
@@ -87,35 +251,29 @@ export function computeMove(
         ...(to && ids.has(to.id) ? { to } : {}),
       } as Element;
     }
-    out.push(moved);
-    for (const p of elementPins(el, ctx)) anchors.add(ptKey(p.x, p.y));
-    if (el.type === 'wire')
-      for (let i = 0; i < el.pts.length; i += 2) anchors.add(ptKey(el.pts[i]!, el.pts[i + 1]!));
+    out.set(el.id, moved);
   }
-  for (const el of elements) {
-    if (ids.has(el.id) || el.type !== 'wire' || el.pts.length < 4) continue;
-    const n = el.pts.length;
-    const startOn = anchors.has(ptKey(el.pts[0]!, el.pts[1]!));
-    const endOn = anchors.has(ptKey(el.pts[n - 2]!, el.pts[n - 1]!));
-    if (startOn && endOn) {
-      out.push(translated(el, dx, dy));
-    } else if (endOn) {
-      out.push({ ...el, pts: moveWireEnd(el.pts, dx, dy) });
-    } else if (startOn) {
-      out.push({ ...el, pts: reversePts(moveWireEnd(reversePts(el.pts), dx, dy)) });
-    }
-  }
+  const pinTarget = (x: number, y: number) =>
+    movedPins.has(ptKey(x, y)) ? { x: x + dx, y: y + dy } : null;
+  for (const f of attachedFollow(elements, ids, pinTarget, edits)) out.set(f.id, f);
   // Connectors attached to moved shapes follow them.
-  const moved = new Map(out.map((e) => [e.id, e]));
-  for (const l of followConnectors(elements, out)) moved.set(l.id, l);
-  return [...moved.values()];
+  for (const l of followConnectors(elements, [...out.values()])) out.set(l.id, l);
+  return [...out.values()];
 }
 
 /**
  * Drag segment `seg` (between vertex seg and seg+1) of a wire perpendicular to itself.
- * End points stay where they are: a new vertex is inserted when an end segment moves.
+ * End points stay where they are (a new vertex is inserted when an end segment moves), unless
+ * `keepStart` / `keepEnd` say they may go with the segment.
  */
-export function dragSegment(w: WireElement, seg: number, dx: number, dy: number): number[] {
+export function dragSegment(
+  w: WireElement,
+  seg: number,
+  dx: number,
+  dy: number,
+  keepStart = true,
+  keepEnd = true,
+): number[] {
   const pts = [...w.pts];
   const n = pts.length / 2;
   if (seg < 0 || seg >= n - 1) return pts;
@@ -135,9 +293,59 @@ export function dragSegment(w: WireElement, seg: number, dx: number, dy: number)
   moved[2 * seg + 3] = by + my;
   let out = moved;
   // Keep the wire's end points fixed.
-  if (seg === n - 2) out = [...out, bx, by];
-  if (seg === 0) out = [ax, ay, ...out];
+  if (seg === n - 2 && keepEnd) out = [...out, bx, by];
+  if (seg === 0 && keepStart) out = [ax, ay, ...out];
   return normalizeWire(out);
+}
+
+/**
+ * Drag one segment of a wire across itself, with what is attached to it: wires ending on the
+ * segment (or on its bends) and net labels on it go along. An end of the wire that touches
+ * nothing goes with the segment; one that is connected stays and a leg is added.
+ * Returns the changed elements (the wire first).
+ */
+export function computeSegmentDrag(
+  elements: Element[],
+  wireId: Id,
+  seg: number,
+  dx: number,
+  dy: number,
+  ctx: SheetContext,
+): Element[] {
+  const w = elements.find((e): e is WireElement => e.id === wireId && e.type === 'wire');
+  if (!w || (!dx && !dy)) return [];
+  const n = w.pts.length / 2;
+  if (seg < 0 || seg >= n - 1) return [];
+  const [ax, ay, bx, by] = w.pts.slice(2 * seg, 2 * seg + 4) as [number, number, number, number];
+  const horizontal = Math.abs(ay - by) < EPS;
+  const vertical = Math.abs(ax - bx) < EPS;
+  const d = { x: horizontal ? 0 : dx, y: vertical ? 0 : dy };
+  if (!d.x && !d.y) return [];
+  const pins = pinKeys(
+    elements.filter((e) => e.type !== 'label'),
+    ctx,
+  );
+  const touches = (x: number, y: number) =>
+    pins.has(ptKey(x, y)) ||
+    elements.some((e) => e.type === 'wire' && e.id !== w.id && onWire(e.pts, x, y));
+  const keepStart = seg === 0 && touches(ax, ay);
+  const keepEnd = seg === n - 2 && touches(bx, by);
+  const pts = dragSegment(w, seg, dx, dy, keepStart, keepEnd);
+  const edit: WireEdit = {
+    old: w.pts,
+    pts,
+    d,
+    moving: (x, y) =>
+      (samePt(x, y, ax, ay) && !keepStart) ||
+      (samePt(x, y, bx, by) && !keepEnd) ||
+      onSegmentInterior(x, y, ax, ay, bx, by),
+  };
+  return [{ ...w, pts }, ...attachedFollow(elements, new Set([w.id]), () => null, [edit])];
+}
+
+/** What remains of a wire once its segment `seg` is removed: 0, 1 or 2 pieces. */
+export function removeSegment(pts: number[], seg: number): number[][] {
+  return [pts.slice(0, 2 * seg + 2), pts.slice(2 * seg + 2)].filter((p) => p.length >= 4);
 }
 
 /** Index of the segment of `w` closest to (x, y). */
@@ -310,33 +518,43 @@ export function mirrorElements(
 export function followPins(all: Element[], changed: Element[], ctx: SheetContext): Element[] {
   const byId = new Map(all.map((e) => [e.id, e]));
   const changedIds = new Set(changed.map((e) => e.id));
-  const moves = new Map<string, { x: number; y: number }>();
+  const moves = new Map<string, Pt>();
+  // Wires that turned with the selection: a point on one goes to the same place on the new one.
+  const turned: { old: number[]; pts: number[] }[] = [];
   for (const n of changed) {
     const o = byId.get(n.id);
     if (!o) continue;
+    if (o.type === 'wire' && n.type === 'wire') {
+      if (o.pts.length === n.pts.length && o.pts.some((v, i) => v !== n.pts[i]))
+        turned.push({ old: o.pts, pts: n.pts });
+      continue;
+    }
     const after = new Map(elementPins(n, ctx).map((p) => [p.pinId, p]));
     for (const p of elementPins(o, ctx)) {
       const q = after.get(p.pinId);
       if (q && (q.x !== p.x || q.y !== p.y)) moves.set(ptKey(p.x, p.y), { x: q.x, y: q.y });
     }
   }
-  if (!moves.size) return [];
-  const out: Element[] = [];
-  for (const w of all) {
-    if (w.type !== 'wire' || changedIds.has(w.id) || w.pts.length < 4) continue;
-    let pts = w.pts;
-    const start = moves.get(ptKey(pts[0]!, pts[1]!));
-    const n = pts.length;
-    const end = moves.get(ptKey(pts[n - 2]!, pts[n - 1]!));
-    if (end) pts = moveWireEnd(pts, end.x - pts[n - 2]!, end.y - pts[n - 1]!);
-    if (start) {
-      const r = reversePts(pts);
-      const m = r.length;
-      pts = reversePts(moveWireEnd(r, start.x - r[m - 2]!, start.y - r[m - 1]!));
+  if (!moves.size && !turned.length) return [];
+  const target = (x: number, y: number): Pt | null => {
+    const m = moves.get(ptKey(x, y));
+    if (m) return m;
+    for (const w of turned) {
+      for (let i = 0; i < w.old.length; i += 2) {
+        if (samePt(w.old[i]!, w.old[i + 1]!, x, y)) return { x: w.pts[i]!, y: w.pts[i + 1]! };
+        if (i + 3 < w.old.length) {
+          const [ax, ay, bx, by] = w.old.slice(i, i + 4) as [number, number, number, number];
+          if (!onSegmentInterior(x, y, ax, ay, bx, by)) continue;
+          const t = Math.hypot(x - ax, y - ay) / Math.hypot(bx - ax, by - ay);
+          const [cx, cy, dx, dy] = w.pts.slice(i, i + 4) as [number, number, number, number];
+          const r = (v: number) => Math.round(v * 1e6) / 1e6;
+          return { x: r(cx + (dx - cx) * t), y: r(cy + (dy - cy) * t) };
+        }
+      }
     }
-    if (pts !== w.pts) out.push({ ...w, pts });
-  }
-  return out;
+    return null;
+  };
+  return attachedFollow(all, changedIds, target, []);
 }
 
 /** True when the point is one of the end points of the wire. */

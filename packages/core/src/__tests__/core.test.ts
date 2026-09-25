@@ -11,6 +11,8 @@ import {
   analyzeConnectivity,
   blockLayout,
   computeMove,
+  computeSegmentDrag,
+  removeSegment,
   copyElements,
   createBlock,
   createUndoManager,
@@ -250,6 +252,87 @@ describe('moving', () => {
   it('drags a wire segment while keeping its end points', () => {
     const w = { id: 'w', type: 'wire', z: 0, kind: 'power', pts: [0, 0, 100, 0] } as WireElement;
     expect(dragSegment(w, 0, 0, 30)).toEqual([0, 0, 0, 30, 100, 30, 100, 0]);
+  });
+
+  it('moves a wire with the wires attached to the middle of it (T junction)', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const a = wire(0, 0, 100, 0);
+    const t = wire(50, 0, 50, 60);
+    const changed = computeMove(p.getElements(sheet), new Set([a.id]), 0, -20, ctx());
+    const nt = changed.find((e) => e.id === t.id) as WireElement;
+    // The T end went up with the wire; the other end stayed.
+    expect(nt.pts.slice(0, 2)).toEqual([50, -20]);
+    expect(nt.pts.slice(-2)).toEqual([50, 60]);
+    // The junction dot moved with it.
+    const after = p.getElements(sheet).map((e) => changed.find((c) => c.id === e.id) ?? e);
+    expect(findJunctions(after, ctx())).toEqual([{ x: 50, y: -20 }]);
+  });
+
+  it('keeps a moved wire attached to the parts that stay', () => {
+    const { p, sheet, ctx, wire } = setup();
+    addComponent(p, sheet, 'resistor', 0, 0, ctx()); // pins at (-30, 0) and (30, 0)
+    addComponent(p, sheet, 'resistor', 160, 0, ctx()); // pins at (130, 0) and (190, 0)
+    const w = wire(30, 0, 130, 0);
+    const [nw] = computeMove(p.getElements(sheet), new Set([w.id]), 0, 40, ctx()) as WireElement[];
+    expect(nw!.pts).toEqual([30, 0, 30, 40, 130, 40, 130, 0]);
+  });
+
+  it('keeps the end of a moved wire on the wire it tees into', () => {
+    const { p, sheet, ctx, wire } = setup();
+    wire(0, 0, 200, 0);
+    const t = wire(100, 0, 100, 80);
+    const [nt] = computeMove(p.getElements(sheet), new Set([t.id]), 40, 0, ctx()) as WireElement[];
+    expect(nt!.pts.slice(0, 2)).toEqual([100, 0]);
+    expect(nt!.pts.slice(-2)).toEqual([140, 80]);
+  });
+
+  it('moves the net labels that sit on a moved wire', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const w = wire(0, 0, 100, 0);
+    const l = p.addElement(sheet, { type: 'label', x: 40, y: 0, text: 'vout' });
+    const changed = computeMove(p.getElements(sheet), new Set([w.id]), 0, 20, ctx());
+    expect(changed.find((e) => e.id === l.id)).toMatchObject({ x: 40, y: 20 });
+  });
+
+  it('drags a segment with the wires attached to it', () => {
+    const { p, sheet, ctx, wire } = setup();
+    addComponent(p, sheet, 'resistor', 0, 0, ctx());
+    addComponent(p, sheet, 'resistor', 260, 0, ctx());
+    const w = wire(30, 0, 230, 0);
+    const t = wire(100, 0, 100, 60);
+    const changed = computeSegmentDrag(p.getElements(sheet), w.id, 0, 0, -20, ctx());
+    expect((changed[0] as WireElement).pts).toEqual([30, 0, 30, -20, 230, -20, 230, 0]);
+    const nt = changed.find((e) => e.id === t.id) as WireElement;
+    expect(nt.pts.slice(0, 2)).toEqual([100, -20]);
+  });
+
+  it('lets the free end of a segment go with it', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const w = wire(0, 0, 100, 0, 100, 100);
+    const [nw] = computeSegmentDrag(p.getElements(sheet), w.id, 1, 40, 0, ctx()) as WireElement[];
+    expect(nw!.pts).toEqual([0, 0, 140, 0, 140, 100]);
+  });
+
+  it('turns the wires teeing into a rotated wire with it', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const a = wire(0, 0, 100, 0);
+    const t = wire(40, 0, 40, 80);
+    const [turned] = rotateElements([a], ctx());
+    const follow = followPins(p.getElements(sheet), [turned!], ctx());
+    const nt = follow.find((e) => e.id === t.id) as WireElement;
+    // The wire turned about its middle (50, 0): x = 40 went to y = -10.
+    expect((turned as WireElement).pts).toEqual([50, -50, 50, 50]);
+    expect(nt.pts.slice(0, 2)).toEqual([50, -10]);
+    expect(nt.pts.slice(-2)).toEqual([40, 80]);
+  });
+
+  it('removes one segment of a wire', () => {
+    expect(removeSegment([0, 0, 100, 0, 100, 100, 200, 100], 1)).toEqual([
+      [0, 0, 100, 0],
+      [100, 100, 200, 100],
+    ]);
+    expect(removeSegment([0, 0, 100, 0, 100, 100], 0)).toEqual([[100, 0, 100, 100]]);
+    expect(removeSegment([0, 0, 100, 0], 0)).toEqual([]);
   });
 
   it('normalizes wires', () => {

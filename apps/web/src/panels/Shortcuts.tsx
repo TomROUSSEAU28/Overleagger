@@ -59,6 +59,10 @@ export function HelpOverlay() {
               wires are not connected.
             </li>
             <li>
+              Click a wire to select it, click it again to pick one segment: drag it, or press
+              Delete to remove only that segment. Wires attached to what moves follow it.
+            </li>
+            <li>
               A hierarchical block is a whole sheet. Add sheet ports inside it: each one becomes a
               pin on the block.
             </li>

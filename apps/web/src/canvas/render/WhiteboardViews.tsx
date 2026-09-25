@@ -155,7 +155,8 @@ export const ShapeView = memo(function ShapeView({
 // Lines & arrows
 // ---------------------------------------------------------------------------
 
-function head(x: number, y: number, fromX: number, fromY: number, w: number): string {
+/** Arrow head at (x, y) coming from (fromX, fromY): its tip and the two corners of its base. */
+function headPts(x: number, y: number, fromX: number, fromY: number, w: number): number[][] {
   const a = Math.atan2(y - fromY, x - fromX);
   const len = 8 + w * 2;
   const half = len * 0.38;
@@ -163,7 +164,33 @@ function head(x: number, y: number, fromX: number, fromY: number, w: number): st
   const by = y - Math.sin(a) * len;
   const nx = -Math.sin(a) * half;
   const ny = Math.cos(a) * half;
-  return `${x},${y} ${bx + nx},${by + ny} ${bx - nx},${by - ny}`;
+  return [
+    [bx + nx, by + ny],
+    [x, y],
+    [bx - nx, by - ny],
+  ];
+}
+
+/** Move `p` towards `to` by `d` (not past it). */
+function pullBack(p: [number, number], to: [number, number], d: number): [number, number] {
+  const len = Math.hypot(to[0] - p[0], to[1] - p[1]);
+  if (len < 1e-6) return p;
+  const k = Math.min(d, len / 2) / len;
+  return [p[0] + (to[0] - p[0]) * k, p[1] + (to[1] - p[1]) * k];
+}
+
+/** Points along the quadratic curve a → b bent by control point c (for the hand-drawn look). */
+function quadPoints(a: [number, number], c: { x: number; y: number }, b: [number, number]) {
+  const out: [number, number][] = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    const u = 1 - t;
+    out.push([
+      u * u * a[0] + 2 * u * t * c.x + t * t * b[0],
+      u * u * a[1] + 2 * u * t * c.y + t * t * b[1],
+    ]);
+  }
+  return out;
 }
 
 export const LineView = memo(function LineView({ el, o }: { el: LineElement; o: RenderOptions }) {
@@ -173,26 +200,49 @@ export const LineView = memo(function LineView({ el, o }: { el: LineElement; o: 
   const route = elbow ? linePoints(el) : null;
   const c = el.bend ? lineControlPoint(el.pts, el.bend) : { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
   const d = route ? `M ${route.map((p) => p.join(' ')).join(' L ')}` : linePath(el);
-  const drawable = useMemo(() => {
-    if (!el.sketch) return null;
-    const opts = { seed: seedOf(el.id), stroke: ink.color, strokeWidth: ink.width, roughness: 1 };
-    if (route) return generator.linearPath(route, opts);
-    return el.bend
-      ? generator.curve(
-          [
-            [x1, y1],
-            [(x1 + 2 * c.x + x2) / 4, (y1 + 2 * c.y + y2) / 4],
-            [x2, y2],
-          ],
-          opts,
-        )
-      : generator.line(x1, y1, x2, y2, opts);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [el.sketch, el.bend, el.id, d, ink.color, ink.width]);
   // Arrow heads follow the first / last segment (or the tangent of a curve).
   const n = route?.length ?? 0;
-  const endFrom = route ? route[n - 2]! : el.bend ? [c.x, c.y] : [x1, y1];
-  const startFrom = route ? route[1]! : el.bend ? [c.x, c.y] : [x2, y2];
+  const endFrom: [number, number] = route ? route[n - 2]! : el.bend ? [c.x, c.y] : [x1, y1];
+  const startFrom: [number, number] = route ? route[1]! : el.bend ? [c.x, c.y] : [x2, y2];
+  // A filled head covers the end of the line: stop the line under it, so a thick line does not
+  // poke out of the tip.
+  const cut = (8 + ink.width * 2) * 0.6;
+  const a: [number, number] =
+    el.arrowStart && !el.sketch ? pullBack([x1, y1], startFrom, cut) : [x1, y1];
+  const b: [number, number] =
+    el.arrowEnd && !el.sketch ? pullBack([x2, y2], endFrom, cut) : [x2, y2];
+  const trimmed =
+    a[0] === x1 && a[1] === y1 && b[0] === x2 && b[1] === y2
+      ? d
+      : route
+        ? `M ${[a, ...route.slice(1, -1), b].map((p) => p.join(' ')).join(' L ')}`
+        : el.bend
+          ? `M ${a[0]} ${a[1]} Q ${c.x} ${c.y} ${b[0]} ${b[1]}`
+          : `M ${a[0]} ${a[1]} L ${b[0]} ${b[1]}`;
+  const drawable = useMemo(() => {
+    if (!el.sketch) return null;
+    // The ends stay exactly in place, so the arrow heads meet the line.
+    const opts = {
+      seed: seedOf(el.id),
+      stroke: ink.color,
+      strokeWidth: ink.width,
+      roughness: 0.9,
+      preserveVertices: true,
+    };
+    const body = route
+      ? generator.linearPath(route, opts)
+      : el.bend
+        ? // Follow the real curve (a rough curve through 3 points takes another shape).
+          generator.curve(quadPoints([x1, y1], c, [x2, y2]), { ...opts, roughness: 0.5 })
+        : generator.line(x1, y1, x2, y2, opts);
+    // Hand-drawn heads: two strokes, like a pen would draw them.
+    const heads = [
+      ...(el.arrowEnd ? [headPts(x2, y2, endFrom[0], endFrom[1], ink.width)] : []),
+      ...(el.arrowStart ? [headPts(x1, y1, startFrom[0], startFrom[1], ink.width)] : []),
+    ].map((h) => generator.linearPath(h as [number, number][], { ...opts, roughness: 0.5 }));
+    return [body, ...heads];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [el.sketch, el.bend, el.id, d, ink.color, ink.width, el.arrowEnd, el.arrowStart]);
   const mid = route
     ? polylineMiddle(route)
     : { x: (x1 + 2 * c.x + x2) / 4, y: (y1 + 2 * c.y + y2) / 4 };
@@ -200,22 +250,30 @@ export const LineView = memo(function LineView({ el, o }: { el: LineElement; o: 
     <g data-id={o.interactive ? el.id : undefined} className="el wire">
       {o.interactive && <path className="hit" d={d} fill="none" strokeWidth={12} />}
       {drawable ? (
-        <RoughPaths drawable={drawable} />
+        drawable.map((dr, i) => <RoughPaths key={i} drawable={dr} />)
       ) : (
-        <path
-          d={d}
-          fill="none"
-          stroke={ink.color}
-          strokeWidth={ink.width}
-          strokeLinejoin="round"
-          strokeDasharray={dashArray(el.style?.dash, ink.width)}
-        />
-      )}
-      {el.arrowEnd && (
-        <polygon points={head(x2, y2, endFrom[0]!, endFrom[1]!, ink.width)} fill={ink.color} />
-      )}
-      {el.arrowStart && (
-        <polygon points={head(x1, y1, startFrom[0]!, startFrom[1]!, ink.width)} fill={ink.color} />
+        <>
+          <path
+            d={trimmed}
+            fill="none"
+            stroke={ink.color}
+            strokeWidth={ink.width}
+            strokeLinejoin="round"
+            strokeDasharray={dashArray(el.style?.dash, ink.width)}
+          />
+          {el.arrowEnd && (
+            <polygon
+              points={headPts(x2, y2, endFrom[0], endFrom[1], ink.width).join(' ')}
+              fill={ink.color}
+            />
+          )}
+          {el.arrowStart && (
+            <polygon
+              points={headPts(x1, y1, startFrom[0], startFrom[1], ink.width).join(' ')}
+              fill={ink.color}
+            />
+          )}
+        </>
       )}
       {el.text &&
         (route ? (

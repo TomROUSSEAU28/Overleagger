@@ -58,6 +58,11 @@ export interface WireDraft {
   manual: boolean;
 }
 
+export interface WireSegment {
+  wireId: Id;
+  index: number;
+}
+
 export interface DragPreview {
   ids: Id[];
   dx: number;
@@ -110,6 +115,8 @@ export interface UIState extends Settings {
   placing: Placing | null;
   sheetId: Id | null;
   selection: Id[];
+  /** One segment of the selected wire, picked by clicking the wire again (moved / deleted alone). */
+  wireSegment: WireSegment | null;
   viewports: Record<Id, Viewport>;
   wireDraft: WireDraft | null;
   drag: DragPreview | null;
@@ -206,6 +213,7 @@ const transient = {
   tool: 'select' as ToolId,
   placing: null,
   selection: [],
+  wireSegment: null,
   wireDraft: null,
   drag: null,
   marquee: null,
@@ -275,3 +283,9 @@ export const useUI = create<UIState>((set, get) => ({
   },
   resetEditor: () => set({ ...transient, sheetId: null, viewports: {} }),
 }));
+
+// A picked wire segment belongs to the selection it was picked in: any other selection drops it.
+useUI.subscribe((s, prev) => {
+  if (s.wireSegment && s.selection !== prev.selection && s.wireSegment === prev.wireSegment)
+    useUI.setState({ wireSegment: null });
+});

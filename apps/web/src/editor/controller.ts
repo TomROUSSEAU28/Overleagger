@@ -19,6 +19,7 @@ import {
   topLevelUnit,
   ungroupElements,
   computeMove,
+  removeSegment,
   alignUnits,
   distributeUnits,
   followPins,
@@ -161,9 +162,32 @@ export class EditorController {
   deleteSelection() {
     const ids = this.selection();
     if (!ids.length) return;
+    if (this.deletePickedSegment(ids)) return;
     vanish([...expandSelection(this.elements(), ids)]);
     this.commit(() => deleteElements(this.project, this.sheetId, ids));
     this.select([]);
+  }
+
+  /** A segment of the selected wire is picked: delete only it (the wire may split in two). */
+  private deletePickedSegment(ids: Id[]): boolean {
+    const seg = this.ui.wireSegment;
+    if (!seg || ids.length !== 1 || ids[0] !== seg.wireId) return false;
+    const w = this.project.getElement(this.sheetId, seg.wireId);
+    if (w?.type !== 'wire' || 2 * seg.index + 3 >= w.pts.length) return false;
+    const [first, second] = removeSegment(w.pts, seg.index);
+    this.commit(() => {
+      if (!first) {
+        deleteElements(this.project, this.sheetId, [w.id]);
+        return;
+      }
+      this.project.updateElement(this.sheetId, w.id, { pts: first });
+      if (second) {
+        const { id: _id, z: _z, pts: _pts, ...rest } = w;
+        this.project.addElement(this.sheetId, { ...rest, pts: second });
+      }
+    });
+    this.select(first ? [w.id] : []);
+    return true;
   }
 
   copy(): ClipData | null {

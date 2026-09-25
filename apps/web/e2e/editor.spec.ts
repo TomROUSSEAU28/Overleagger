@@ -217,3 +217,95 @@ test('a project saved by the first versions (one document) still opens', async (
   await expect(page.getByTestId('canvas')).toBeVisible();
   await expect.poll(() => elementTypes(page)).toEqual(['text', 'text']);
 });
+
+test('wires: drag with what is attached, pick a segment, delete it', async ({ page }) => {
+  await page.goto('/app/');
+  await page.getByTestId('new-project').click();
+  await page.getByTestId('new-project-name').fill('Wires');
+  await page.getByTestId('create-project').click();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  const ids = await page.evaluate(() => {
+    const ed = (
+      window as unknown as {
+        __overleagger: {
+          ed: {
+            setViewport(v: object): void;
+            addElement(e: object): { id: string };
+          };
+        };
+      }
+    ).__overleagger.ed;
+    ed.setViewport({ x: 300, y: 200, zoom: 1 });
+    const a = ed.addElement({ type: 'wire', kind: 'power', pts: [0, 0, 200, 0, 200, 160] });
+    const t = ed.addElement({ type: 'wire', kind: 'power', pts: [100, 0, 100, 100] });
+    return [a.id, t.id];
+  });
+  const pts = (id: string) =>
+    page.evaluate(
+      (id) =>
+        (
+          window as unknown as {
+            __overleagger: { ed: { elements(): { id: string; pts?: number[] }[] } };
+          }
+        ).__overleagger.ed
+          .elements()
+          .find((e) => e.id === id)?.pts,
+      id,
+    );
+  await expect(page.locator('.junctions circle')).toHaveCount(1);
+
+  // Drag the wire up: the wire teeing into it follows, and so does the junction dot.
+  const from = await toScreen(page, 40, 0);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x, from.y - 40, { steps: 5 });
+  await page.mouse.up();
+  expect(await pts(ids[1]!)).toEqual([100, -40, 100, 100]);
+  await expect(page.locator('.junctions circle')).toHaveCount(1);
+
+  // Click it again: the segment under the pointer is picked; Delete removes only it.
+  await page.waitForTimeout(400);
+  await clickWorld(page, 200, 60);
+  await expect(page.getByTestId('picked-segment')).toBeVisible();
+  await page.keyboard.press('Delete');
+  expect(await pts(ids[0]!)).toEqual([0, -40, 200, -40]);
+  await page.keyboard.press('Control+z');
+  expect(await pts(ids[0]!)).toEqual([0, -40, 200, -40, 200, 120]);
+});
+
+test('text: the math bar wraps in $…$ and inserts LaTeX', async ({ page }) => {
+  await page.goto('/app/');
+  await page.getByTestId('new-project').click();
+  await page.getByTestId('new-project-name').fill('Math');
+  await page.getByTestId('create-project').click();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await page.keyboard.press('t');
+  await clickWorld(page, 0, 0);
+  const editor = page.getByTestId('inline-editor');
+  const bar = page.locator('.inline-edit').getByTestId('math-bar');
+  await expect(bar).toBeVisible();
+  await editor.fill('V_out');
+  await editor.press('Control+a');
+  await bar.getByTestId('math-dollars').click();
+  await expect(editor).toHaveValue('$V_out$');
+  await editor.press('End');
+  await editor.pressSequentially(' = ');
+  await bar.getByTestId('math-fracab').click();
+  await editor.pressSequentially('R_2');
+  await expect(editor).toHaveValue('$V_out$ = $\\frac{R_2}{b}$');
+  await editor.press('Control+Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __overleagger: { ed: { elements(): { type: string; text?: string }[] } };
+            }
+          ).__overleagger.ed
+            .elements()
+            .find((e) => e.type === 'text')?.text,
+      ),
+    )
+    .toBe('$V_out$ = $\\frac{R_2}{b}$');
+});

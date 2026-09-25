@@ -2,10 +2,10 @@ import {
   GRID,
   bindableAt,
   computeMove,
+  computeSegmentDrag,
   nearestAnchor,
   type LineEnd,
   createBlock,
-  dragSegment,
   elbow,
   elementBBox,
   expandSelection,
@@ -84,7 +84,10 @@ export class ToolController {
   private startWorld: Pt = { x: 0, y: 0 };
   private startVp = { x: 0, y: 0, zoom: 1 };
   private dragIds: Id[] = [];
+  /** Segment dragged (the wire's picked segment, or the one grabbed on it). */
   private segment: { wireId: Id; index: number } | null = null;
+  /** Segment a plain click on the selected wire picks. */
+  private clickSegment: { wireId: Id; index: number } | null = null;
   private downTarget: Id | null = null;
   private wasSelected = false;
   private lastClick = { t: 0, x: 0, y: 0, target: null as Id | null, tool: '' };
@@ -246,14 +249,19 @@ export class ToolController {
         this.mode = 'idle';
         return;
       }
+      const onlyThis = this.wasSelected && sel.length === 1;
       if (!this.wasSelected) ed.select([unit]);
       this.dragIds = ed.selection();
       this.downTarget = unit;
       const el = elements.find((e) => e.id === unit);
-      this.segment =
-        el?.type === 'wire' && this.dragIds.length === 1
+      // A click on the selected wire picks the segment under the pointer; once a segment is
+      // picked, dragging the wire moves the segment grabbed (not the whole wire).
+      const seg =
+        el?.type === 'wire' && onlyThis
           ? { wireId: el.id, index: nearestSegment(el, p.world.x, p.world.y) }
           : null;
+      this.clickSegment = seg;
+      this.segment = seg && this.ui.wireSegment?.wireId === seg.wireId ? seg : null;
       this.mode = editable ? 'maybe-drag' : 'idle';
       return;
     }
@@ -424,17 +432,36 @@ export class ToolController {
       case 'segment': {
         const d = ui.drag;
         ui.set({ drag: null });
-        if (d?.segment && (d.dx || d.dy)) {
-          const w = ed.project.getElement(ed.sheetId, d.segment.wireId);
-          if (w?.type === 'wire')
-            ed.applyElements([{ ...w, pts: dragSegment(w, d.segment.index, d.dx, d.dy) }]);
-        }
+        const s = d?.segment;
+        if (!s || !(d.dx || d.dy)) return;
+        const elements = ed.elements();
+        const w = elements.find((e) => e.id === s.wireId);
+        const changed = computeSegmentDrag(elements, s.wireId, s.index, d.dx, d.dy, ed.ctx);
+        const nw = changed[0];
+        if (w?.type !== 'wire' || nw?.type !== 'wire') return;
+        ed.applyElements(changed);
+        // The dragged segment stays picked (its index may have changed): find its middle.
+        const i = 2 * s.index;
+        const [ax, ay, bx, by] = w.pts.slice(i, i + 4) as [number, number, number, number];
+        const at = {
+          x: (ax + bx) / 2 + (ax === bx || ay !== by ? d.dx : 0),
+          y: (ay + by) / 2 + (ay === by || ax !== bx ? d.dy : 0),
+        };
+        ui.set({ wireSegment: { wireId: nw.id, index: nearestSegment(nw, at.x, at.y) } });
         return;
       }
       case 'maybe-drag':
         // Plain click on an already selected element of a multi-selection: keep only it.
         if (this.wasSelected && this.downTarget && ed.selection().length > 1)
           ed.select([this.downTarget]);
+        // Click on the selected wire: pick the segment under the pointer (again: the whole wire).
+        else if (this.clickSegment) {
+          const c = this.clickSegment;
+          const cur = ui.wireSegment;
+          ui.set({
+            wireSegment: cur && cur.wireId === c.wireId && cur.index === c.index ? null : c,
+          });
+        }
         return;
       case 'marquee': {
         const r = ui.marquee;
@@ -531,6 +558,14 @@ export class ToolController {
     const el = ed.project.getElement(ed.sheetId, p.targetId);
     if (!el) return;
     const unit = topLevelUnit(ed.elements(), el.id);
+    if (el.type === 'wire' && unit === el.id) {
+      // A quick second click on a wire picks the segment under the pointer.
+      ui.set({
+        selection: [el.id],
+        wireSegment: { wireId: el.id, index: nearestSegment(el, p.world.x, p.world.y) },
+      });
+      return;
+    }
     if (unit !== el.id) {
       // Double-click inside a group selects the element itself.
       ed.select([el.id]);
