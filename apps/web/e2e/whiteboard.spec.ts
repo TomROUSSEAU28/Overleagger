@@ -570,3 +570,78 @@ test('slide order: move a frame one slide earlier, then back to reading order', 
   await expect(order).toContainText('Slide 2 of 2');
   await expect(page.getByTestId('slide-reset')).toHaveCount(0);
 });
+
+test('animated current: through the selected wires, settings, presentation and export', async ({
+  page,
+}) => {
+  type Ed = {
+    __overleagger: {
+      ed: {
+        addElement(e: object): { id: string };
+        elements(): { type: string; current?: number; symbol?: string; closed?: boolean }[];
+        select(ids: string[]): void;
+      };
+    };
+  };
+  await newProject(page, 'Current');
+  await page.evaluate(() => {
+    const { ed } = (window as unknown as Ed).__overleagger;
+    const w = (...pts: number[]) => ed.addElement({ type: 'wire', pts, kind: 'power' }).id;
+    ed.select([w(0, 0, 200, 0), w(200, 0, 200, 120), w(200, 120, 0, 120), w(0, 120, 0, 0)]);
+  });
+  // A loop is selected: one click, and a current runs around it.
+  await page.getByTestId('flow-from-selection').click();
+  const flow = () =>
+    page.evaluate(() =>
+      (window as unknown as Ed).__overleagger.ed.elements().find((e) => e.type === 'flow'),
+    );
+  await expect.poll(async () => (await flow())?.closed).toBe(true);
+  await page.getByTestId('flow-current').fill('-2');
+  await page.getByTestId('flow-symbol-electron').click();
+  await expect.poll(async () => (await flow())?.current).toBe(-2);
+  expect((await flow())?.symbol).toBe('electron');
+  // Selected: its preview runs in the editor.
+  const where = (sel: string) => page.locator(`${sel} .flow > g`).first().getAttribute('transform');
+  const a = await where('[data-testid=canvas]');
+  await page.waitForTimeout(300);
+  expect(await where('[data-testid=canvas]')).not.toBe(a);
+
+  // In the presentation it runs too.
+  await page.getByTestId('present').click();
+  await expect(page.locator('.present-stage .flow circle').first()).toBeVisible();
+  const b = await where('.present-stage');
+  await page.waitForTimeout(300);
+  expect(await where('.present-stage')).not.toBe(b);
+  await page.keyboard.press('Escape');
+
+  // Exports draw it still (and do not break).
+  await page.getByTestId('open-export').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-svg').click();
+  const svg = readFileSync((await (await download).path())!).toString('utf8');
+  expect(svg).toContain('<circle');
+  await page.keyboard.press('Escape');
+
+  // Nothing selected: the tool draws the path, point by point (clicking the start closes it).
+  await page.evaluate(() => (window as unknown as Ed).__overleagger.ed.select([]));
+  await page.keyboard.press('Shift+I');
+  for (const [x, y] of [
+    [300, 0],
+    [400, 0],
+    [400, 100],
+    [300, 100],
+    [300, 0],
+  ] as const) {
+    const p = await toScreen(page, x, y);
+    await page.mouse.click(p.x, p.y);
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as Ed).__overleagger.ed.elements().filter((e) => e.type === 'flow')
+            .length,
+      ),
+    )
+    .toBe(2);
+});

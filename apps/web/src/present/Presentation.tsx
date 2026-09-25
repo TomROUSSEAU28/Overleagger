@@ -499,7 +499,7 @@ export function Presentation() {
   };
 
   const o = useMemo(
-    () => ({ theme, ctx: ed.ctx, interactive: true, latexRefs }),
+    () => ({ theme, ctx: ed.ctx, interactive: true, latexRefs, live: true }),
     [theme, ed.ctx, latexRefs],
   );
 

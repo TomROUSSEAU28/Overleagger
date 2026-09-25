@@ -402,6 +402,8 @@ export function elementBBox(el: Element, ctx: SheetContext, all?: Element[]): Re
       const c = lineControlPoint(el.pts, el.bend ?? 0);
       return inflateRect(rectUnion([b, { x: c.x, y: c.y, w: 0, h: 0 }])!, pad);
     }
+    case 'flow':
+      return inflateRect(ptsBBox(el.pts), (el.size ?? 12) / 2 + 3);
     case 'stroke': {
       const xy: number[] = [];
       for (let i = 0; i < el.pts.length; i += 3) xy.push(el.pts[i]!, el.pts[i + 1]!);

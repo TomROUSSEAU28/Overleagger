@@ -325,6 +325,13 @@
                 <td>Text</td>
                 <td>Typed letter by letter, or replaced by another text.</td>
               </tr>
+              <tr>
+                <td>Change the current</td>
+                <td>
+                  On an animated current: its current (or speed, period…) goes to another value, for
+                  example from 1 A to −1 A to make it flow backwards.
+                </td>
+              </tr>
             </tbody>
           </table>
           <p>
@@ -335,9 +342,42 @@
             small numbers on the page show on which click things happen, and a selected frame lists
             its build order. <b>Preview</b> presents that slide right away.
           </p>
+          <h3 id="current">Animated currents</h3>
+          <p>
+            Show a current flowing through the circuit: dots, electrons, charges, arrows, dashes or
+            comets that move along its path, at a speed that follows the current.
+          </p>
+          <ul>
+            <li>
+              <b>Select the wires</b> (and the parts, like a resistor or a coil) the current goes
+              through, then click <b>Animate a current here</b> in the right panel, or press
+              <kbd>Shift</kbd>+<kbd>I</kbd>. When they make a loop, the current goes round it.
+            </li>
+            <li>
+              Or, with nothing selected, press <kbd>Shift</kbd>+<kbd>I</kbd> (the
+              <b>⚡ Animated current</b> tool) and click its path point by point, like a wire; click
+              its first point to close a loop, double-click or press <kbd>Enter</kbd> to end it.
+            </li>
+            <li>
+              <b>Current</b> in amperes: a negative current flows the other way (or use
+              <b>Reverse</b>). <b>Signal</b>: DC, sine, square, triangle (a ripple around an
+              <b>offset</b>), sawtooth, PWM pulses, or a ramp, rise or decay that starts when the
+              current appears. The small graph shows i(t).
+            </li>
+            <li>
+              What flows, its colour (Style), <b>size</b>, <b>spacing</b> and <b>speed</b> per
+              ampere; <b>Electron flow</b> makes electrons go against the current.
+            </li>
+            <li>
+              It runs in the presentation, and in the editor while it is selected (a live preview of
+              its settings). Give it an <b>Appear</b> animation to start it on a click, or
+              <b>Change the current</b> to reverse it. In exports it is drawn still (untick
+              <b>Show in → Export</b> to leave it out).
+            </li>
+          </ul>
           <p>
             The <a href="../app/#/example">example</a> is an animated presentation: open it and
-            press Present to see.
+            press Present to see (click 1 starts the inductor current, with its ripple).
           </p>
         </section>
 

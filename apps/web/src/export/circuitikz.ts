@@ -497,6 +497,9 @@ function element(w: Writer, el: Element, all: Element[], ctx: SheetContext, shee
     case 'image':
       w.emit(`% image “${el.name ?? 'image'}” not exported (use \\includegraphics)`);
       return;
+    case 'flow':
+      // An animated current: only in the presentation.
+      return;
     case 'group':
       return;
   }

@@ -14,3 +14,4 @@ export * from './slides';
 export * from './visibility';
 export * from './collab';
 export * from './geometry/connectors';
+export * from './flow';

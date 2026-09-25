@@ -12,6 +12,7 @@ import {
   WireView,
   type RenderOptions,
 } from './ElementViews';
+import { FlowView } from './FlowView';
 import {
   ButtonView,
   FrameView,
@@ -23,7 +24,7 @@ import {
   WaveformView,
 } from './WhiteboardViews';
 
-export function ElementView({ el, o }: { el: Element; o: RenderOptions }) {
+export function ElementView({ el, o, fx }: { el: Element; o: RenderOptions; fx?: ElFx }) {
   switch (el.type) {
     case 'component':
       return <ComponentView el={el} o={o} />;
@@ -60,6 +61,8 @@ export function ElementView({ el, o }: { el: Element; o: RenderOptions }) {
       return <WaveformView el={el} o={o} />;
     case 'frame':
       return <FrameView el={el} o={o} />;
+    case 'flow':
+      return <FlowView el={el} o={o} fx={fx} />;
     case 'group':
       return null;
   }
@@ -97,8 +100,12 @@ export const Junctions = memo(function Junctions({
   );
 });
 
-/** Draw order layer: frames at the back, then blocks, then everything else in z order. */
-const layer = (e: Element) => (e.type === 'frame' ? 0 : e.type === 'block' ? 1 : 2);
+/**
+ * Draw order layer: frames at the back, then blocks, then everything else in z order, and the
+ * animated currents on top (they run over the wires and the parts).
+ */
+const layer = (e: Element) =>
+  e.type === 'frame' ? 0 : e.type === 'block' ? 1 : e.type === 'flow' ? 3 : 2;
 
 /** CSS for an animated element (presentation): fade, move / scale around its centre, wipe, glow. */
 function fxStyle(f: ElFx | undefined): CSSProperties | undefined {
@@ -146,7 +153,7 @@ export const SheetRenderer = memo(function SheetRenderer({
         // Animated elements get a wrapper (always the same, so they are not re-created).
         fx && el.anims?.length ? (
           <g key={el.id} className="anim-el" style={fxStyle(fx.get(el.id))}>
-            <ElementView el={el} o={o} />
+            <ElementView el={el} o={o} fx={fx.get(el.id)} />
           </g>
         ) : (
           <ElementView key={el.id} el={el} o={o} />

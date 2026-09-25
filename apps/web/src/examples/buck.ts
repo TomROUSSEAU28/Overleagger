@@ -214,6 +214,21 @@ export function seedBuckExample(p: Project) {
       // Click 3: the specs.
       anims: [anim({ kind: 'appear', step: 3, effect: 'pop' })],
     });
+    // Click 1 of the power stage: the inductor current flows around its loop (through the
+    // low-side switch as it freewheels), with its triangular ripple around the load current.
+    p.addElement(root, {
+      type: 'flow',
+      pts: [180, 100, 400, 100, 400, 190, 160, 190, 160, 100],
+      closed: true,
+      current: 0.45,
+      offset: 1,
+      signal: 'triangle',
+      period: 1.6,
+      symbol: 'dot',
+      speed: 55,
+      noExport: true,
+      anims: [anim({ kind: 'appear', step: 1, effect: 'fade', delay: 300 })],
+    });
     // Two frames: the slides of the presentation.
     p.addElement(root, { type: 'frame', x: -60, y: -90, w: 560, h: 480, name: 'Power stage' });
     p.addElement(root, { type: 'frame', x: 530, y: -90, w: 490, h: 560, name: 'Waveforms' });

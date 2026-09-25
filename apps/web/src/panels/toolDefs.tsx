@@ -18,6 +18,7 @@ import {
   StickyNote,
   Tag,
   Type,
+  Zap,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCanEdit } from '../cloud/hooks';
@@ -49,6 +50,12 @@ export const GROUPS: ToolDef[][] = [
     { tool: 'block', action: 'tool.block', label: 'Hierarchical block', icon: <Box size={18} /> },
     { tool: 'port', action: 'tool.port', label: 'Sheet port', icon: <LogIn size={18} /> },
     { tool: 'label', action: 'tool.label', label: 'Net label', icon: <Tag size={18} /> },
+    {
+      tool: 'flow',
+      action: 'tool.flow',
+      label: 'Animated current (select wires first, or draw its path)',
+      icon: <Zap size={18} />,
+    },
   ],
   [
     { tool: 'text', action: 'tool.text', label: 'Text / LaTeX', icon: <Type size={18} /> },

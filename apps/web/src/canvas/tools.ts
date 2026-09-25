@@ -202,6 +202,8 @@ export class ToolController {
       case 'wire':
       case 'signal':
         return this.wireClick(this.snapPt(p.world));
+      case 'flow':
+        return this.flowClick(this.snapPt(p.world));
       case 'place': {
         if (!ui.placing) return;
         const at = this.snapPt(p.world);
@@ -307,7 +309,7 @@ export class ToolController {
       return;
     }
 
-    if (ui.tool === 'select' || ui.tool === 'wire' || ui.tool === 'signal') {
+    if (ui.tool === 'select' || ui.tool === 'wire' || ui.tool === 'signal' || ui.tool === 'flow') {
       const pin = pinAt(this.ed.elements(), this.ed.ctx, world.x, world.y, 6 / this.zoom());
       const hp = ui.hoverPin;
       if (pin ? !hp || hp.x !== pin.x || hp.y !== pin.y : hp)
@@ -414,7 +416,8 @@ export class ToolController {
       ui.tool === 'block' ||
       ui.tool === 'note' ||
       ui.tool === 'button' ||
-      ui.tool === 'image'
+      ui.tool === 'image' ||
+      ui.tool === 'flow'
     ) {
       const g = this.snapPt(world);
       if (!ui.ghost || ui.ghost.x !== g.x || ui.ghost.y !== g.y) ui.set({ ghost: g });
@@ -821,9 +824,48 @@ export class ToolController {
     ui.set({ wireDraft: { ...d, pts, manual: false } });
   }
 
+  /**
+   * The path of an animated current, clicked point by point like a wire (orthogonal bends):
+   * clicking its first point closes a loop; clicking the last one again (or a double click,
+   * Enter, Escape) ends it.
+   */
+  flowClick(pt: Pt) {
+    const ui = this.ui;
+    const d = ui.wireDraft;
+    if (!d) {
+      this.flowClosed = false;
+      ui.set({ wireDraft: { pts: [pt.x, pt.y], cursor: pt, hFirst: true, manual: false } });
+      return;
+    }
+    const n = d.pts.length;
+    const last = { x: d.pts[n - 2]!, y: d.pts[n - 1]! };
+    if (samePt(last.x, last.y, pt.x, pt.y)) {
+      this.finishWire();
+      return;
+    }
+    const pts = [...d.pts, ...elbow(last, pt, d.hFirst).slice(2)];
+    ui.set({ wireDraft: { ...d, pts, manual: false } });
+    if (n >= 4 && samePt(d.pts[0]!, d.pts[1]!, pt.x, pt.y)) {
+      this.flowClosed = true;
+      this.finishWire();
+    }
+  }
+
+  private flowClosed = false;
+
   finishWire() {
     const ui = this.ui;
     const d = ui.wireDraft;
+    if (d && ui.tool === 'flow') {
+      ui.set({ wireDraft: null });
+      let pts = normalizeWire(d.pts);
+      const closed = this.flowClosed;
+      this.flowClosed = false;
+      // A loop ends on its first point: kept once.
+      if (closed) pts = normalizeWire(pts.slice(0, -2));
+      if (pts.length >= 4) this.ed.addFlow(pts, closed);
+      return;
+    }
     ui.set({ wireDraft: null });
     if (d) {
       const pts = normalizeWire(d.pts);

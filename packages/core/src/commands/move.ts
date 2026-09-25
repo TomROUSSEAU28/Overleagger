@@ -22,6 +22,7 @@ export function translated(el: Element, dx: number, dy: number): Element {
   switch (el.type) {
     case 'wire':
     case 'line':
+    case 'flow':
       return { ...el, pts: shiftPts(el.pts, dx, dy) };
     case 'stroke':
       return { ...el, pts: shiftPts(el.pts, dx, dy, 3) };
@@ -585,7 +586,8 @@ function transformElement(
 ): Element {
   switch (el.type) {
     case 'wire':
-    case 'line': {
+    case 'line':
+    case 'flow': {
       const pts: number[] = [];
       for (let i = 0; i < el.pts.length; i += 2) pts.push(...f(el.pts[i]!, el.pts[i + 1]!));
       return { ...el, pts };

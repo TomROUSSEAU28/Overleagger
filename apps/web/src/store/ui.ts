@@ -22,7 +22,8 @@ export type ToolId =
   | 'image'
   | 'button'
   | 'waveform'
-  | 'frame';
+  | 'frame'
+  | 'flow';
 
 export interface ToolPrefs {
   shapeKind: ShapeKind;

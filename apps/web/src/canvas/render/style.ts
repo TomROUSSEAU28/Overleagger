@@ -13,6 +13,8 @@ export interface RenderOptions {
   standard?: string;
   /** Custom-symbol revision (only used to invalidate memoized views). */
   symbolsVersion?: number;
+  /** Presenting: animated currents run while they are shown. */
+  live?: boolean;
 }
 
 export const dashArray = (dash: string | undefined, w: number) =>

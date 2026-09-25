@@ -265,7 +265,18 @@ export function evaluate(
           }
           break;
         case 'wave':
-          if (el.type === 'waveform' && a.key) {
+          if (el.type === 'flow' && a.key) {
+            // An animated current: its current (or offset, speed, period) changes.
+            const from = a.from ?? 0;
+            const to = a.to ?? 1;
+            let v: number;
+            if (a.loop) {
+              busy = true;
+              const tl = t === Infinity ? clock.now : t;
+              v = from + (to - from) * (tl < 0 ? 0 : 0.5 - 0.5 * Math.cos((Math.PI * tl) / dur));
+            } else v = from + (to - from) * easeInOut(t < 0 ? 0 : p);
+            el = { ...el, [a.key]: v };
+          } else if (el.type === 'waveform' && a.key) {
             const from = a.from ?? 0;
             const to = a.to ?? 1;
             let v: number;

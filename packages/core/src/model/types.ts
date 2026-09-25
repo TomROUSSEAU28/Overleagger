@@ -45,7 +45,8 @@ interface BaseElement {
  *  - `color`: the ink turns to `color`;
  *  - `move`: slides by (dx, dy);
  *  - `set`: a part changes (symbol options, e.g. a switch closes);
- *  - `wave`: a waveform trace parameter goes from → to (or keeps going back and forth: `loop`);
+ *  - `wave`: a waveform trace parameter, or the current of a flow, goes from → to (or keeps going
+ *    back and forth: `loop`);
  *  - `text`: the text is typed (`typewriter`), or replaced by `text`.
  */
 export type AnimKind =
@@ -68,7 +69,19 @@ export interface Anim {
   opts?: Record<string, OptionValue>;
   /** `wave`: which trace (id; the first one when missing) and which parameter. */
   trace?: string;
-  key?: 'duty' | 'amp' | 'phase' | 'periods' | 'offset' | 'tau' | 'zeta' | 'ripple';
+  key?:
+    | 'duty'
+    | 'amp'
+    | 'phase'
+    | 'periods'
+    | 'offset'
+    | 'tau'
+    | 'zeta'
+    | 'ripple'
+    // Animated currents (flow elements).
+    | 'current'
+    | 'speed'
+    | 'period';
   from?: number;
   to?: number;
   /** `wave`: keep going back and forth between `from` and `to` (period = 2 × dur). */
@@ -318,6 +331,43 @@ export interface WaveformElement extends BaseElement, BoxFields {
   axes: boolean;
 }
 
+/** How an animated current changes in time (see `flowCurrent`). */
+export type FlowSignal =
+  'dc' | 'sine' | 'square' | 'triangle' | 'sawtooth' | 'pwm' | 'ramp' | 'rise' | 'decay';
+
+/** What flows: dots, electrons (−), holes / charges (+), arrows, dashes, or comets. */
+export type FlowSymbol = 'dot' | 'electron' | 'plus' | 'arrow' | 'dash' | 'comet';
+
+/**
+ * An animated current (presentation): symbols move along a path at a speed proportional to the
+ * current i(t) = offset + current × signal(t). A negative current flows backwards.
+ */
+export interface FlowElement extends BaseElement {
+  type: 'flow';
+  /** The path, in the direction of a positive current [x0, y0, x1, y1, …] (px). */
+  pts: number[];
+  /** A loop: the last point joins the first one. */
+  closed?: boolean;
+  /** Current (A): the DC value, or the peak of the signal. */
+  current: number;
+  signal: FlowSignal;
+  /** Period (s) of a periodic signal; ramp time or time constant of the others. */
+  period?: number;
+  /** Added to the signal (A). */
+  offset?: number;
+  /** Duty cycle of the PWM (0…1). */
+  duty?: number;
+  symbol: FlowSymbol;
+  /** Size of a symbol (px). */
+  size?: number;
+  /** Space between two symbols (px). */
+  spacing?: number;
+  /** Speed for 1 A (px/s). */
+  speed?: number;
+  /** Show the electrons: they move against the current. */
+  electrons?: boolean;
+}
+
 export interface FrameElement extends BaseElement, BoxFields {
   type: 'frame';
   name: string;
@@ -344,7 +394,8 @@ export type Element =
   | NoteElement
   | ButtonElement
   | WaveformElement
-  | FrameElement;
+  | FrameElement
+  | FlowElement;
 
 /** Elements positioned by a rectangle (x, y, w, h). */
 export type BoxElement =

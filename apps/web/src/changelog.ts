@@ -28,6 +28,7 @@ export const CHANGELOG: Release[] = [
       'Whiteboard tools: shapes and flowcharts, arrows, sticky notes, pencil, images, waveforms and frames.',
       'Your own symbols, templates and a personal library.',
       'Presentation mode with animations (appear, emphasis, colour, move, change state, animated waveforms, typed text), transitions and slide order per frame, laser pointer and pen.',
+      'Animated currents: dots, electrons, arrows or comets flowing through the selected wires in the presentation, with DC, AC, ramps, ripple or PWM currents that can reverse.',
       'Exports: smart PDF, PNG, SVG and CircuiTikZ for LaTeX.',
       'Working together: accounts, sharing with people and teams, rights per sheet, live presence, comments and history.',
       'A phone version, a user manual, and this list of versions.',

@@ -100,6 +100,11 @@ export function runAction(ed: EditorController, id: ActionId): boolean {
     case 'tool.comment':
       ed.setTool('comment');
       return true;
+    case 'tool.flow':
+      tools?.finishWire();
+      // Wires or parts selected: the current goes through them. Otherwise: draw its path.
+      if (!ed.flowFromSelection()) ed.setTool('flow');
+      return true;
     case 'edit.toBlock':
       ed.selectionToBlock();
       return true;

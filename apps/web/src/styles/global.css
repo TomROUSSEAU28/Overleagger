@@ -3498,6 +3498,43 @@ body.resizing-panel {
 .anim-menu button:hover {
   background: var(--hover);
 }
+.flow-btn {
+  width: 100%;
+  justify-content: center;
+  margin: 2px 0 10px;
+}
+.flow-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.flow-symbols .icon-btn {
+  width: 38px;
+  height: 30px;
+  border-color: var(--border);
+}
+.flow-preview {
+  display: block;
+  margin: 2px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.flow-preview .flow-zero {
+  stroke: var(--muted);
+  stroke-opacity: 0.4;
+  stroke-dasharray: 3 3;
+}
+.flow-preview .flow-axis {
+  font-size: 10px;
+  font-style: italic;
+  fill: var(--muted);
+}
+.flow-reverse {
+  align-self: flex-end;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
 .slide-order {
   display: flex;
   align-items: center;

@@ -31,7 +31,9 @@ import {
   moveToNewBlock,
   ReadOnlyError,
   newId,
+  flowPathFromSelection,
   type AlignMode,
+  type FlowElement,
   type ClipData,
   type Element,
   type Id,
@@ -284,6 +286,32 @@ export class EditorController {
       moveToNewBlock(this.project, this.sheetId, ids, `Block ${n}`, this.ctx),
     );
     if (id) this.select([id]);
+  }
+
+  /**
+   * An animated current through the selected wires and parts (a loop when they close one).
+   * False when the selection has no wire nor part to go through.
+   */
+  flowFromSelection(): boolean {
+    const path = flowPathFromSelection(this.elements(), this.selection(), this.ctx);
+    if (!path) return false;
+    const el = this.addFlow(path.pts, path.closed);
+    ripple(el.pts[0]!, el.pts[1]!, 'connect');
+    return true;
+  }
+
+  /** A new animated current along `pts`, selected (its preview runs), with the select tool. */
+  addFlow(pts: number[], closed: boolean): FlowElement {
+    const el = this.addElement({
+      type: 'flow',
+      pts,
+      ...(closed ? { closed: true } : {}),
+      current: 1,
+      signal: 'dc',
+      symbol: 'dot',
+    }) as FlowElement;
+    useUI.getState().set({ tool: 'select', selection: [el.id], wireSegment: null });
+    return el;
   }
 
   /** Follow the link of an element (URL in a new tab, or a sheet of the project). */

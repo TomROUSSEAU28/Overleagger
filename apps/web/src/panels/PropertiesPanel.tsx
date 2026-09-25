@@ -1,5 +1,6 @@
 import { MathTextarea } from '../latex/MathBar';
 import { AnimationSection, FrameAnimation } from './AnimationPanel';
+import { FlowProps } from './FlowProps';
 import {
   GRID,
   ROLE_LABELS,
@@ -46,6 +47,7 @@ import {
   Pencil,
   Plus,
   UserCog,
+  Zap,
 } from 'lucide-react';
 import { useEditor, useMeta, useSheetElements, useSheets } from '../editor/context';
 import { useCanEdit, useSession } from '../cloud/hooks';
@@ -509,6 +511,7 @@ function SingleProps({ el, elements }: { el: Element; elements: Element[] }) {
       {el.type === 'button' && <ButtonProps el={el} />}
       {el.type === 'waveform' && <WaveformProps el={el} />}
       {el.type === 'frame' && <FrameProps el={el} />}
+      {el.type === 'flow' && <FlowProps el={el} />}
       {LINKABLE.includes(el.type) && <LinkSection el={el} />}
       {el.type === 'group' && (
         <>
@@ -579,6 +582,23 @@ function ShowIn({ els }: { els: Element[] }) {
   );
 }
 
+/** An animated current through the selected wires and parts (presentation). */
+function FlowButton({ sel }: { sel: Element[] }) {
+  const ed = useEditor();
+  if (!sel.some((e) => e.type === 'wire' || e.type === 'component')) return null;
+  return (
+    <button
+      type="button"
+      className="btn flow-btn"
+      title="Symbols flow along these wires and parts in the presentation (Shift+I)"
+      onClick={() => ed.flowFromSelection()}
+      data-testid="flow-from-selection"
+    >
+      <Zap size={15} /> Animate a current here
+    </button>
+  );
+}
+
 function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) {
   const ed = useEditor();
   const all = elements.filter(
@@ -601,6 +621,7 @@ function MultiProps({ sel, elements }: { sel: Element[]; elements: Element[] }) 
           </button>
         )}
       </div>
+      <FlowButton sel={sel} />
       <ArrangeButtons />
       <OrderButtons />
       <AlignButtons count={sel.length} />
@@ -810,6 +831,7 @@ function WireProps({ el }: { el: WireElement }) {
   return (
     <>
       <h3>{el.kind === 'signal' ? 'Signal line' : 'Wire'}</h3>
+      <FlowButton sel={[el]} />
       <Field label="Kind">
         <select
           value={el.kind}

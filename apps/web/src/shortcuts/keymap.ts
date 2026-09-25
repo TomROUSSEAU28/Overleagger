@@ -22,6 +22,7 @@ export type ActionId =
   | 'tool.waveform'
   | 'tool.frame'
   | 'tool.comment'
+  | 'tool.flow'
   | 'edit.toBlock'
   | 'edit.quickAdd'
   | 'edit.rotate'
@@ -90,6 +91,12 @@ export const ACTIONS: ActionDef[] = [
   { id: 'tool.waveform', label: 'Waveform / oscillogram', category: 'Tools', keys: ['o'] },
   { id: 'tool.frame', label: 'Frame', category: 'Tools', keys: ['shift+f'] },
   { id: 'tool.comment', label: 'Comment', category: 'Tools', keys: ['c'] },
+  {
+    id: 'tool.flow',
+    label: 'Animated current (along the selected wires, or draw its path)',
+    category: 'Tools',
+    keys: ['shift+i'],
+  },
   {
     id: 'edit.toBlock',
     label: 'Move selection into a new block',

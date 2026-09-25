@@ -76,11 +76,22 @@ const WAVE_KEYS: [NonNullable<Anim['key']>, string, number, number][] = [
   ['ripple', 'Ripple', 0, 1],
 ];
 
+/** The name of a kind of animation, for this element. */
+const kindLabel = (k: AnimKind, el: Element) =>
+  k === 'wave' && el.type === 'flow' ? 'Change the current' : KIND_LABEL[k];
+
+const FLOW_KEYS: [NonNullable<Anim['key']>, string][] = [
+  ['current', 'Current (A)'],
+  ['offset', 'Offset (A)'],
+  ['speed', 'Speed (px/s per A)'],
+  ['period', 'Period (s)'],
+];
+
 /** What can be animated on an element. */
 function kindsFor(el: Element, options: OptionDef[]): AnimKind[] {
   const out: AnimKind[] = ['appear', 'disappear', 'emphasis', 'color', 'move'];
   if (el.type === 'component' && options.length) out.push('set');
-  if (el.type === 'waveform') out.push('wave');
+  if (el.type === 'waveform' || el.type === 'flow') out.push('wave');
   if (textField(el)) out.push('text');
   return out;
 }
@@ -158,7 +169,7 @@ function AnimCard({
   return (
     <div className="anim-card" data-testid="anim-card">
       <div className="anim-card-head">
-        <b>{KIND_LABEL[a.kind]}</b>
+        <b>{kindLabel(a.kind, el)}</b>
         <WhenSelect value={a.step} steps={steps} onChange={(step) => onChange({ step })} />
         <button
           type="button"
@@ -269,6 +280,51 @@ function AnimCard({
             </Field>
           )}
         </div>
+      )}
+      {a.kind === 'wave' && el.type === 'flow' && (
+        <>
+          <Field label="Parameter">
+            <select
+              value={a.key ?? 'current'}
+              onChange={(e) => onChange({ key: e.target.value as Anim['key'] })}
+            >
+              {FLOW_KEYS.map(([k, l]) => (
+                <option key={k} value={k}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="row">
+            <Field label="From">
+              <input
+                type="number"
+                step={0.1}
+                value={a.from ?? 0}
+                onChange={(e) => onChange({ from: Number(e.target.value) })}
+                data-testid="anim-from"
+              />
+            </Field>
+            <Field label="To">
+              <input
+                type="number"
+                step={0.1}
+                value={a.to ?? 1}
+                onChange={(e) => onChange({ to: Number(e.target.value) })}
+                data-testid="anim-to"
+              />
+            </Field>
+          </div>
+          <p className="muted small">A negative current flows the other way.</p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={Boolean(a.loop)}
+              onChange={(e) => onChange({ loop: e.target.checked || undefined })}
+            />
+            Keep going back and forth
+          </label>
+        </>
       )}
       {a.kind === 'wave' && el.type === 'waveform' && (
         <>
@@ -402,6 +458,13 @@ function makeAnim(kind: AnimKind, el: Element, step: number, options: OptionDef[
       a.opts = { [o.key]: v };
     }
   }
+  if (kind === 'wave' && el.type === 'flow') {
+    // The current reverses (to show AC, or a switch that changes the loop).
+    a.key = 'current';
+    a.from = el.current;
+    a.to = -el.current || 1;
+    a.dur = 800;
+  }
   if (kind === 'wave' && el.type === 'waveform') {
     const t = el.traces[0];
     a.key = 'duty';
@@ -483,7 +546,7 @@ export function AnimationSection({ el }: { el: Element }) {
                       }}
                       data-testid={`anim-add-${k}`}
                     >
-                      {KIND_LABEL[k]}
+                      {kindLabel(k, el)}
                     </button>
                   ))}
                 </div>
@@ -512,6 +575,7 @@ function nameOf(el: Element): string {
   const t = f ? String((el as unknown as Record<string, unknown>)[f] ?? '').trim() : '';
   if (t) return t.length > 22 ? `${t.slice(0, 20)}…` : t;
   if (el.type === 'line') return el.arrowEnd || el.arrowStart ? 'Arrow' : 'Line';
+  if (el.type === 'flow') return 'Current';
   return el.type[0]!.toUpperCase() + el.type.slice(1);
 }
 
@@ -651,7 +715,7 @@ export function FrameAnimation({ el }: { el: FrameElement }) {
                     onClick={() => ed.select([e.id])}
                     title="Select it"
                   >
-                    {nameOf(e)} · {KIND_LABEL[a.kind].toLowerCase()}
+                    {nameOf(e)} · {kindLabel(a.kind, e).toLowerCase()}
                   </button>
                 ))}
               </li>

@@ -41,6 +41,7 @@ import { CommentPins, CommentPopover } from '../comments/Comments';
 import { RemoteOverlay } from '../cloud/Presence';
 import { useFollow, usePresencePublisher } from '../cloud/presenceHooks';
 import { useUserLib } from '../storage/userLibrary';
+import { FLOW_COLOR } from './render/flowStyle';
 import { useUI } from '../store/ui';
 import { THEMES, resolveColor, type Theme } from '../theme';
 import { MAX_ZOOM, MIN_ZOOM } from '../editor/controller';
@@ -885,6 +886,8 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
       .filter((e): e is Element => Boolean(e))
       .map((e) => {
         if (e.type === 'wire') return { el: e, wire: e.pts };
+        // An animated current shows itself: its path, dashed, and its symbols running.
+        if (e.type === 'flow') return null;
         const members =
           e.type === 'group'
             ? elements.filter(
@@ -987,9 +990,10 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
             <polyline
               points={wireDraftPoints(wireDraft).join(' ')}
               fill="none"
-              stroke={t.ink}
+              stroke={tool === 'flow' ? resolveColor(FLOW_COLOR, t) : t.ink}
               strokeOpacity={0.75}
-              strokeWidth={1.5}
+              strokeWidth={tool === 'flow' ? 2.5 : 1.5}
+              strokeDasharray={tool === 'flow' ? '2 6' : undefined}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
