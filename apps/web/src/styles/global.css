@@ -1500,10 +1500,10 @@ html[data-anim='off'] *::after {
 .presentation.mode-pen {
   cursor: crosshair;
 }
+/* (Its fades are driven frame by frame: no CSS transition, which would lag behind.) */
 .present-stage {
   position: absolute;
   inset: 0;
-  transition: opacity 140ms ease;
 }
 .present-stage .el.block,
 .present-stage .el.button {
@@ -3497,6 +3497,24 @@ body.resizing-panel {
 }
 .anim-menu button:hover {
   background: var(--hover);
+}
+.slide-order {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0 8px;
+  font-size: 13px;
+}
+.slide-order span {
+  margin-right: auto;
+  color: var(--muted);
+}
+.slide-order b {
+  color: var(--ink);
+}
+.slide-order .icon-btn {
+  width: 26px;
+  height: 26px;
 }
 .build-order {
   display: grid;

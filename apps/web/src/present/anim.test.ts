@@ -113,6 +113,13 @@ describe('presentation animations', () => {
     expect(duty(2000, true)).toBeCloseTo(0.2);
   });
 
+  it('waits for the slide to arrive: nothing plays, nothing flashes', () => {
+    const typing = text([{ id: 'a', kind: 'text', step: 0, effect: 'typewriter' }]);
+    const arriving = at(0, [[0, Infinity]], 500);
+    const e = evaluate([typing], arriving, resolve, box).elements[0]!;
+    expect(e.type === 'text' && e.text).toBe('');
+  });
+
   it('types a text, keeping formulas whole', () => {
     expect(typed('ab $x^2$', 0.5)).toBe('ab');
     expect(typed('ab $x^2$', 0.99)).toBe('ab $x^2$');

@@ -1,7 +1,7 @@
 import {
   exportedElements,
   flattenSheetTree,
-  framesInReadingOrder,
+  framesInSlideOrder,
   sheetPath,
   sheetTree,
   type FrameElement,
@@ -179,7 +179,7 @@ export async function exportPdf(
       const frames = exportedElements(project.getElements(sheet.id)).filter(
         (e): e is FrameElement => e.type === 'frame',
       );
-      for (const f of framesInReadingOrder(frames))
+      for (const f of framesInSlideOrder(frames))
         doc.outline.add(item, f.name || 'Frame', { pageNumber: i + 1 });
     }
   } finally {

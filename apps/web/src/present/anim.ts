@@ -210,8 +210,11 @@ export function evaluate(
         continue;
       }
       if (t < 0 && a.kind !== 'wave') {
-        // Waiting for its delay: an entrance keeps it hidden, the rest has not happened yet.
+        // Waiting (its delay, or the slide still arriving): an entrance keeps it hidden, a text
+        // to type is not there yet, the rest has not happened yet.
         if (a.kind === 'appear') shown = 0;
+        if (a.kind === 'text' && tf && (a.effect === 'typewriter' || !a.text))
+          el = { ...el, [tf]: '' } as Element;
         continue;
       }
       switch (a.kind) {
@@ -269,7 +272,7 @@ export function evaluate(
             if (a.loop) {
               busy = true;
               // (Played long ago: keep going on the presentation's clock.)
-              const tl = Number.isFinite(t) ? t : clock.now;
+              const tl = t === Infinity ? clock.now : t;
               const k = tl < 0 ? 0 : 0.5 - 0.5 * Math.cos((Math.PI * tl) / dur);
               v = from + (to - from) * k;
             } else v = from + (to - from) * easeInOut(t < 0 ? 0 : p);

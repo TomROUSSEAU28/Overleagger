@@ -5,7 +5,7 @@
  */
 import {
   elementBBox,
-  framesInReadingOrder,
+  framesInSlideOrder,
   newId,
   rectsIntersect,
   type Anim,
@@ -15,7 +15,16 @@ import {
   type Transition,
 } from '@overleagger/core';
 import { isStatic, type OptionDef, type OptionValue } from '@overleagger/symbols';
-import { ChevronDown, ChevronRight, Play, Plus, Sparkles, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useEditor, useSheetElements } from '../editor/context';
 import { slideElements, slideSteps, textField } from '../present/anim';
@@ -76,10 +85,10 @@ function kindsFor(el: Element, options: OptionDef[]): AnimKind[] {
   return out;
 }
 
-/** The slide an element is on: the first frame it touches (reading order), else its sheet. */
+/** The slide an element is on: the first frame it touches (slide order), else its sheet. */
 function slideAround(el: Element, all: Element[], ctx: ReturnType<typeof useEditor>['ctx']) {
   const box = elementBBox(el, ctx, all);
-  const frames = framesInReadingOrder(
+  const frames = framesInSlideOrder(
     all.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent),
   );
   const frame =
@@ -509,10 +518,75 @@ function nameOf(el: Element): string {
 const TRANSITIONS: [Transition, string][] = [
   ['move', 'Camera glides (default)'],
   ['fade', 'Fade'],
-  ['slide', 'Slide in'],
-  ['zoom', 'Zoom'],
+  ['slide', 'Slide in from the right'],
+  ['slide-up', 'Slide up'],
+  ['zoom', 'Zoom through'],
+  ['blur', 'Blur'],
   ['none', 'Cut'],
 ];
+
+/**
+ * Where the frame comes in the presentation: "Slide 2 of 5", one place earlier or later.
+ * Frames follow the reading order until one is moved; then the sheet keeps its own order.
+ */
+function SlideOrder({ el, all }: { el: FrameElement; all: Element[] }) {
+  const ed = useEditor();
+  const frames = framesInSlideOrder(
+    all.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent),
+  );
+  const i = frames.findIndex((f) => f.id === el.id);
+  if (frames.length < 2 || i < 0) return null;
+  const custom = frames.some((f) => f.slide !== undefined);
+  const move = (d: number) => {
+    const order = [...frames];
+    const j = i + d;
+    if (j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j]!, order[i]!];
+    ed.commit(() => order.forEach((f, k) => f.slide !== k && ed.updateElement(f.id, { slide: k })));
+  };
+  const reset = () =>
+    ed.commit(() =>
+      frames.forEach((f) => f.slide !== undefined && ed.updateElement(f.id, { slide: undefined })),
+    );
+  return (
+    <div className="slide-order" data-testid="slide-order">
+      <span>
+        Slide <b>{i + 1}</b> of {frames.length}
+      </span>
+      <button
+        type="button"
+        className="icon-btn"
+        onClick={() => move(-1)}
+        disabled={i === 0}
+        title="Show it one slide earlier"
+        data-testid="slide-earlier"
+      >
+        <ChevronLeft size={15} />
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        onClick={() => move(1)}
+        disabled={i === frames.length - 1}
+        title="Show it one slide later"
+        data-testid="slide-later"
+      >
+        <ChevronRight size={15} />
+      </button>
+      {custom && (
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={reset}
+          title="Back to reading order (top to bottom, left to right)"
+          data-testid="slide-reset"
+        >
+          <RotateCcw size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** A frame: how the presentation arrives on it, and what plays on it, click by click. */
 export function FrameAnimation({ el }: { el: FrameElement }) {
@@ -530,6 +604,7 @@ export function FrameAnimation({ el }: { el: FrameElement }) {
   return (
     <>
       <h3>Presentation</h3>
+      <SlideOrder el={el} all={all} />
       <div className="row">
         <Field label="Transition">
           <select

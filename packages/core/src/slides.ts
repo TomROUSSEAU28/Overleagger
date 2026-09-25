@@ -37,7 +37,18 @@ export function framesInReadingOrder(frames: FrameElement[]): FrameElement[] {
 }
 
 /**
- * Slides of the whole project: for each sheet (hierarchy order), its frames in reading order,
+ * Frames in presentation order: those given a place (`slide`) first, by that place, then the
+ * others in reading order (a frame added later comes at the end).
+ */
+export function framesInSlideOrder(frames: FrameElement[]): FrameElement[] {
+  const read = framesInReadingOrder(frames);
+  const placed = read.filter((f) => f.slide !== undefined);
+  placed.sort((a, b) => a.slide! - b.slide!);
+  return [...placed, ...read.filter((f) => f.slide === undefined)];
+}
+
+/**
+ * Slides of the whole project: for each sheet (hierarchy order), its frames in slide order,
  * or the whole drawing when the sheet has no frame. Empty sheets, sheets and frames hidden from
  * the presentation are skipped (a sheet whose frames are all hidden gives no slide), and so
  * are the sheets the user may not see.
@@ -56,7 +67,7 @@ export function buildSlides(project: Project, ctx: SheetContext): Slide[] {
     const els = visibleFor(all, 'present');
     const frames = els.filter((e): e is FrameElement => e.type === 'frame');
     if (all.some((e) => e.type === 'frame')) {
-      for (const f of framesInReadingOrder(frames))
+      for (const f of framesInSlideOrder(frames))
         out.push({
           sheetId: s.id,
           rect: { x: f.x, y: f.y, w: f.w, h: f.h },

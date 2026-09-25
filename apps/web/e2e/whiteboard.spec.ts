@@ -541,3 +541,32 @@ test('presentation animations: appear on a click, then the next slide', async ({
   await expect(text).toHaveCount(0);
   await page.keyboard.press('Escape');
 });
+
+test('slide order: move a frame one slide earlier, then back to reading order', async ({
+  page,
+}) => {
+  await newProject(page, 'Slide order');
+  await page.evaluate(() => {
+    const ed = (
+      window as unknown as {
+        __overleagger: {
+          ed: { addElement(e: object): { id: string }; select(ids: string[]): void };
+        };
+      }
+    ).__overleagger.ed;
+    ed.addElement({ type: 'frame', x: 0, y: 0, w: 400, h: 240, name: 'One' });
+    const two = ed.addElement({ type: 'frame', x: 500, y: 0, w: 400, h: 240, name: 'Two' });
+    ed.select([two.id]);
+  });
+  const order = page.getByTestId('slide-order');
+  await expect(order).toContainText('Slide 2 of 2');
+  await expect(page.getByTestId('slide-number')).toHaveCount(2);
+  await page.getByTestId('slide-earlier').click();
+  await expect(order).toContainText('Slide 1 of 2');
+  await page.getByTestId('present').click();
+  await expect(page.getByTestId('present-count')).toContainText('1 / 2');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('slide-reset').click();
+  await expect(order).toContainText('Slide 2 of 2');
+  await expect(page.getByTestId('slide-reset')).toHaveCount(0);
+});

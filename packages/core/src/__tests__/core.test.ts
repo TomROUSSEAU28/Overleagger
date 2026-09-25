@@ -39,6 +39,7 @@ import {
   componentBBox,
   componentLabels,
   framesInReadingOrder,
+  framesInSlideOrder,
   type ComponentElement,
   type FrameElement,
   type Rot,
@@ -550,6 +551,15 @@ describe('phase 2 helpers', () => {
 });
 
 describe('slides', () => {
+  it('follows the slide order given to frames, new frames at the end', () => {
+    const { p, sheet, ctx } = setup();
+    const f = (name: string, x: number, slide?: number) =>
+      p.addElement(sheet, { type: 'frame', name, x, y: 0, w: 100, h: 80, slide }) as FrameElement;
+    const frames = [f('a', 0, 2), f('b', 150, 0), f('c', 300, 1), f('d', 450)];
+    expect(framesInSlideOrder(frames).map((x) => x.name)).toEqual(['b', 'c', 'a', 'd']);
+    expect(buildSlides(p, ctx()).map((s) => s.title)).toEqual(['b', 'c', 'a', 'd']);
+  });
+
   it('orders frames like text (rows, then left to right) and uses whole sheets without frames', () => {
     const { p, sheet, ctx } = setup();
     const f = (name: string, x: number, y: number) =>

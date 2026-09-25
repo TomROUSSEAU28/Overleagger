@@ -31,6 +31,9 @@ type Mode = 'point' | 'laser' | 'pen';
 type Box = { x: number; y: number; w: number; h: number };
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+/** Halves of an ease-in-out: they meet at the same speed, so out + in is one movement. */
+const easeInQuad = (t: number) => t * t;
+const easeOutQuad = (t: number) => 1 - (1 - t) ** 2;
 
 /** Height kept free at the bottom for the control bar (screen px). */
 const HUD_SPACE = 72;
@@ -79,6 +82,8 @@ export function Presentation() {
   });
   const slide: Slide | undefined = slides[index];
   const [sheetId, setSheetId] = useState<Id | undefined>(slide?.sheetId);
+  const sheetIdRef = useRef(sheetId);
+  sheetIdRef.current = sheetId;
   const sheetElements = useSheetElements(sheetId ?? ed.project.rootSheetId);
   // Elements hidden from the presentation are neither drawn nor clickable.
   const elements = useMemo(() => visibleFor(sheetElements, 'present'), [sheetElements]);
@@ -99,6 +104,7 @@ export function Presentation() {
     slide ? fitBox(slide.rect, screen) : { x: 0, y: 0, w: 800, h: 600 },
   );
   const [fade, setFade] = useState(1);
+  const [blur, setBlur] = useState(0);
   const [mode, setMode] = useState<Mode>('point');
   const [blank, setBlank] = useState(false);
   const [ink, setInk] = useState<number[][]>([]);
@@ -184,7 +190,7 @@ export function Presentation() {
     const t0 = performance.now();
     const step = (t: number) => {
       const k = Math.min(1, (t - t0) / ms);
-      frame(easeInOut(k));
+      frame(k);
       if (k < 1) anim.current = requestAnimationFrame(step);
       else done?.();
     };
@@ -195,87 +201,106 @@ export function Presentation() {
    * Show slide `i` with the transition of its frame (the camera glides by default, and
    * cross-fades to another sheet). `atEnd`: with all its steps played (going back).
    */
+  const goToken = useRef(0);
   const go = useCallback(
     (i: number, via?: Rect, atEnd = false) => {
       const target = slides[i];
       if (!target) return;
       setInk([]);
       setIndex(i);
+      const token = ++goToken.current;
       const to = fitBox(target.rect, screen);
       const frame = target.frameId
         ? (ed.project.getElement(target.sheetId, target.frameId) as FrameElement | undefined)
         : undefined;
-      const kind: Transition = via ? 'move' : (frame?.transition ?? 'move');
-      const ms = frame?.transitionMs ?? (kind === 'move' ? 520 : 600);
-      // The slide's own animations start once it has arrived.
-      const lastLevel = atEnd ? slideSteps(slideOf(target)).length : 0;
-      setLevel(lastLevel);
-      started.current = new Map(atEnd ? [] : [[0, performance.now() + (kind === 'none' ? 0 : ms)]]);
-      setNow(performance.now());
       const sameSheet = target.sheetId === sheetId;
+      let kind: Transition = via ? 'move' : (frame?.transition ?? 'move');
+      // The camera cannot glide to another sheet: it fades there.
+      if (kind === 'move' && !sameSheet && !via) kind = 'fade';
+      const ms = frame?.transitionMs ?? (kind === 'move' ? 560 : kind === 'fade' ? 480 : 620);
+      setLevel(atEnd ? slideSteps(slideOf(target)).length : 0);
+      // The slide's own animations wait until it has arrived (then step 0 starts).
+      started.current = new Map(atEnd ? [] : [[0, Infinity]]);
+      setNow(performance.now());
+      const arrived = () => {
+        if (token !== goToken.current) return;
+        setFade(1);
+        setBlur(0);
+        if (!atEnd) started.current.set(0, performance.now());
+        setNow(performance.now());
+      };
       const from = boxRef.current;
-      const shift = (b: Box, dx: number, k = 1): Box => ({
+      /** A box moved by (dx, dy) of its size, and scaled by k around its centre. */
+      const shift = (b: Box, dx: number, dy: number, k = 1): Box => ({
         x: b.x + b.w * dx + (b.w * (1 - k)) / 2,
-        y: b.y + (b.h * (1 - k)) / 2,
+        y: b.y + b.h * dy + (b.h * (1 - k)) / 2,
         w: b.w * k,
         h: b.h * k,
       });
-      /** Out with `outBox`, then in from `inBox`, fading between them. */
-      const outIn = (outBox: Box, inBox: Box) =>
+      /**
+       * Out, then in, as one movement: the first half speeds up (ease in), the second slows
+       * down (ease out), at the same speed where they meet — no stop in the middle. The sheet
+       * changes when the screen is at its faintest.
+       */
+      const outIn = (outBox: Box, inBox: Box, blurPx = 0) =>
         tween(
-          ms * 0.45,
+          ms,
           (k) => {
-            setBox(lerpBox(from, outBox, k));
-            setFade(1 - k);
+            if (k < 0.5) {
+              const e = easeInQuad(k * 2);
+              setBox(lerpBox(from, outBox, e));
+              setFade(1 - e);
+              setBlur(blurPx * e);
+            } else {
+              if (sheetIdRef.current !== target.sheetId) setSheetId(target.sheetId);
+              const e = easeOutQuad(k * 2 - 1);
+              setBox(lerpBox(inBox, to, e));
+              setFade(e);
+              setBlur(blurPx * (1 - e));
+            }
           },
-          () => {
-            setSheetId(target.sheetId);
-            setBox(inBox);
-            tween(
-              ms * 0.55,
-              (k) => {
-                setBox(lerpBox(inBox, to, k));
-                setFade(k);
-              },
-              () => setFade(1),
-            );
-          },
+          arrived,
         );
       if (kind === 'none') {
         cancelAnimationFrame(anim.current);
         setSheetId(target.sheetId);
         setBox(to);
-        setFade(1);
+        arrived();
         return;
       }
       if (kind === 'fade') return outIn(from, to);
-      if (kind === 'slide') return outIn(shift(from, 0.3), shift(to, -0.3));
-      if (kind === 'zoom') return outIn(shift(from, 0, 1.5), shift(to, 0, 0.6));
+      if (kind === 'blur') return outIn(from, to, 10);
+      if (kind === 'slide') return outIn(shift(from, 0.35, 0), shift(to, -0.35, 0));
+      if (kind === 'slide-up') return outIn(shift(from, 0, 0.35), shift(to, 0, -0.35));
+      if (kind === 'zoom') return outIn(shift(from, 0, 0, 0.55), shift(to, 0, 0, 1.6));
       if (sameSheet) {
-        animateTo(to, ms);
+        animateTo(to, ms, arrived);
         return;
       }
-      const swap = () => {
-        setFade(0);
-        window.setTimeout(() => {
-          setSheetId(target.sheetId);
-          setFade(1);
-          if (!via) return setBox(to);
-          // Arrive in the sub-sheet from slightly further away, like diving into the block.
-          const k = 1.35;
-          const start = {
-            x: to.x - (to.w * (k - 1)) / 2,
-            y: to.y - (to.h * (k - 1)) / 2,
-            w: to.w * k,
-            h: to.h * k,
-          };
-          setBox(start);
-          animateTo(to, 380, undefined, start);
-        }, 140);
+      // Drilling into a block: zoom onto it, then dive into its sheet from a bit further away.
+      const k = 1.35;
+      const dive = {
+        x: to.x - (to.w * (k - 1)) / 2,
+        y: to.y - (to.h * (k - 1)) / 2,
+        w: to.w * k,
+        h: to.h * k,
       };
-      // Drilling into a block: first zoom onto the block, then open its sheet.
-      if (via) animateTo(fitBox(via, screen), 420, swap);
-      else swap();
+      const block = fitBox(via!, screen);
+      animateTo(block, 420, () =>
+        tween(
+          420,
+          (t) => {
+            if (t < 0.35) setFade(1 - easeInQuad(t / 0.35));
+            else {
+              if (sheetIdRef.current !== target.sheetId) setSheetId(target.sheetId);
+              const e = easeOutQuad((t - 0.35) / 0.65);
+              setFade(e);
+              setBox(lerpBox(dive, to, e));
+            }
+          },
+          arrived,
+        ),
+      );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [slides, screen, sheetId, animateTo, tween, ed],
@@ -579,7 +604,7 @@ export function Presentation() {
           width={screen.w}
           height={screen.h}
           viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
-          style={{ opacity: fade }}
+          style={{ opacity: fade, filter: blur > 0.2 ? `blur(${blur}px)` : undefined }}
         >
           <SheetRenderer elements={played.elements} o={o} fx={played.fx} hidden={gone} />
           {played.rings.map((r, i) => (

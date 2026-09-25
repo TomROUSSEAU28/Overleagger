@@ -78,7 +78,7 @@ export interface Anim {
 }
 
 /** How the presentation arrives on a frame. */
-export type Transition = 'move' | 'fade' | 'slide' | 'zoom' | 'none';
+export type Transition = 'move' | 'fade' | 'slide' | 'slide-up' | 'zoom' | 'blur' | 'none';
 
 export interface ComponentElement extends BaseElement {
   type: 'component';
@@ -325,6 +325,8 @@ export interface FrameElement extends BaseElement, BoxFields {
   transition?: Transition;
   /** Duration of the transition (ms). */
   transitionMs?: number;
+  /** Place among the sheet's slides (0 = first); none = reading order. */
+  slide?: number;
 }
 
 export type Element =

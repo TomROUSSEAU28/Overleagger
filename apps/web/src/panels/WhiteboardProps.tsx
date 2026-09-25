@@ -342,7 +342,8 @@ export function FrameProps({ el }: { el: FrameElement }) {
         <input value={el.name} onChange={(e) => upd({ name: e.target.value })} />
       </Field>
       <p className="muted small">
-        A frame is a slide of the presentation: it shows what is inside it, in reading order.
+        A frame is a slide of the presentation: it shows what is inside it. Set its place under
+        Presentation.
       </p>
     </>
   );

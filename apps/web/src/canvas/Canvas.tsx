@@ -8,6 +8,8 @@ import {
   computeSegmentDrag,
   elementBBox,
   expandSelection,
+  framesInSlideOrder,
+  textWidth,
   handlePos,
   inflate,
   isBox,
@@ -732,6 +734,40 @@ function AnimBadges({
   );
 }
 
+/** While a frame is selected: every frame's place in the presentation, next to its tab. */
+function SlideNumbers({
+  elements,
+  o,
+  zoom,
+}: {
+  elements: Element[];
+  o: RenderOptions;
+  zoom: number;
+}) {
+  const frames = framesInSlideOrder(
+    elements.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent),
+  );
+  if (frames.length < 2) return null;
+  const k = 1 / zoom;
+  return (
+    <>
+      {frames.map((f, i) => (
+        <g
+          key={f.id}
+          transform={`translate(${f.x + Math.max(60, textWidth(f.name, 13) + 20) + 4 + 9 * k} ${f.y - 10})`}
+          className="slide-number"
+          data-testid="slide-number"
+        >
+          <circle r={9 * k} fill={o.theme.select} />
+          <text y={4 * k} fontSize={11 * k} textAnchor="middle" fill={o.theme.paper}>
+            {i + 1}
+          </text>
+        </g>
+      ))}
+    </>
+  );
+}
+
 /** Small "↗" tag on the corner of elements that carry a link (Ctrl+click follows it). */
 function LinkBadges({
   elements,
@@ -897,6 +933,9 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
       <g pointerEvents="none">
         <LinkBadges elements={elements} o={o} zoom={zoom} />
         {animOpen && <AnimBadges elements={elements} o={o} zoom={zoom} />}
+        {elements.some((e) => e.type === 'frame' && selection.includes(e.id)) && (
+          <SlideNumbers elements={elements} o={o} zoom={zoom} />
+        )}
         <HiddenBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (
