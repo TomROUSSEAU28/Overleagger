@@ -1027,14 +1027,24 @@ main > section {
   .nb-check li {
     margin: 1px 0;
   }
+  /* The phone on the left, its note on its right (no room for both on one side of it). */
+  .nb-phone {
+    justify-content: flex-start;
+  }
   .nb-phone .nb-shot {
-    margin: 2cqw 0 2cqw 30cqw;
+    margin: 2cqw 0 4cqw 12cqw;
   }
   .nb-phone .nb-shot > img {
-    height: min(24svh, 220px);
+    height: min(22svh, 200px);
+  }
+  .nb-phone .nb-ink {
+    display: none;
   }
   .nb-phone .hw {
     font-size: 4.6cqw;
+    left: 118% !important;
+    top: 40% !important;
+    transform: rotate(-4deg);
   }
   .nb-last .nb-body {
     grid-template-columns: 1fr;
