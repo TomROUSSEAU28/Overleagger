@@ -15,6 +15,8 @@ import {
   rectUnion,
   snap,
   wirePieces,
+  analyzeConnectivity,
+  onWire,
   type ComponentElement,
   type Element,
   type FrameElement,
@@ -603,93 +605,69 @@ function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; l
   );
 }
 
-/**
- * A selected wire, drawn like a drafting mark (widths stay the same at any zoom): a soft halo
- * with small squares on its corners and ends; with a picked piece, the rest fades and the piece
- * is traced over, with a tick across each of its ends.
- */
 /** Piece `i` of a wire's pieces ([ax, ay, bx, by]), if it exists. */
 const pieceOf = (pts: number[], i: number) =>
   2 * i + 3 < pts.length ? pts.slice(2 * i, 2 * i + 4) : null;
 
+/**
+ * A selected wire: traced over in the selection colour with a soft halo, its junction dots
+ * too (they belong to it). With a picked piece, the rest of the wire turns pale and the piece
+ * stays strong. Widths of the halo stay the same at any zoom.
+ */
 function WireSelection({
   pts,
   piece,
+  dots,
   color,
-  paper,
   sw,
 }: {
   pts: number[];
   /** The picked piece, as [ax, ay, bx, by]. */
   piece: number[] | null;
+  /** Junction dots on the wire. */
+  dots: Pt[];
   color: string;
-  paper: string;
   sw: number;
 }) {
-  const h = 2.6 * sw;
-  const corners: [number, number][] = [];
-  for (let i = 0; i < pts.length; i += 2) corners.push([pts[i]!, pts[i + 1]!]);
-  const halo = (d: number[], width: number, opacity: number) => (
+  const line = (d: number[], width: number, opacity: number) => (
     <polyline
       points={d.join(' ')}
       fill="none"
       stroke={color}
       strokeOpacity={opacity}
-      strokeWidth={width * sw}
+      strokeWidth={width}
       strokeLinecap="round"
       strokeLinejoin="round"
     />
   );
-  if (!piece) {
-    return (
-      <g>
-        {halo(pts, 9, 0.22)}
-        {corners.map(([x, y]) => (
-          <rect
-            key={`${x},${y}`}
-            x={x - h}
-            y={y - h}
-            width={2 * h}
-            height={2 * h}
-            fill={paper}
-            stroke={color}
-            strokeWidth={1.2 * sw}
-          />
-        ))}
-      </g>
-    );
-  }
-  const [ax, ay, bx, by] = piece as [number, number, number, number];
-  const len = Math.hypot(bx - ax, by - ay) || 1;
-  // Unit normal of the piece: the ticks across its ends.
-  const nx = (-(by - ay) / len) * 6 * sw;
-  const ny = ((bx - ax) / len) * 6 * sw;
+  const ink = 1.6 + 0.6 * sw;
+  // With a piece, only the dots at its ends are strong.
+  const strong = (p: Pt) =>
+    !piece ||
+    (Math.abs(p.x - piece[0]!) < 1e-6 && Math.abs(p.y - piece[1]!) < 1e-6) ||
+    (Math.abs(p.x - piece[2]!) < 1e-6 && Math.abs(p.y - piece[3]!) < 1e-6);
   return (
-    <g data-testid="picked-segment">
-      {halo(pts, 9, 0.08)}
-      {halo(piece, 10, 0.25)}
-      <line
-        x1={ax}
-        y1={ay}
-        x2={bx}
-        y2={by}
-        stroke={color}
-        strokeWidth={2 * sw}
-        strokeLinecap="round"
-      />
-      {[
-        [ax, ay],
-        [bx, by],
-      ].map(([x, y]) => (
-        <line
-          key={`${x},${y}`}
-          x1={x! - nx}
-          y1={y! - ny}
-          x2={x! + nx}
-          y2={y! + ny}
-          stroke={color}
-          strokeWidth={1.6 * sw}
-          strokeLinecap="round"
+    <g data-testid={piece ? 'picked-segment' : 'wire-selection'}>
+      {piece ? (
+        <>
+          {line(pts, ink, 0.4)}
+          {line(piece, 9 * sw, 0.2)}
+          {line(piece, ink, 1)}
+        </>
+      ) : (
+        <>
+          {line(pts, 9 * sw, 0.16)}
+          {line(pts, ink, 1)}
+        </>
+      )}
+      {dots.map((p) => (
+        <circle
+          key={`${p.x},${p.y}`}
+          cx={p.x}
+          cy={p.y}
+          r={3.4}
+          fill={color}
+          fillOpacity={strong(p) ? 1 : 0.45}
         />
       ))}
     </g>
@@ -884,6 +862,12 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
   }, [selection, elements, o.ctx]);
 
   const single = boxes.length === 1 ? boxes[0]!.el : null;
+  // Junction dots, for the selected wires (only worked out when a wire is selected).
+  const anyWire = boxes.some((b) => b.wire);
+  const junctions = useMemo(
+    () => (anyWire ? analyzeConnectivity(elements, o.ctx).junctions : []),
+    [anyWire, elements, o.ctx],
+  );
 
   const ghostEl: ComponentElement | null = useMemo(() => {
     if (tool !== 'place' || !placing || !ghost) return null;
@@ -924,8 +908,8 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
                   ? pieceOf(wirePieces(elements, b.el, o.ctx), wireSegment.index)
                   : null
               }
+              dots={junctions.filter((j) => onWire(b.wire!, j.x, j.y))}
               color={sel}
-              paper={t.paper}
               sw={sw}
             />
           ) : (

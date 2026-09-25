@@ -279,13 +279,45 @@ describe('moving', () => {
     expect(nw!.pts).toEqual([30, 0, 30, 40, 130, 40, 130, 0]);
   });
 
-  it('keeps the end of a moved wire on the wire it tees into', () => {
+  it('slides the ends of a moved wire along the wire they tee into', () => {
     const { p, sheet, ctx, wire } = setup();
     wire(0, 0, 200, 0);
     const t = wire(100, 0, 100, 80);
+    // Along the rail: the junction slides with it.
     const [nt] = computeMove(p.getElements(sheet), new Set([t.id]), 40, 0, ctx()) as WireElement[];
-    expect(nt!.pts.slice(0, 2)).toEqual([100, 0]);
-    expect(nt!.pts.slice(-2)).toEqual([140, 80]);
+    expect(nt!.pts).toEqual([140, 0, 140, 80]);
+    // Across the rail: the junction stays, the wire stretches.
+    const [up] = computeMove(p.getElements(sheet), new Set([t.id]), 0, 20, ctx()) as WireElement[];
+    expect(up!.pts).toEqual([100, 0, 100, 100]);
+    // Not past the end of the rail.
+    const [far] = computeMove(
+      p.getElements(sheet),
+      new Set([t.id]),
+      300,
+      0,
+      ctx(),
+    ) as WireElement[];
+    expect(far!.pts.slice(0, 2)).toEqual([200, 0]);
+  });
+
+  it('moves a loop standing on a wire, its junctions sliding with it', () => {
+    const { p, sheet, ctx, wire } = setup();
+    wire(0, 100, 300, 100);
+    const u = wire(100, 100, 100, 40, 180, 40, 180, 100);
+    const [nu] = computeMove(p.getElements(sheet), new Set([u.id]), 40, 0, ctx()) as WireElement[];
+    expect(nu!.pts).toEqual([140, 100, 140, 40, 220, 40, 220, 100]);
+    expect(
+      findJunctions(
+        p.getElements(sheet).map((e) => (e.id === u.id ? nu! : e)),
+        ctx(),
+      ),
+    ).toEqual([
+      { x: 140, y: 100 },
+      { x: 220, y: 100 },
+    ]);
+    // Its right leg dragged right: its foot slides along the wire, no leg along it.
+    const [leg] = computeSegmentDrag(p.getElements(sheet), u.id, 2, 40, 0, ctx()) as WireElement[];
+    expect(leg!.pts).toEqual([100, 100, 100, 40, 220, 40, 220, 100]);
   });
 
   it('moves the net labels that sit on a moved wire', () => {

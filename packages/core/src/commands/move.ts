@@ -270,6 +270,31 @@ function attachedFollow(
   return out;
 }
 
+/**
+ * A point in the middle of a straight run of one of `hosts` (a T junction), pushed by
+ * (dx, dy): it slides along that run as far as the run goes. Null when the point is not in
+ * the middle of a run.
+ */
+function slideOnHost(
+  hosts: WireElement[],
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+): Pt | null {
+  const clamp = (v: number, a: number, b: number) =>
+    Math.min(Math.max(v, Math.min(a, b)), Math.max(a, b));
+  for (const w of hosts)
+    for (let i = 2; i < w.pts.length; i += 2) {
+      const [ax, ay, bx, by] = [w.pts[i - 2]!, w.pts[i - 1]!, w.pts[i]!, w.pts[i + 1]!];
+      if (!onSegmentInterior(x, y, ax, ay, bx, by)) continue;
+      if (Math.abs(ay - by) < EPS) return { x: clamp(x + dx, ax, bx), y };
+      if (Math.abs(ax - bx) < EPS) return { x, y: clamp(y + dy, ay, by) };
+      return { x, y };
+    }
+  return null;
+}
+
 /** Keys of the pins of `els`. */
 function pinKeys(els: Element[], ctx: SheetContext): Set<string> {
   const out = new Set<string>();
@@ -331,10 +356,16 @@ export function computeMove(
   const stayingWires = elements.filter(
     (e): e is WireElement => e.type === 'wire' && !ids.has(e.id) && e.pts.length >= 4,
   );
-  const held = (x: number, y: number) => {
+  // Where an end of a moved wire goes when what it touches stays: on the pin of a part that
+  // stays it stays; in the middle of a wire that stays it slides along it (the junction dot
+  // follows); on a bend of a wire that stays it stays. Null: it moves freely.
+  const endTarget = (x: number, y: number): Pt | null => {
     const k = ptKey(x, y);
-    if (movedPins.has(k)) return false;
-    return stayingPins.has(k) || stayingWires.some((w) => throughWire(w.pts, x, y));
+    if (movedPins.has(k)) return null;
+    if (stayingPins.has(k)) return { x, y };
+    const slid = slideOnHost(stayingWires, x, y, dx, dy);
+    if (slid) return slid;
+    return stayingWires.some((w) => throughWire(w.pts, x, y)) ? { x, y } : null;
   };
   const d = { x: dx, y: dy };
   const edits: WireEdit[] = [];
@@ -343,17 +374,20 @@ export function computeMove(
     if (el.type === 'wire' && el.pts.length >= 4) {
       const n = el.pts.length;
       const [sx, sy, ex, ey] = [el.pts[0]!, el.pts[1]!, el.pts[n - 2]!, el.pts[n - 1]!];
-      const hs = held(sx, sy);
-      const he = held(ex, ey);
+      const hs = endTarget(sx, sy);
+      const he = endTarget(ex, ey);
       let pts = shiftPts(el.pts, dx, dy);
-      if (hs) pts = holdStart(pts, sx, sy);
-      if (he) pts = holdEnd(pts, ex, ey);
+      if (hs) pts = holdStart(pts, hs.x, hs.y);
+      if (he) pts = holdEnd(pts, he.x, he.y);
+      // Ends that did not move at all.
+      const fixedS = hs && samePt(hs.x, hs.y, sx, sy);
+      const fixedE = he && samePt(he.x, he.y, ex, ey);
       out.set(el.id, { ...el, pts });
       edits.push({
         old: el.pts,
         pts,
         d,
-        moving: (x, y) => !((hs && samePt(x, y, sx, sy)) || (he && samePt(x, y, ex, ey))),
+        moving: (x, y) => !((fixedS && samePt(x, y, sx, sy)) || (fixedE && samePt(x, y, ex, ey))),
       });
       continue;
     }
@@ -466,11 +500,20 @@ export function computeSegmentDrag(
     elements.filter((e) => e.type !== 'label'),
     ctx,
   );
-  const touches = (x: number, y: number) =>
-    pins.has(ptKey(x, y)) ||
-    elements.some((e) => e.type === 'wire' && e.id !== w.id && onWire(e.pts, x, y));
-  const keepStart = seg === 0 && touches(ax, ay);
-  const keepEnd = seg === n - 2 && touches(bx, by);
+  const others = elements.filter(
+    (e): e is WireElement => e.type === 'wire' && e.id !== w.id && e.pts.length >= 4,
+  );
+  // An end of the wire stays (with a leg) on a pin, or on a wire it cannot slide along; in the
+  // middle of a wire running the way it is pushed it slides along it (the junction follows);
+  // on the end of another wire, or on nothing, it goes (and the other wire follows).
+  const stays = (x: number, y: number) => {
+    if (pins.has(ptKey(x, y))) return true;
+    const slid = slideOnHost(others, x, y, d.x, d.y);
+    if (slid) return !samePt(slid.x, slid.y, x + d.x, y + d.y);
+    return others.some((o) => throughWire(o.pts, x, y));
+  };
+  const keepStart = seg === 0 && stays(ax, ay);
+  const keepEnd = seg === n - 2 && stays(bx, by);
   const pts = dragSegment(w, seg, dx, dy, keepStart, keepEnd);
   const { keepA, keepB } = segmentKeeps(w.pts, seg, keepStart, keepEnd);
   const edit: WireEdit = {
