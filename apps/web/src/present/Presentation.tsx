@@ -567,23 +567,27 @@ export function Presentation() {
   // The animations: the current slide at its step, the slides before all played, the ones after
   // not started yet (seen while the camera glides past them).
   const played: AnimFrame = useMemo(() => {
-    // Animated currents wait for their slide (on screen, the camera arrived), then start.
-    const arrivedHere = slide?.sheetId === sheetId && started.current.get(0) !== Infinity;
+    // Animated currents wait for their slide (on screen, the camera arrived), then start; those
+    // of the slides already shown go on flowing (an overview, then a zoom on a part of it).
+    const onSheet = slide?.sheetId === sheetId;
+    const arrivedHere = onSheet && started.current.get(0) !== Infinity;
     const idleFlows = (fx: Map<Id, ElFx>) => {
       for (const e of drawn) {
         if (e.type !== 'flow') continue;
         const i = slideOfEl.get(e.id);
-        if (!arrivedHere || (i !== undefined && i !== index))
-          fx.set(e.id, { ...fx.get(e.id), idle: true });
+        const waits =
+          !onSheet ||
+          (i !== undefined && i > index) ||
+          ((i === undefined || i === index) && !arrivedHere);
+        if (waits) fx.set(e.id, { ...fx.get(e.id), idle: true });
       }
       return fx;
     };
     const animated = drawn.filter((e) => e.anims?.length);
     if (!animated.length) return { elements: drawn, fx: idleFlows(new Map()), busy: false };
     const reached = level === 0 ? 0 : (steps[level - 1] ?? 0);
-    const onScreen = slide?.sheetId === sheetId;
     const clocks: Record<'cur' | 'before' | 'after', Clock> = {
-      cur: { reached: onScreen ? reached : -1, started: started.current, now },
+      cur: { reached: onSheet ? reached : -1, started: started.current, now },
       before: { reached: Infinity, started: new Map(), now },
       after: { reached: -1, started: new Map(), now },
     };

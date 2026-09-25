@@ -645,3 +645,41 @@ test('animated current: through the selected wires, settings, presentation and e
     )
     .toBe(2);
 });
+
+test('animated current: goes on flowing when the next slide zooms on a part of it', async ({
+  page,
+}) => {
+  type Ed = { __overleagger: { ed: { addElement(e: object): { id: string } } } };
+  await newProject(page, 'Zoom');
+  await page.evaluate(() => {
+    const { ed } = (window as unknown as Ed).__overleagger;
+    ed.addElement({ type: 'wire', pts: [0, 0, 300, 0, 300, 200, 0, 200, 0, 0], kind: 'power' });
+    ed.addElement({
+      type: 'flow',
+      pts: [0, 0, 300, 0, 300, 200, 0, 200],
+      closed: true,
+      current: 1,
+      signal: 'dc',
+      symbol: 'dot',
+    });
+    // An overview, then a zoom on its top-left corner.
+    ed.addElement({ type: 'frame', x: -60, y: -60, w: 420, h: 320, name: 'Overview', slide: 0 });
+    ed.addElement({ type: 'frame', x: -40, y: -40, w: 180, h: 120, name: 'Zoom', slide: 1 });
+  });
+  await page.getByTestId('present').click();
+  const count = page.getByTestId('present-count');
+  await expect(count).toContainText('Overview');
+  const where = () => page.locator('.present-stage .flow > g').first().getAttribute('transform');
+  const moves = async () => {
+    const a = await where();
+    await page.waitForTimeout(300);
+    return (await where()) !== a;
+  };
+  await expect.poll(moves).toBe(true);
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('Zoom');
+  // While the camera glides, and once it has arrived.
+  expect(await moves()).toBe(true);
+  await page.waitForTimeout(1200);
+  expect(await moves()).toBe(true);
+});
