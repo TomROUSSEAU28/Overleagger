@@ -36,6 +36,10 @@ export interface ServerInfo {
   name: string;
   signup: boolean;
   github: boolean;
+  /** New accounts confirm their e-mail with a code. */
+  verify?: boolean;
+  /** A forgotten password can be changed with a code sent by e-mail. */
+  reset?: boolean;
 }
 
 export interface Member {
@@ -105,7 +109,18 @@ interface CloudState {
   init: () => Promise<void>;
   setServer: (url: string | null) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, name: string, password: string, invite?: string) => Promise<void>;
+  /** 'verify': a code was e-mailed to confirm the address (then `verifySignUp`). */
+  signUp: (
+    email: string,
+    name: string,
+    password: string,
+    invite?: string,
+  ) => Promise<'done' | 'verify'>;
+  verifySignUp: (email: string, code: string) => Promise<void>;
+  /** E-mail a code to choose a new password. */
+  forgotPassword: (email: string) => Promise<void>;
+  /** A new password with that code (signs in). */
+  resetPassword: (email: string, code: string, password: string) => Promise<void>;
   acceptToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateMe: (patch: { name?: string; color?: string; handle?: string }) => Promise<void>;
@@ -185,11 +200,35 @@ export const useCloud = create<CloudState>((set, get) => ({
   },
 
   signUp: async (email, name, password, invite) => {
-    const r = await api<{ token: string; user: CloudUser }>('POST', '/api/auth/signup', {
+    const r = await api<{ token?: string; user?: CloudUser; verify?: boolean }>(
+      'POST',
+      '/api/auth/signup',
+      { email, name, password, ...(invite ? { invite } : {}) },
+    );
+    if (r.verify || !r.token || !r.user) return 'verify';
+    write(TOKEN_KEY, r.token);
+    set({ token: r.token, user: r.user });
+    return 'done';
+  },
+
+  verifySignUp: async (email, code) => {
+    const r = await api<{ token: string; user: CloudUser }>('POST', '/api/auth/signup/verify', {
       email,
-      name,
+      code,
+    });
+    write(TOKEN_KEY, r.token);
+    set({ token: r.token, user: r.user });
+  },
+
+  forgotPassword: async (email) => {
+    await api('POST', '/api/auth/forgot', { email });
+  },
+
+  resetPassword: async (email, code, password) => {
+    const r = await api<{ token: string; user: CloudUser }>('POST', '/api/auth/reset', {
+      email,
+      code,
       password,
-      ...(invite ? { invite } : {}),
     });
     write(TOKEN_KEY, r.token);
     set({ token: r.token, user: r.user });

@@ -802,6 +802,16 @@ button.kbd {
   gap: 8px;
   margin-top: 14px;
 }
+/* The code e-mailed to confirm an address: big digits, easy to check. */
+input.auth-code {
+  font-size: 20px;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+.auth-forgot {
+  margin: -4px 0 0;
+  text-align: right;
+}
 
 .quickadd {
   background: var(--panel);

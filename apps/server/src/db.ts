@@ -4,7 +4,8 @@
  * Tables: users, sessions, projects, members, invites, docs (Yjs state of each document of a
  * project: its root and each sheet; `documents` held the single document of old projects), versions,
  * libraries (each user's personal symbols and templates), friends, teams, team_members and
- * project_teams (a team added to a project: all its members get the role).
+ * project_teams (a team added to a project: all its members get the role), codes (the codes
+ * e-mailed to confirm an address or choose a new password).
  */
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -30,6 +31,19 @@ export interface UserRow {
   handle?: string | null;
   /** Projects this account may keep on the server (null: the server's default). */
   max_projects?: number | null;
+}
+
+export type CodePurpose = 'signup' | 'reset';
+
+export interface CodeRow {
+  email: string;
+  purpose: CodePurpose;
+  code_hash: string;
+  /** Signing up: the account waiting for its code (JSON). */
+  data: string | null;
+  sent_at: number;
+  expires_at: number;
+  attempts: number;
 }
 
 /** What other people may see of an account. */
@@ -138,6 +152,16 @@ CREATE TABLE IF NOT EXISTS messages (
   body TEXT NOT NULL,
   user_id TEXT,
   read_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS codes (
+  email TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  data TEXT,
+  sent_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (email, purpose)
 );
 CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY,
@@ -323,6 +347,55 @@ export class Store {
 
   deleteSession(tokenHash: string) {
     this.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
+  }
+
+  /** Sign out everywhere (a new password). */
+  deleteSessionsOf(userId: string) {
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  }
+
+  setPassword(userId: string, passwordHash: string) {
+    this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+  }
+
+  // E-mailed codes -----------------------------------------------------------
+
+  /** A new code for this address and purpose (it replaces the previous one). */
+  setCode(c: {
+    email: string;
+    purpose: CodePurpose;
+    codeHash: string;
+    data?: string;
+    ttlMs: number;
+  }) {
+    const now = Date.now();
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO codes (email, purpose, code_hash, data, sent_at, expires_at, attempts) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      )
+      .run(c.email, c.purpose, c.codeHash, c.data ?? null, now, now + c.ttlMs);
+  }
+
+  code(email: string, purpose: CodePurpose) {
+    return this.db
+      .prepare('SELECT * FROM codes WHERE email = ? AND purpose = ? AND expires_at > ?')
+      .get(email, purpose, Date.now()) as CodeRow | undefined;
+  }
+
+  /** One more wrong try; returns how many so far. */
+  codeAttempt(email: string, purpose: CodePurpose): number {
+    this.db
+      .prepare('UPDATE codes SET attempts = attempts + 1 WHERE email = ? AND purpose = ?')
+      .run(email, purpose);
+    return this.code(email, purpose)?.attempts ?? 0;
+  }
+
+  deleteCode(email: string, purpose: CodePurpose) {
+    this.db.prepare('DELETE FROM codes WHERE email = ? AND purpose = ?').run(email, purpose);
+  }
+
+  pruneCodes() {
+    this.db.prepare('DELETE FROM codes WHERE expires_at <= ?').run(Date.now());
   }
 
   // Projects & members ------------------------------------------------------

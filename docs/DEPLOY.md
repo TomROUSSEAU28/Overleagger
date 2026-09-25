@@ -166,6 +166,10 @@ reach your mailbox and give the site its address, contact@circuitnotebook.com.
      ```
 
    - `deploy/update.sh --force`, then send yourself a message from the homepage.
+   - The same settings make new accounts **confirm their e-mail**: a 6-digit code is sent to
+     the address and the account exists only once it is typed (`VERIFY_EMAIL: 'false'` turns
+     it off). _Forgot your password?_ also appears on the sign-in window: a code by e-mail,
+     then a new password (it signs out the account's other sessions).
 3. **Answer as contact@ from Gmail** (optional)
    - Gmail → ⚙ → _See all settings_ → **Accounts and Import** → _Send mail as_ → _Add another
      email address_: name `Circuit Notebook`, address `contact@circuitnotebook.com` (keep _Treat

@@ -369,3 +369,75 @@ test('delete my account: says what goes away, asks for the password', async ({ b
   });
   expect(login.status()).toBe(401);
 });
+
+test('a new account confirms its e-mail with a code; a forgotten password', async ({ browser }) => {
+  // The test server sends no e-mails: its answers about codes are played here, and the account
+  // is really created (then signed in) once the right code is typed.
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  const email = `vera.${stamp}@lab.test`;
+  let signup = '';
+  await page.route(`${SERVER}/api/health`, async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ json: { ...(await res.json()), verify: true, reset: true } });
+  });
+  await page.route(`${SERVER}/api/auth/signup`, async (route) => {
+    signup = route.request().postData() ?? '';
+    await route.fulfill({ json: { verify: true, email } });
+  });
+  await page.route(`${SERVER}/api/auth/signup/verify`, async (route) => {
+    const { code } = JSON.parse(route.request().postData() ?? '{}') as { code: string };
+    if (code.replace(/\s/g, '') !== '123456')
+      return route.fulfill({
+        status: 400,
+        json: { error: 'Wrong code: check the last e-mail we sent you.' },
+      });
+    const res = await route.fetch({ url: `${SERVER}/api/auth/signup`, postData: signup });
+    await route.fulfill({ response: res });
+  });
+  await page.goto('/app/');
+  await page.getByTestId('connect-server').click();
+  await page.getByTestId('server-url').fill(SERVER);
+  await page.getByTestId('server-connect').click();
+  await page.getByTestId('sign-in').click();
+  await page.getByTestId('auth-switch').click();
+  await expect(page.getByText('We will send a code to this address')).toBeVisible();
+  await page.getByTestId('auth-name').fill('Vera');
+  await page.getByTestId('auth-email').fill(email);
+  await page.getByTestId('auth-password').fill('correct horse battery');
+  await page.getByTestId('auth-submit').click();
+
+  await expect(page.getByText('Check your e-mail')).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
+  await page.getByTestId('auth-code').fill('000000');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByText('Wrong code')).toBeVisible();
+  await page.getByTestId('auth-resend').click();
+  await expect(page.getByText('A new code is on its way')).toBeVisible();
+  await page.getByTestId('auth-code').fill('123 456');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('account-menu')).toContainText('Vera');
+
+  // Signed out, the password is forgotten: a code, then a new password (played here too).
+  await page.evaluate(() => localStorage.removeItem('sb.token'));
+  await page.route(`${SERVER}/api/auth/forgot`, (route) => route.fulfill({ json: { ok: true } }));
+  await page.route(`${SERVER}/api/auth/reset`, async (route) => {
+    const res = await route.fetch({
+      url: `${SERVER}/api/auth/login`,
+      postData: JSON.stringify({ email, password: 'correct horse battery' }),
+    });
+    await route.fulfill({ response: res });
+  });
+  await page.reload();
+  await page.getByTestId('sign-in').click();
+  await page.getByTestId('auth-forgot').click();
+  await expect(page.getByText('Forgot your password?')).toBeVisible();
+  await page.getByTestId('auth-email').fill(email);
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByText('Choose a new password')).toBeVisible();
+  await page.getByTestId('auth-code').fill('654321');
+  await page.getByTestId('auth-password').fill('a brand new password');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('account-menu')).toContainText('Vera');
+  await ctx.close();
+});

@@ -35,12 +35,18 @@ export interface Config {
   messageKeepDays: number;
   /** Outgoing e-mail (optional): without it, messages are only in the admin page. */
   smtp?: { host: string; port: number; user?: string; pass?: string; from: string };
+  /**
+   * A new account confirms its e-mail with a code sent to it (on by default when e-mail can be
+   * sent; VERIFY_EMAIL=false turns it off).
+   */
+  verifyEmail: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const port = Number(env.PORT ?? 8787);
   const cors = (env.CORS_ORIGINS ?? '*').trim();
   return {
+    verifyEmail: Boolean(env.SMTP_HOST) && env.VERIFY_EMAIL !== 'false',
     port,
     host: env.HOST ?? '0.0.0.0',
     dbFile: env.DB_FILE ?? './data/circuit-notebook.sqlite',

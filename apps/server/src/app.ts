@@ -14,6 +14,7 @@ import {
   type Role,
   type SheetLevel,
 } from '@overleagger/core';
+import { randomInt } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { statfs } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -23,7 +24,7 @@ import type { Transporter } from 'nodemailer';
 import { startBackups } from './backup';
 import { createCollab, visibleParts } from './collab';
 import { isAdminEmail, type Config } from './config';
-import { Store, type UserRow } from './db';
+import { Store, type CodePurpose, type UserRow } from './db';
 import { createMailer } from './mail';
 
 const publicUser = (u: UserRow) => ({
@@ -58,9 +59,12 @@ export async function createApp(
   const mailer = createMailer(config, options.mailTransport);
   const collab = createCollab(store, config);
   const backups = startBackups(store.db, config);
-  // Contact messages are kept one year at most (privacy policy): checked at start, then daily.
-  const pruneMessages = () =>
+  // Contact messages are kept one year at most (privacy policy), old codes are dropped: checked
+  // at start, then daily.
+  const pruneMessages = () => {
     store.pruneMessages(Date.now() - config.messageKeepDays * 24 * 3600 * 1000);
+    store.pruneCodes();
+  };
   pruneMessages();
   const pruneTimer = setInterval(pruneMessages, 24 * 3600 * 1000);
   pruneTimer.unref();
@@ -168,6 +172,10 @@ export async function createApp(
     name: 'Circuit Notebook',
     signup: config.allowSignup,
     github: Boolean(config.github),
+    /** New accounts confirm their e-mail with a code. */
+    verify: config.verifyEmail,
+    /** A forgotten password can be changed with a code sent by e-mail. */
+    reset: Boolean(config.smtp),
     ...(config.contactEmail ? { contact: config.contactEmail } : {}),
   }));
 
@@ -211,6 +219,75 @@ export async function createApp(
     return { ok: true };
   });
 
+  // E-mailed codes (confirm an address, choose a new password) -------------
+
+  const CODE_TTL = 30 * 60 * 1000;
+  const codeHash = (email: string, code: string) => hashToken(`${email}|${code}`);
+  const codeSends = new Map<string, number[]>();
+  /**
+   * E-mail a new 6-digit code. Signing up, a code asked again too soon is refused; for a new
+   * password it is silently not sent again (that would tell whether the account exists).
+   */
+  const sendCode = async (
+    req: FastifyRequest,
+    email: string,
+    purpose: CodePurpose,
+    data?: string,
+  ) => {
+    const prev = store.code(email, purpose);
+    if (prev && Date.now() - prev.sent_at < 30_000) {
+      if (purpose === 'reset') return;
+      throw new HttpError(429, 'A code was just sent: wait a little before asking for another.');
+    }
+    const now = Date.now();
+    const recent = (codeSends.get(req.ip) ?? []).filter((t) => now - t < 3600_000);
+    if (recent.length >= 10)
+      throw new HttpError(429, 'Too many e-mails asked from here, try again in an hour.');
+    codeSends.set(req.ip, [...recent, now]);
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    store.setCode({ email, purpose, codeHash: codeHash(email, code), data, ttlMs: CODE_TTL });
+    const sent = await mailer.sendCode(email, purpose, code).catch((e: unknown) => {
+      console.error('Could not e-mail a code:', e);
+      return false;
+    });
+    if (!sent) {
+      store.deleteCode(email, purpose);
+      throw new HttpError(502, 'The e-mail could not be sent. Please try again in a moment.');
+    }
+  };
+  /** Check a code typed by the person (5 tries); it can be used once. */
+  const useCode = (email: string, purpose: CodePurpose, code: string) => {
+    const row = store.code(email, purpose);
+    if (!row) throw bad('This code has expired: ask for a new one.');
+    if (codeHash(email, code.replace(/\s/g, '')) !== row.code_hash) {
+      if (store.codeAttempt(email, purpose) >= 5) {
+        store.deleteCode(email, purpose);
+        throw bad('Too many wrong codes: ask for a new one.');
+      }
+      throw bad('Wrong code: check the last e-mail we sent you.');
+    }
+    store.deleteCode(email, purpose);
+    return row;
+  };
+
+  const createAccount = (email: string, name: string, passwordHash: string) => {
+    const user: UserRow = {
+      id: randomToken(9),
+      email,
+      name: name.slice(0, 60),
+      color: colorFor(email),
+      password_hash: passwordHash,
+      github_id: null,
+      created_at: Date.now(),
+    };
+    store.createUser(user);
+    return { token: newSession(user.id), user: account(user) };
+  };
+
+  /**
+   * Create an account. When the server sends e-mails, the account waits for the code sent to
+   * the address (`{ verify: true }`, then /api/auth/signup/verify); asking again sends a new one.
+   */
   app.post('/api/auth/signup', async (req) => {
     const b = (req.body ?? {}) as {
       email?: string;
@@ -220,22 +297,59 @@ export async function createApp(
     };
     const email = (b.email ?? '').trim().toLowerCase();
     const name = (b.name ?? '').trim() || email.split('@')[0] || 'Engineer';
-    if (!EMAIL.test(email)) throw bad('Please enter a valid email address.');
+    if (!EMAIL.test(email) || email.length > 200) throw bad('Please enter a valid email address.');
     if ((b.password ?? '').length < 8) throw bad('The password needs at least 8 characters.');
     if (!config.allowSignup && !(b.invite && validInvite(b.invite)))
       throw new HttpError(403, 'Sign-up is closed on this server: ask for an invite link.');
     if (store.userByEmail(email)) throw bad('An account already exists with this email.');
-    const user: UserRow = {
-      id: randomToken(9),
-      email,
-      name: name.slice(0, 60),
-      color: colorFor(email),
-      password_hash: await hashPassword(b.password!),
-      github_id: null,
-      created_at: Date.now(),
+    const passwordHash = await hashPassword(b.password!);
+    if (!config.verifyEmail) return createAccount(email, name, passwordHash);
+    const pending = { name, passwordHash, ...(b.invite ? { invite: b.invite } : {}) };
+    await sendCode(req, email, 'signup', JSON.stringify(pending));
+    return { verify: true, email };
+  });
+
+  app.post('/api/auth/signup/verify', async (req) => {
+    const b = (req.body ?? {}) as { email?: string; code?: string };
+    const email = (b.email ?? '').trim().toLowerCase();
+    const row = useCode(email, 'signup', b.code ?? '');
+    const d = JSON.parse(row.data ?? '{}') as {
+      name?: string;
+      passwordHash?: string;
+      invite?: string;
     };
-    store.createUser(user);
-    return { token: newSession(user.id), user: account(user) };
+    if (!d.passwordHash) throw bad('This code has expired: ask for a new one.');
+    if (!config.allowSignup && !(d.invite && validInvite(d.invite)))
+      throw new HttpError(403, 'Sign-up is closed on this server: ask for an invite link.');
+    if (store.userByEmail(email)) throw bad('An account already exists with this email.');
+    return createAccount(email, d.name || email.split('@')[0] || 'Engineer', d.passwordHash);
+  });
+
+  /** Forgot my password: a code by e-mail (the answer is the same for an unknown address). */
+  app.post('/api/auth/forgot', async (req) => {
+    if (!config.smtp)
+      throw new HttpError(
+        503,
+        'This server cannot send e-mails: ask its administrator to reset your password.',
+      );
+    const email = ((req.body as { email?: string } | undefined)?.email ?? '').trim().toLowerCase();
+    if (!EMAIL.test(email)) throw bad('Please enter a valid email address.');
+    if (store.userByEmail(email)) await sendCode(req, email, 'reset');
+    return { ok: true };
+  });
+
+  /** A new password with the e-mailed code: signs out everywhere else, signs in here. */
+  app.post('/api/auth/reset', async (req) => {
+    const b = (req.body ?? {}) as { email?: string; code?: string; password?: string };
+    const email = (b.email ?? '').trim().toLowerCase();
+    if ((b.password ?? '').length < 8) throw bad('The password needs at least 8 characters.');
+    useCode(email, 'reset', b.code ?? '');
+    const user = store.userByEmail(email);
+    if (!user) throw bad('This code has expired: ask for a new one.');
+    store.setPassword(user.id, await hashPassword(b.password!));
+    store.deleteSessionsOf(user.id);
+    failures.delete(`${req.ip}|${email}`);
+    return { token: newSession(user.id), user: account(store.userById(user.id)!) };
   });
 
   app.post('/api/auth/login', async (req) => {

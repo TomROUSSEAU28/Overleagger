@@ -115,7 +115,30 @@ export function ServerDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Sign in or create an account on the current server. */
+type AuthMode =
+  /** Sign in. */
+  | 'in'
+  /** Create an account. */
+  | 'up'
+  /** Type the code e-mailed to confirm the address of the new account. */
+  | 'code'
+  /** Forgot my password: the address to send a code to. */
+  | 'forgot'
+  /** The code, and a new password. */
+  | 'reset';
+
+const AUTH_TITLES: Record<AuthMode, string> = {
+  in: 'Sign in',
+  up: 'Create an account',
+  code: 'Check your e-mail',
+  forgot: 'Forgot your password?',
+  reset: 'Choose a new password',
+};
+
+/**
+ * Sign in or create an account on the current server. A new account confirms its e-mail with a
+ * 6-digit code when the server sends e-mails; a forgotten password is changed the same way.
+ */
 export function SignInDialog({
   onClose,
   invite,
@@ -126,76 +149,174 @@ export function SignInDialog({
   onDone?: () => void;
 }) {
   const cloud = useCloud();
-  const [mode, setMode] = useState<'in' | 'up'>('in');
+  const [mode, setModeRaw] = useState<AuthMode>('in');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const canSignUp = cloud.info?.signup || Boolean(invite);
-  const submit = async () => {
+  const setMode = (m: AuthMode) => {
+    setModeRaw(m);
+    setError('');
+    setNote('');
+  };
+  const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError('');
     try {
-      if (mode === 'in') await cloud.signIn(email, password);
-      else await cloud.signUp(email, name, password, invite);
-      onDone?.();
-      onClose();
+      await fn();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+  const done = () => {
+    onDone?.();
+    onClose();
+  };
+  const submit = () =>
+    run(async () => {
+      if (mode === 'in') {
+        await cloud.signIn(email, password);
+        done();
+      } else if (mode === 'up') {
+        if ((await cloud.signUp(email, name, password, invite)) === 'done') done();
+        else {
+          setCode('');
+          setMode('code');
+        }
+      } else if (mode === 'code') {
+        await cloud.verifySignUp(email, code);
+        done();
+      } else if (mode === 'forgot') {
+        await cloud.forgotPassword(email);
+        setCode('');
+        setPassword('');
+        setMode('reset');
+      } else {
+        await cloud.resetPassword(email, code, password);
+        done();
+      }
+    });
+  /** Another code (the last one got lost, or expired). */
+  const resend = () =>
+    run(async () => {
+      if (mode === 'code') await cloud.signUp(email, name, password, invite);
+      else await cloud.forgotPassword(email);
+      setNote('A new code is on its way.');
+    });
   const githubUrl = `${cloud.server}/api/auth/github?return=${encodeURIComponent(
     `${location.origin}${location.pathname}`,
   )}`;
+  const codeField = (
+    <Field label="Code (6 digits)">
+      <input
+        autoFocus
+        className="mono auth-code"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={7}
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ''))}
+        data-testid="auth-code"
+      />
+    </Field>
+  );
+  const submitLabel: Record<AuthMode, string> = {
+    in: 'Sign in',
+    up: 'Create account',
+    code: 'Confirm',
+    forgot: 'Send me a code',
+    reset: 'Save and sign in',
+  };
   return (
-    <Modal title={mode === 'in' ? 'Sign in' : 'Create an account'} onClose={onClose}>
+    <Modal title={AUTH_TITLES[mode]} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
         }}
       >
-        <p className="muted small">
-          Server: <span className="mono">{cloud.server}</span>
-        </p>
+        {(mode === 'in' || mode === 'up') && (
+          <p className="muted small">
+            Server: <span className="mono">{cloud.server}</span>
+          </p>
+        )}
         {mode === 'up' && (
           <Field label="Name (shown to your collaborators)">
             <input value={name} onChange={(e) => setName(e.target.value)} data-testid="auth-name" />
           </Field>
         )}
-        <Field label="Email">
-          <input
-            type="email"
-            autoFocus
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            data-testid="auth-email"
-          />
-        </Field>
-        <Field label={mode === 'up' ? 'Password (8 characters or more)' : 'Password'}>
-          <input
-            type="password"
-            autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            data-testid="auth-password"
-          />
-        </Field>
+        {(mode === 'in' || mode === 'up' || mode === 'forgot') && (
+          <Field label="Email">
+            <input
+              type="email"
+              autoFocus
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              data-testid="auth-email"
+            />
+          </Field>
+        )}
+        {mode === 'forgot' && (
+          <p className="muted small">We will e-mail you a code to choose a new password.</p>
+        )}
+        {(mode === 'code' || mode === 'reset') && (
+          <p className="small">
+            We sent a 6-digit code to <b>{email}</b>. It works for 30 minutes (have a look in your
+            spam folder too).
+          </p>
+        )}
+        {(mode === 'code' || mode === 'reset') && codeField}
+        {(mode === 'in' || mode === 'up' || mode === 'reset') && (
+          <Field
+            label={
+              mode === 'up'
+                ? 'Password (8 characters or more)'
+                : mode === 'reset'
+                  ? 'New password (8 characters or more)'
+                  : 'Password'
+            }
+          >
+            <input
+              type="password"
+              autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              data-testid="auth-password"
+            />
+          </Field>
+        )}
+        {mode === 'in' && cloud.info?.reset && (
+          <p className="small auth-forgot">
+            <button
+              type="button"
+              className="link"
+              onClick={() => setMode('forgot')}
+              data-testid="auth-forgot"
+            >
+              Forgot your password?
+            </button>
+          </p>
+        )}
         {mode === 'up' && (
           <p className="muted small">
+            {cloud.info?.verify ? 'We will send a code to this address to check it. ' : ''}
             Your e-mail is only used to sign you in and to share projects.{' '}
             <a href={`${cloud.server}/privacy/`} target="_blank" rel="noopener">
               Privacy policy
             </a>
           </p>
         )}
+        {note && !error && <p className="muted small">{note}</p>}
         {error && <p className="warning small">{error}</p>}
         <div className="modal-foot">
-          {canSignUp && (
+          {(mode === 'in' || mode === 'up') && canSignUp && (
             <button
               type="button"
               className="link accent"
@@ -205,14 +326,35 @@ export function SignInDialog({
               {mode === 'in' ? 'No account yet? Create one' : 'I already have an account'}
             </button>
           )}
+          {(mode === 'code' || mode === 'reset') && (
+            <button
+              type="button"
+              className="link accent"
+              disabled={busy}
+              onClick={() => void resend()}
+              data-testid="auth-resend"
+            >
+              Send a new code
+            </button>
+          )}
+          {mode === 'forgot' && (
+            <button type="button" className="link accent" onClick={() => setMode('in')}>
+              Back to sign in
+            </button>
+          )}
           <span style={{ flex: 1 }} />
-          {cloud.info?.github && (
+          {mode === 'code' && (
+            <button type="button" className="btn" onClick={() => setMode('up')}>
+              Change e-mail
+            </button>
+          )}
+          {(mode === 'in' || mode === 'up') && cloud.info?.github && (
             <a className="btn" href={githubUrl}>
               Continue with GitHub
             </a>
           )}
           <button type="submit" className="btn primary" disabled={busy} data-testid="auth-submit">
-            {mode === 'in' ? 'Sign in' : 'Create account'}
+            {submitLabel[mode]}
           </button>
         </div>
       </form>
