@@ -216,21 +216,35 @@ test('presentation mode: slides, drill into a block, laser and pen', async ({ pa
   const show = page.getByTestId('presentation');
   await expect(show).toBeVisible();
   const count = page.getByTestId('present-count');
-  // The two frames of the example, then the controller's sheet.
-  await expect(count).toContainText('1 / 3');
-  await expect(count).toContainText('Power stage');
+  // The five frames of the example (an overview, then zooms), then the controller's sheet.
+  await expect(count).toContainText('1 / 6');
+  await expect(count).toContainText('Overview');
   // Clicking the block zooms into its sub-sheet.
   await page.locator('.present-stage .el.block').first().click();
-  await expect(count).toContainText('3 / 3');
+  await expect(count).toContainText('6 / 6');
   await page.keyboard.press('Backspace');
-  await expect(count).toContainText('1 / 3');
-  // The power stage builds up in 3 clicks (current, output, controller), then the next slide.
-  for (let i = 0; i < 3; i++) {
+  await expect(count).toContainText('1 / 6');
+  // The power stage builds up in 5 clicks (the currents, a load step, the controller)…
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('Power stage');
+  for (let i = 0; i < 5; i++) {
     await page.keyboard.press('ArrowRight');
-    await expect(count).toContainText('1 / 3');
+    await expect(count).toContainText('2 / 6');
+  }
+  // …whose button leads into the controller.
+  await page.locator('.present-stage').getByText('Open the controller').click();
+  await expect(count).toContainText('6 / 6');
+  await page.keyboard.press('Backspace');
+  await expect(count).toContainText('2 / 6');
+  // A closer zoom on the output filter (2 clicks), then the waveforms.
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('Output filter');
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(count).toContainText('3 / 6');
   }
   await page.keyboard.press('ArrowRight');
-  await expect(count).toContainText('2 / 3');
+  await expect(count).toContainText('4 / 6');
   await expect(count).toContainText('Waveforms');
   await page.keyboard.press('p');
   await page.mouse.move(400, 300);
@@ -245,7 +259,7 @@ test('presentation mode: slides, drill into a block, laser and pen', async ({ pa
   await expect(page.getByTestId('present-blank-note')).toBeVisible();
   await page.mouse.click(400, 300);
   await expect(page.getByTestId('present-blank-note')).toBeHidden();
-  await expect(count).toContainText('2 / 3');
+  await expect(count).toContainText('4 / 6');
   await page.keyboard.press('Escape');
   await expect(show).toBeHidden();
 });

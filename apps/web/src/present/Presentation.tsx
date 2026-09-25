@@ -134,7 +134,8 @@ export function Presentation() {
   const [ink, setInk] = useState<number[][]>([]);
   const [laser, setLaser] = useState<{ x: number; y: number; t: number }[]>([]);
   const [hud, setHud] = useState(true);
-  const history = useRef<number[]>([]);
+  /** Where to come back (Backspace) after following a block or a link: the slide and its click. */
+  const history = useRef<{ index: number; level: number }[]>([]);
   const anim = useRef(0);
   const boxRef = useRef(box);
   boxRef.current = box;
@@ -234,11 +235,12 @@ export function Presentation() {
 
   /**
    * Show slide `i` with the transition of its frame (the camera glides by default, and
-   * cross-fades to another sheet). `atEnd`: with all its steps played (going back).
+   * cross-fades to another sheet). `atEnd`: with all its steps played (going back), or those up
+   * to this click (coming back to where one was).
    */
   const goToken = useRef(0);
   const go = useCallback(
-    (i: number, via?: Rect, atEnd = false) => {
+    (i: number, via?: Rect, atEnd: boolean | number = false) => {
       const target = slides[i];
       if (!target) return;
       setInk([]);
@@ -253,7 +255,9 @@ export function Presentation() {
       // The camera cannot glide to another sheet: it fades there.
       if (kind === 'move' && !sameSheet && !via) kind = 'fade';
       const ms = frame?.transitionMs ?? (kind === 'move' ? 560 : kind === 'fade' ? 480 : 620);
-      setLevel(atEnd ? slideSteps(slideOf(target)).length : 0);
+      setLevel(
+        atEnd === true ? slideSteps(slideOf(target)).length : typeof atEnd === 'number' ? atEnd : 0,
+      );
       // The slide's own animations wait until it has arrived (then step 0 starts).
       started.current = new Map(atEnd ? [] : [[0, Infinity]]);
       setNow(performance.now());
@@ -383,7 +387,7 @@ export function Presentation() {
   }, [index, go, level, steps]);
   const up = useCallback(() => {
     const back = history.current.pop();
-    if (back !== undefined) return go(back);
+    if (back !== undefined) return go(back.index, undefined, back.level);
     const parent = ed.project.getSheet(sheetId ?? '')?.parentSheetId;
     const i = slides.findIndex((s) => s.sheetId === parent);
     if (i >= 0) go(i);
@@ -499,7 +503,7 @@ export function Presentation() {
     if (el?.type === 'block') {
       const i = slides.findIndex((s) => s.sheetId === el.childSheetId);
       if (i >= 0) {
-        history.current.push(index);
+        history.current.push({ index, level });
         go(i, { x: el.x, y: el.y, w: el.w, h: el.h });
         return;
       }
@@ -514,7 +518,7 @@ export function Presentation() {
         const sid = el.link.sheetId;
         const i = slides.findIndex((s) => s.sheetId === sid);
         if (i >= 0) {
-          history.current.push(index);
+          history.current.push({ index, level });
           go(i);
         }
       }
