@@ -1498,3 +1498,105 @@ main > section {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ manual and changelog */
+
+.manual-page {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 760px);
+  justify-content: center;
+  gap: 40px;
+  padding: 0 20px;
+}
+.manual-page .legal {
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.manual-toc {
+  position: sticky;
+  top: 84px;
+  align-self: start;
+  padding-top: 72px;
+  font-size: 15px;
+}
+.manual-toc ol {
+  margin: 0;
+  padding-left: 1.3em;
+  border-left: 1px solid var(--line);
+}
+.manual-toc li {
+  padding: 3px 0 3px 4px;
+}
+.manual-toc a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.manual-toc a:hover {
+  color: var(--accent);
+}
+.manual section {
+  scroll-margin-top: 84px;
+}
+.manual td:first-child {
+  white-space: nowrap;
+}
+.manual td kbd,
+.manual li kbd,
+.manual p kbd {
+  font-size: 0.82em;
+}
+@media (max-width: 900px) {
+  .manual-page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .manual-toc {
+    position: static;
+    padding-top: 32px;
+  }
+  .manual td:first-child {
+    white-space: normal;
+  }
+}
+
+.changelog .release {
+  margin-top: 36px;
+  padding: 6px 24px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.changelog .release:first-child {
+  border-left: 3px solid var(--margin);
+}
+.changelog .release h2 {
+  margin: 0.5em 0 0;
+  font-size: 26px;
+}
+.release-title {
+  font-weight: 400;
+  color: var(--muted);
+  font-style: italic;
+}
+.changelog .release .kicker {
+  margin: 4px 0 0;
+}
+.changelog .release h3 {
+  display: inline-block;
+  margin: 18px 0 2px;
+  padding: 1px 10px 2px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  font-weight: 400;
+}
+.changelog h3.added {
+  background: rgba(47, 93, 158, 0.12);
+  color: var(--accent);
+}
+.changelog h3.fixed {
+  background: rgba(200, 65, 47, 0.1);
+  color: var(--pen-red);
+}

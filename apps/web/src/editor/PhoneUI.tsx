@@ -4,11 +4,13 @@
  */
 import { sheetPath } from '@overleagger/core';
 import {
+  BookOpen,
   Check,
   Copy,
   Download,
   FlipHorizontal2,
   Grid3x3,
+  History,
   Layers,
   Maximize,
   MessageSquare,
@@ -21,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
+import { STAGE, versionLabel } from '../changelog';
 import { useCanEdit } from '../cloud/hooks';
 import { CommentsPanel } from '../comments/Comments';
 import { useComments } from '../comments/hooks';
@@ -249,6 +252,13 @@ function MoreSettings() {
         () => ui().set({ phoneSheet: null, modal: 'export' }),
         'phone-export',
       )}
+      {row(<History size={18} />, `What's new (${versionLabel()} ${STAGE})`, () =>
+        ui().set({ phoneSheet: null, modal: 'whatsnew' }),
+      )}
+      <a className="phone-row" href="../manual/" target="_blank" rel="noopener">
+        <BookOpen size={18} />
+        <span>User manual</span>
+      </a>
     </div>
   );
 }

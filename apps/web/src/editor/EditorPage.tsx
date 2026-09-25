@@ -1,3 +1,4 @@
+import { WhatsNew } from '../panels/WhatsNew';
 import { roleAtLeast } from '@overleagger/core';
 import { useEffect, useState } from 'react';
 import { Canvas } from '../canvas/Canvas';
@@ -50,6 +51,7 @@ function EditorLayout() {
       {modal === 'export' && <ExportDialog />}
       {modal === 'symbol-editor' && <SymbolEditor />}
       {modal === 'save-template' && <SaveTemplateDialog />}
+      {modal === 'whatsnew' && <WhatsNew />}
       {presenting && <Presentation />}
       <Toast />
     </>

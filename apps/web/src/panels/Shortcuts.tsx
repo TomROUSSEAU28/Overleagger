@@ -94,7 +94,20 @@ export function HelpOverlay() {
               “New symbol” in the library opens the symbol editor. “Customize symbol…” in the
               properties starts from the selected part.
             </li>
+            <li>
+              Animations: select something in a frame, open “Animation” at the bottom of the
+              properties, and make it appear, move or change on a click of the presentation.
+            </li>
           </ul>
+          <p className="help-links">
+            <a href="../manual/" target="_blank" rel="noopener" data-testid="help-manual">
+              User manual
+            </a>
+            {' · '}
+            <a href="../changelog/" target="_blank" rel="noopener">
+              What's new
+            </a>
+          </p>
         </section>
       </div>
     </Modal>

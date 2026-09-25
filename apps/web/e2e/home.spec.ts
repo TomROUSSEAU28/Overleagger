@@ -121,3 +121,18 @@ test('homepage: with reduced motion, the pages are simply one under the other', 
   const hw = page.locator('#p-together .hw').first();
   expect(await hw.evaluate((e) => getComputedStyle(e).clipPath)).not.toContain('100%');
 });
+
+test('version, what is new, manual and changelog', async ({ page }) => {
+  await page.goto('/app/#/example');
+  const chip = page.getByTestId('version-chip');
+  await expect(chip).toHaveClass(/fresh/);
+  await chip.click();
+  await expect(page.getByTestId('whatsnew')).toContainText('Animated presentations');
+  await expect(chip).not.toHaveClass(/fresh/);
+  await page.goto('/manual/');
+  await expect(page.getByTestId('manual')).toContainText('How to use Circuit Notebook');
+  await expect(page.locator('[data-version]').first()).toContainText('beta');
+  await page.goto('/changelog/');
+  await expect(page.locator('.release')).toHaveCount(9);
+  await expect(page.locator('.release').first()).toContainText('current version');
+});

@@ -1,3 +1,4 @@
+import { versionLabel } from '../changelog';
 import type { Standard } from '@overleagger/symbols';
 import {
   Copy,
@@ -539,6 +540,19 @@ export function Dashboard() {
           <span className="beta-tag" title="Open beta: free while it grows">
             Beta
           </span>
+        </a>
+        <a
+          className="dash-version"
+          href="../changelog/"
+          target="_blank"
+          rel="noopener"
+          title="What's new in each version"
+          data-testid="dash-version"
+        >
+          {versionLabel()}
+        </a>
+        <a className="dash-version" href="../manual/" target="_blank" rel="noopener">
+          Manual
         </a>
         <div className="dash-top-right">
           <a

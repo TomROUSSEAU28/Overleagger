@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User manual — Circuit Notebook</title>
+    <meta
+      name="description"
+      content="How to use Circuit Notebook: draw schematics with hierarchy, wires and LaTeX, sketch on the whiteboard, present with animations, export to PDF and CircuiTikZ, and work together."
+    />
+    <meta name="theme-color" content="#f7f3e8" />
+    <link rel="icon" type="image/svg+xml" href="/brand/logo.svg" />
+    <link rel="canonical" href="https://circuitnotebook.com/manual/" />
+    <script type="module" src="/src/landing/landing.ts"></script>
+    <script type="module" src="/src/landing/docs.ts"></script>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="../" aria-label="Circuit Notebook, home">
+        <img src="/brand/logo.svg" alt="" width="30" height="30" />
+        <span>Circuit Notebook</span>
+      </a>
+      <nav aria-label="Sections">
+        <a href="../">Home</a>
+        <a href="../changelog/">What's new</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+      <a class="btn primary" href="../app/">Open the app</a>
+    </header>
+
+    <main class="manual-page">
+      <nav class="manual-toc" aria-label="Contents">
+        <p class="kicker">Contents</p>
+        <ol>
+          <li><a href="#start">Getting started</a></li>
+          <li><a href="#schematic">Drawing a schematic</a></li>
+          <li><a href="#wires">Wires and connections</a></li>
+          <li><a href="#hierarchy">Sheets and blocks</a></li>
+          <li><a href="#text">Text and LaTeX</a></li>
+          <li><a href="#whiteboard">Whiteboard tools</a></li>
+          <li><a href="#waveforms">Waveforms</a></li>
+          <li><a href="#arrange">Arrange and style</a></li>
+          <li><a href="#present">Presenting</a></li>
+          <li><a href="#animations">Animations</a></li>
+          <li><a href="#export">Export</a></li>
+          <li><a href="#together">Working together</a></li>
+          <li><a href="#phone">On a phone</a></li>
+          <li><a href="#keys">Keyboard shortcuts</a></li>
+          <li><a href="#beta">The beta</a></li>
+        </ol>
+      </nav>
+
+      <article class="legal manual" data-testid="manual">
+        <p class="kicker">User manual · <span data-version>v0.9 beta</span></p>
+        <h1>How to use Circuit Notebook</h1>
+        <div class="legal-summary">
+          <h2>In one minute</h2>
+          <ul>
+            <li>
+              Pick a part in the <b>library</b> (left), click on the page to place it. Press
+              <kbd>R</kbd> to rotate, <kbd>X</kbd> to mirror.
+            </li>
+            <li>
+              Drag from a <b>pin</b> to draw a wire. Dots appear by themselves where three
+              connections meet.
+            </li>
+            <li>
+              Write <code>$V_{out}$</code> anywhere: it becomes LaTeX. The <b>math bar</b> above the
+              text helps.
+            </li>
+            <li>
+              Draw <b>frames</b> around what you want to show, then <b>Present</b>: each frame is a
+              slide.
+            </li>
+            <li>Your work is saved as you go. Press <kbd>?</kbd> for every shortcut.</li>
+          </ul>
+        </div>
+
+        <section id="start">
+          <h2>1. Getting started</h2>
+          <p>
+            Open <a href="../app/">the app</a> and create a project, or open the
+            <a href="../app/#/example">buck converter example</a> to look around. You do not need an
+            account: without one, projects are saved in your browser only (keep a copy with
+            <i>Export → Download .olg file</i>). With an account, your projects can live on the
+            server, and you can share them.
+          </p>
+          <p>The editor has four areas:</p>
+          <ul>
+            <li>
+              <b>Top bar</b>: project name, where you are in the hierarchy, undo / redo, theme,
+              Present and Export.
+            </li>
+            <li><b>Tool rail</b> (far left): select, pan, wire, block, text, pencil, shapes…</li>
+            <li>
+              <b>Left panel</b>: the library of parts, your templates, comments and the sheets.
+            </li>
+            <li><b>Right panel</b>: the properties of what is selected.</li>
+          </ul>
+          <p>
+            Move around with the mouse wheel (zoom) and by dragging with the middle button or with
+            <kbd>Space</kbd> held down. <kbd>F</kbd> fits the drawing to the screen. Both side
+            panels can be resized by their edge, or hidden.
+          </p>
+        </section>
+
+        <section id="schematic">
+          <h2>2. Drawing a schematic</h2>
+          <p>
+            Search the library (<i>mosfet</i>, <i>transformer</i>, <i>pi</i>…) or press
+            <kbd>A</kbd> for the quick add box. Click a part, then click on the page to place it; it
+            stays in your hand to place more, <kbd>Esc</kbd> stops.
+          </p>
+          <ul>
+            <li>
+              <kbd>R</kbd> rotates, <kbd>Shift R</kbd> the other way, <kbd>X</kbd> /
+              <kbd>Y</kbd> mirror.
+            </li>
+            <li>
+              The right panel sets the reference (R1…), the value, and the options of the part:
+              channel and body diode of a MOSFET, polarity dots and secondaries of a transformer,
+              position of a switch (at rest or actuated), size…
+            </li>
+            <li>
+              <b>EU / US</b> in the top bar switches every symbol between IEC and US drawings.
+            </li>
+            <li>
+              A transformer can also be drawn <b>winding by winding</b> (<i>Transformer winding</i
+              >): put the primary and the secondaries where they belong, and give them the same
+              reference.
+            </li>
+            <li>
+              Your own parts: <i>New symbol</i> in the library opens the symbol editor. Save a
+              selection as a <b>template</b> to reuse it in other projects.
+            </li>
+          </ul>
+        </section>
+
+        <section id="wires">
+          <h2>3. Wires and connections</h2>
+          <ul>
+            <li>
+              Drag from a pin, or press <kbd>W</kbd>: click to add corners, click a pin or a wire to
+              finish (or double-click). <kbd>/</kbd> flips the bend while drawing.
+              <kbd>Shift W</kbd> draws a signal line with an arrow.
+            </li>
+            <li>
+              A <b>junction dot</b> appears by itself where three or more connections meet. Wires
+              that simply cross are not connected.
+            </li>
+            <li>
+              <b>Moving</b>: drag a part or a wire, and what is attached follows: wires stretch and
+              keep square corners, junction dots move along, net labels stay on their wire.
+            </li>
+            <li>
+              <b>One segment</b>: click a selected wire again to pick the segment under the pointer.
+              Drag it, or press <kbd>Delete</kbd> to remove only that segment.
+            </li>
+            <li>
+              <b>Net labels</b> (<kbd>L</kbd>): two labels with the same name are connected, even
+              without a wire between them.
+            </li>
+          </ul>
+        </section>
+
+        <section id="hierarchy">
+          <h2>4. Sheets and blocks</h2>
+          <p>
+            A <b>block</b> (<kbd>B</kbd>) is a whole sheet shown as a box: the controller of a
+            converter, a gate driver… Double-click it (or <kbd>Enter</kbd>) to open its sheet;
+            <kbd>U</kbd> or <kbd>Esc</kbd> goes back up. Inside, <b>sheet ports</b> (<kbd>P</kbd>)
+            become the pins of the block. <i>Ctrl Shift B</i> moves a selection into a new block.
+            The breadcrumbs at the top show where you are, and the Sheets tab lists them all.
+          </p>
+        </section>
+
+        <section id="text">
+          <h2>5. Text and LaTeX</h2>
+          <p>
+            Anything between dollars is LaTeX: <code>$\Delta i_L = \frac{V}{L}\,t$</code>. It works
+            in texts (<kbd>T</kbd>), labels, notes, shapes, arrows, values and port names.
+            Double-click something (or <kbd>F2</kbd>) to edit its text in place.
+          </p>
+          <p>
+            The <b>math bar</b> above the text helps: <b>$…$</b> (or <kbd>Ctrl M</kbd>) puts dollars
+            around the selection or the line, and the buttons insert a fraction, an index, an
+            exponent, a root, Greek letters and symbols (<b>⋯</b> for more). Pressing the index
+            button right after <code>V</code> gives <code>$V_{n}$</code>, ready to type over.
+          </p>
+        </section>
+
+        <section id="whiteboard">
+          <h2>6. Whiteboard tools</h2>
+          <ul>
+            <li>
+              <b>Pencil</b> (<kbd>D</kbd>) and <b>eraser</b> (<kbd>E</kbd>): freehand notes, with
+              pen pressure.
+            </li>
+            <li>
+              <b>Shapes</b> (<kbd>S</kbd>), including flowchart shapes; hand-drawn look as an
+              option.
+            </li>
+            <li>
+              <b>Lines and arrows</b> (<kbd>Shift L</kbd>): started or ended on a shape, they stay
+              attached to it; drag their middle to bend them.
+            </li>
+            <li>
+              <b>Sticky notes</b> (<kbd>N</kbd>), <b>images</b> (<kbd>I</kbd>, or paste / drop a
+              file), <b>link buttons</b> (<kbd>K</kbd>).
+            </li>
+            <li>
+              <b>Frames</b> (<kbd>Shift F</kbd>): group a region; they are the slides of the
+              presentation.
+            </li>
+            <li><b>Comments</b> (<kbd>C</kbd>): pin a discussion anywhere on the page.</li>
+          </ul>
+        </section>
+
+        <section id="waveforms">
+          <h2>7. Waveforms</h2>
+          <p>
+            The waveform tool (<kbd>O</kbd>) draws oscillograms and chronograms: sine, square, PWM,
+            triangle, ripple, first and second order steps, or your own points. Each trace has its
+            amplitude, offset, periods, phase, duty cycle, colour and label (LaTeX).
+            <i>Stacked</i> puts one trace per band, like a chronogram; <i>overlay</i> puts them on
+            one axis.
+          </p>
+        </section>
+
+        <section id="arrange">
+          <h2>8. Arrange and style</h2>
+          <ul>
+            <li>
+              Group (<kbd>Ctrl G</kbd>), align and distribute several things from the right panel.
+            </li>
+            <li>
+              <b>Order</b>: to the front, one step forward (<kbd>Ctrl ]</kbd>), one step backward
+              (<kbd>Ctrl [</kbd>), to the back (a background). One step goes past the next thing it
+              overlaps.
+            </li>
+            <li>
+              Colour, stroke, dash and fill in <i>Style</i>; lock an element so it does not move.
+            </li>
+            <li>
+              <i>Show in</i>: leave something out of the presentation or of the exports (draft
+              notes, hints).
+            </li>
+          </ul>
+        </section>
+
+        <section id="present">
+          <h2>9. Presenting</h2>
+          <p>
+            <b>Present</b> (<kbd>F5</kbd>) shows your frames as slides, in reading order, sheet by
+            sheet; a sheet without frames is one slide. Click, <kbd>→</kbd> or <kbd>Space</kbd> goes
+            on; click a block to dive into its sheet, <kbd>Backspace</kbd> comes back up.
+          </p>
+          <ul>
+            <li>
+              <kbd>L</kbd> laser pointer, <kbd>P</kbd> pen (nothing is saved), <kbd>C</kbd> clears
+              the pen.
+            </li>
+            <li><kbd>B</kbd> blanks the screen; the button turns red while it is blank.</li>
+            <li>Links open in a new tab, and the presentation goes on.</li>
+            <li>With an account, others can follow your presentation live.</li>
+          </ul>
+          <p>
+            Select a frame to choose its <b>transition</b>: the camera glides (default), fade, slide
+            in, zoom or cut, fast, normal or slow.
+          </p>
+        </section>
+
+        <section id="animations">
+          <h2>10. Animations</h2>
+          <p>
+            Select something inside a frame and open <b>Animation</b> at the bottom of the right
+            panel, then <b>Add</b>:
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Animation</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Appear / Disappear</td>
+                <td>Fade, pop, rise, zoom, or wipe (an arrow draws itself).</td>
+              </tr>
+              <tr>
+                <td>Emphasis</td>
+                <td>Pulse, shake or glow, to draw the eye.</td>
+              </tr>
+              <tr>
+                <td>Change colour</td>
+                <td>The ink turns to another colour, smoothly.</td>
+              </tr>
+              <tr>
+                <td>Move</td>
+                <td>Slides by a distance.</td>
+              </tr>
+              <tr>
+                <td>Change state</td>
+                <td>A part changes an option: a switch closes, a MOSFET changes…</td>
+              </tr>
+              <tr>
+                <td>Animate the curve</td>
+                <td>
+                  A waveform parameter goes from one value to another, or back and forth: a duty
+                  cycle that sweeps, a damping that improves…
+                </td>
+              </tr>
+              <tr>
+                <td>Text</td>
+                <td>Typed letter by letter, or replaced by another text.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Each animation plays <b>as the slide opens</b> or <b>on click 1, 2, 3…</b>, with a
+            duration and a delay (several on the same click start together; use the delay to play
+            them one after the other). A click in the presentation plays the next step before going
+            to the next slide; going back undoes the last step. While the Animation section is open,
+            small numbers on the page show on which click things happen, and a selected frame lists
+            its build order. <b>Preview</b> presents that slide right away.
+          </p>
+          <p>
+            The <a href="../app/#/example">example</a> is an animated presentation: open it and
+            press Present to see.
+          </p>
+        </section>
+
+        <section id="export">
+          <h2>11. Export</h2>
+          <p>
+            <b>Export</b> (<kbd>Ctrl E</kbd>) gives a PDF (one page per sheet, the blocks and links
+            are clickable), PNG or SVG images, <b>CircuiTikZ</b> code for LaTeX, or the project file
+            (<i>.olg</i>) to keep or send. Tick <i>Only the selection</i> to export just what is
+            selected. <kbd>Shift C</kbd> copies the selection as an image, to paste in a report.
+          </p>
+        </section>
+
+        <section id="together">
+          <h2>12. Working together</h2>
+          <p>
+            With an account, <b>Share</b> invites people or a whole team, as editors, commenters or
+            viewers. Rights can be set <b>per sheet</b>, and a sheet can be hidden from some people.
+            Everyone's cursor and selection show live; comments can be answered, resolved and
+            reopened; <i>History</i> brings back an earlier version of the project.
+          </p>
+        </section>
+
+        <section id="phone">
+          <h2>13. On a phone</h2>
+          <p>
+            On a phone the drawing takes the whole screen. The bar at the bottom opens the tools,
+            the parts, the sheets, the comments and the settings. One finger moves the view (or a
+            part), two fingers zoom. Tap a part to get its actions: rotate, mirror, copy, edit,
+            delete.
+          </p>
+        </section>
+
+        <section id="keys">
+          <h2>14. Keyboard shortcuts</h2>
+          <p>
+            Press <kbd>?</kbd> in the app for the full list; you can change any of them there. The
+            most useful:
+          </p>
+          <table>
+            <tbody>
+              <tr>
+                <td>
+                  <kbd>V</kbd> select · <kbd>H</kbd> pan · <kbd>W</kbd> wire · <kbd>T</kbd> text ·
+                  <kbd>B</kbd> block
+                </td>
+                <td>Tools</td>
+              </tr>
+              <tr>
+                <td>
+                  <kbd>A</kbd> quick add · <kbd>R</kbd> rotate · <kbd>X</kbd> / <kbd>Y</kbd> mirror
+                </td>
+                <td>Parts</td>
+              </tr>
+              <tr>
+                <td>
+                  <kbd>Ctrl Z</kbd> undo · <kbd>Ctrl Shift Z</kbd> redo ·
+                  <kbd>Ctrl D</kbd> duplicate
+                </td>
+                <td>Edit</td>
+              </tr>
+              <tr>
+                <td><kbd>F</kbd> fit · <kbd>G</kbd> grid · <kbd>0</kbd> zoom 100 %</td>
+                <td>View</td>
+              </tr>
+              <tr>
+                <td><kbd>F5</kbd> present · <kbd>Ctrl E</kbd> export</td>
+                <td>Show</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="beta">
+          <h2>15. The beta</h2>
+          <p>
+            Circuit Notebook is in <b>open beta</b>, free while it grows. Each account keeps a few
+            projects on the server; projects in your browser are unlimited. Things change often: see
+            <a href="../changelog/">what's new</a> in each version. Found a bug, or missing a
+            symbol? Tell me through the <a href="../#contact">contact form</a>.
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="foot">
+      <div class="brand">
+        <img src="/brand/logo.svg" alt="" width="22" height="22" />
+        <span>Circuit Notebook</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="../app/">Open the app</a>
+        <a href="./">Manual</a>
+        <a href="../changelog/">What's new</a>
+        <a href="../privacy/">Privacy</a>
+        <a href="../legal/">Legal notice</a>
+      </nav>
+      <p class="muted small"><span data-year></span></p>
+    </footer>
+  </body>
+</html>

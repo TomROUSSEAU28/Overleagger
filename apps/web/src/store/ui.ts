@@ -82,7 +82,8 @@ export type Modal =
   | 'export'
   | 'rename'
   | 'symbol-editor'
-  | 'save-template';
+  | 'save-template'
+  | 'whatsnew';
 
 /** Live preview of a resize / line edit. */
 export interface ResizePreview {

@@ -1,3 +1,4 @@
+import { VersionChip } from './WhatsNew';
 import { sheetPath } from '@overleagger/core';
 import {
   ArrowLeft,
@@ -110,6 +111,7 @@ function DesktopTopBar() {
         data-testid="project-name"
       />
       <Breadcrumbs />
+      <VersionChip />
       <div className="spacer" />
       <CollabBar />
       <div className="segmented" role="group" aria-label="Drawing standard">

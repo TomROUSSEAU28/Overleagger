@@ -3552,3 +3552,122 @@ body.resizing-panel {
 .anim-card-head .icon-btn {
   flex: none;
 }
+
+/* ------------------------------------------------------------ version and what's new */
+
+.version-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-left: 10px;
+  padding: 2px 9px 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--serif);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.version-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.version-stage {
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  color: #c0453a;
+}
+/* A version not looked at yet: a small dot that breathes. */
+.version-chip.fresh::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0453a;
+  box-shadow: 0 0 0 2px var(--panel);
+  animation: version-dot 2.4s ease-in-out infinite;
+}
+@keyframes version-dot {
+  50% {
+    transform: scale(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .version-chip.fresh::after {
+    animation: none;
+  }
+}
+.whatsnew {
+  display: grid;
+  gap: 12px;
+  max-height: min(70vh, 640px);
+  overflow: auto;
+}
+.wn-release {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+.wn-release.current {
+  border-left: 3px solid var(--accent);
+}
+.wn-release h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.wn-release h3 i {
+  font-weight: 400;
+}
+.wn-release h3 .small {
+  margin-left: auto;
+}
+.wn-release ul {
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.45;
+}
+.wn-release li + li {
+  margin-top: 3px;
+}
+.wn-fixed-title {
+  display: block;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  color: #c0453a;
+}
+.wn-links,
+.help-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dash-version {
+  align-self: center;
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: var(--serif);
+  font-size: 13px;
+  text-decoration: none;
+}
+.dash-version:hover {
+  color: var(--accent);
+}
+a.phone-row {
+  color: inherit;
+  text-decoration: none;
+}
