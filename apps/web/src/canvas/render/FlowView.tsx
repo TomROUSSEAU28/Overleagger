@@ -6,6 +6,7 @@
  */
 import {
   FLOW_DEFAULTS,
+  PERIODIC_SIGNALS,
   flowPoints,
   flowPositions,
   flowVelocity,
@@ -42,8 +43,10 @@ export const FlowView = memo(function FlowView({
   const selected = useUI((s) => o.interactive && !o.live && s.selection.includes(el.id));
   // Presentation: runs while shown (a hidden flow waits, and starts from 0 when it appears).
   const shown = (fx?.opacity ?? 1) > 0.01;
-  const running = o.live ? shown : selected;
-  const pts = useMemo(() => flowPoints(el), [el]);
+  const running = o.live ? shown && !fx?.idle : selected;
+  // (Presenting, the element is a new object at every frame of an animation: keyed on its path.)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pts = useMemo(() => flowPoints(el), [el.pts, el.closed]);
   const path = useMemo(() => pathSampler(pts), [pts]);
   const elRef = useRef(el);
   elRef.current = el;
@@ -70,12 +73,25 @@ export const FlowView = memo(function FlowView({
         if (Math.abs(v) > 1e-6) r.dir = Math.sign(v);
       }
       r.t += dt;
+      // Editing: a ramp, rise or decay starts again once it has settled, to be seen again.
+      const cur = elRef.current;
+      if (
+        !o.live &&
+        cur.signal !== 'dc' &&
+        !PERIODIC_SIGNALS.includes(cur.signal) &&
+        r.t > 5 * (cur.period ?? FLOW_DEFAULTS.period) + 1.5
+      )
+        r.t = 0;
       redraw();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [running]);
+  }, [running, o.live]);
+  // A new signal starts from its beginning (a ramp starts at 0 again).
+  useEffect(() => {
+    run.current.t = 0;
+  }, [el.signal, el.period]);
 
   const r = run.current;
   // Still: the direction of the current at its start.
@@ -117,7 +133,7 @@ export const FlowView = memo(function FlowView({
             transform={`translate(${p.x} ${p.y})${turns ? ` rotate(${angle})` : ''}`}
             opacity={alpha}
           >
-            {o.interactive && !o.live && <circle className="hit" r={Math.max(6, size)} />}
+            {o.interactive && !o.live && <circle className="hit" r={Math.max(4, size / 2 + 3)} />}
             <FlowMark
               symbol={el.symbol}
               size={size}

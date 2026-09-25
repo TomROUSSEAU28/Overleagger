@@ -845,7 +845,8 @@ export class ToolController {
     }
     const pts = [...d.pts, ...elbow(last, pt, d.hFirst).slice(2)];
     ui.set({ wireDraft: { ...d, pts, manual: false } });
-    if (n >= 4 && samePt(d.pts[0]!, d.pts[1]!, pt.x, pt.y)) {
+    // Back on the first point, with at least three points: a loop.
+    if (n >= 6 && samePt(d.pts[0]!, d.pts[1]!, pt.x, pt.y)) {
       this.flowClosed = true;
       this.finishWire();
     }

@@ -1,6 +1,5 @@
 import {
   buildSlides,
-  elementBBox,
   visibleFor,
   type Element,
   type FrameElement,
@@ -32,6 +31,35 @@ type Box = { x: number; y: number; w: number; h: number };
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 /** Halves of an ease-in-out: they meet at the same speed, so out + in is one movement. */
+/**
+ * The uncovered frame while the camera glides from box a (frame `from`) to box b (frame `to`):
+ * in between, as far as the camera went.
+ */
+function spotAt(
+  box: Box,
+  still: Rect | null,
+  glide: { from: Rect; to: Rect; a: Box; b: Box } | null,
+): Rect | null {
+  if (!glide) return still;
+  const { a, b, from, to } = glide;
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const d = Math.hypot(cb.x - ca.x, cb.y - ca.y);
+  const k =
+    d > 1
+      ? Math.hypot(box.x + box.w / 2 - ca.x, box.y + box.h / 2 - ca.y) / d
+      : Math.abs(b.w - a.w) > 1
+        ? (box.w - a.w) / (b.w - a.w)
+        : 1;
+  const t = Math.min(1, Math.max(0, k));
+  return {
+    x: from.x + (to.x - from.x) * t,
+    y: from.y + (to.y - from.y) * t,
+    w: from.w + (to.w - from.w) * t,
+    h: from.h + (to.h - from.h) * t,
+  };
+}
+
 const easeInQuad = (t: number) => t * t;
 const easeOutQuad = (t: number) => 1 - (1 - t) ** 2;
 
@@ -114,6 +142,15 @@ export function Presentation() {
   const anim = useRef(0);
   const boxRef = useRef(box);
   boxRef.current = box;
+  /**
+   * The frame shown (the rest of the sheet is covered): it changes with the camera — along
+   * with it when the camera glides to another frame, when the screen is at its faintest in a
+   * fade — never before (the frame left would be covered while still on screen).
+   */
+  const [spotRect, setSpotRect] = useState<Rect | null>(() => (slide?.frameId ? slide.rect : null));
+  const spotRef = useRef(spotRect);
+  spotRef.current = spotRect;
+  const spotGlide = useRef<{ from: Rect; to: Rect; a: Box; b: Box } | null>(null);
 
   const close = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
@@ -222,8 +259,12 @@ export function Presentation() {
       // The slide's own animations wait until it has arrived (then step 0 starts).
       started.current = new Map(atEnd ? [] : [[0, Infinity]]);
       setNow(performance.now());
+      const nextSpot = target.frameId ? target.rect : null;
+      spotGlide.current = null;
       const arrived = () => {
         if (token !== goToken.current) return;
+        spotGlide.current = null;
+        setSpotRect(nextSpot);
         setFade(1);
         setBlur(0);
         if (!atEnd) started.current.set(0, performance.now());
@@ -253,6 +294,7 @@ export function Presentation() {
               setBlur(blurPx * e);
             } else {
               if (sheetIdRef.current !== target.sheetId) setSheetId(target.sheetId);
+              if (spotRef.current !== nextSpot) setSpotRect(nextSpot);
               const e = easeOutQuad(k * 2 - 1);
               setBox(lerpBox(inBox, to, e));
               setFade(e);
@@ -268,6 +310,10 @@ export function Presentation() {
         arrived();
         return;
       }
+      // The camera glides from frame to frame: the uncovered part goes along with it.
+      const fromSpot = spotRef.current;
+      if (sameSheet && kind === 'move' && fromSpot && nextSpot)
+        spotGlide.current = { from: fromSpot, to: nextSpot, a: from, b: to };
       if (kind === 'fade') return outIn(from, to);
       if (kind === 'blur') return outIn(from, to, 10);
       if (kind === 'slide') return outIn(shift(from, 0.35, 0), shift(to, -0.35, 0));
@@ -293,6 +339,7 @@ export function Presentation() {
             if (t < 0.35) setFade(1 - easeInQuad(t / 0.35));
             else {
               if (sheetIdRef.current !== target.sheetId) setSheetId(target.sheetId);
+              if (spotRef.current !== nextSpot) setSpotRect(nextSpot);
               const e = easeOutQuad((t - 0.35) / 0.65);
               setFade(e);
               setBox(lerpBox(dive, to, e));
@@ -520,8 +567,19 @@ export function Presentation() {
   // The animations: the current slide at its step, the slides before all played, the ones after
   // not started yet (seen while the camera glides past them).
   const played: AnimFrame = useMemo(() => {
+    // Animated currents wait for their slide (on screen, the camera arrived), then start.
+    const arrivedHere = slide?.sheetId === sheetId && started.current.get(0) !== Infinity;
+    const idleFlows = (fx: Map<Id, ElFx>) => {
+      for (const e of drawn) {
+        if (e.type !== 'flow') continue;
+        const i = slideOfEl.get(e.id);
+        if (!arrivedHere || (i !== undefined && i !== index))
+          fx.set(e.id, { ...fx.get(e.id), idle: true });
+      }
+      return fx;
+    };
     const animated = drawn.filter((e) => e.anims?.length);
-    if (!animated.length) return { elements: drawn, fx: new Map(), rings: [], busy: false };
+    if (!animated.length) return { elements: drawn, fx: idleFlows(new Map()), busy: false };
     const reached = level === 0 ? 0 : (steps[level - 1] ?? 0);
     const onScreen = slide?.sheetId === sheetId;
     const clocks: Record<'cur' | 'before' | 'after', Clock> = {
@@ -540,22 +598,17 @@ export function Presentation() {
     }
     const byId = new Map<Id, Element>();
     const fx = new Map<Id, ElFx>();
-    const rings: AnimFrame['rings'] = [];
     let busy = false;
     const resolve = (c: string | undefined) => resolveColor(c, theme);
-    const box = (e: Element) => elementBBox(e, ed.ctx, elements);
     for (const k of ['cur', 'before', 'after'] as const) {
       if (!groups[k].length) continue;
-      const f = evaluate(groups[k], clocks[k], resolve, box);
+      const f = evaluate(groups[k], clocks[k], resolve);
       f.elements.forEach((e) => byId.set(e.id, e));
       f.fx.forEach((v, id) => fx.set(id, v));
-      if (k === 'cur') {
-        rings.push(...f.rings);
-        busy = f.busy;
-      }
+      if (k === 'cur') busy = f.busy;
     }
-    return { elements: drawn.map((e) => byId.get(e.id) ?? e), fx, rings, busy };
-  }, [drawn, level, steps, slide, sheetId, now, slideOfEl, index, theme, ed.ctx, elements]);
+    return { elements: drawn.map((e) => byId.get(e.id) ?? e), fx: idleFlows(fx), busy };
+  }, [drawn, level, steps, slide, sheetId, now, slideOfEl, index, theme]);
   // Keep drawing while something moves.
   useEffect(() => {
     if (!played.busy) return;
@@ -571,7 +624,7 @@ export function Presentation() {
     return out;
   }, [played]);
   // On a frame slide, what lies outside the frame is covered, so the slide is just the frame.
-  const spot = slide?.frameId && slide.sheetId === sheetId ? slide.rect : null;
+  const spot = spotAt(box, spotRect, spotGlide.current);
 
   const head = laser[laser.length - 1];
   const inkColor = theme.name === 'blackboard' ? '#ffd166' : '#d62828';
@@ -607,21 +660,6 @@ export function Presentation() {
           style={{ opacity: fade, filter: blur > 0.2 ? `blur(${blur}px)` : undefined }}
         >
           <SheetRenderer elements={played.elements} o={o} fx={played.fx} hidden={gone} />
-          {played.rings.map((r, i) => (
-            <rect
-              key={i}
-              x={r.x}
-              y={r.y}
-              width={r.w}
-              height={r.h}
-              rx={Math.min(14, r.h / 2)}
-              fill="none"
-              stroke={theme.select}
-              strokeWidth={2.5}
-              opacity={r.opacity}
-              pointerEvents="none"
-            />
-          ))}
           {spot && (
             <path
               className="present-spot"

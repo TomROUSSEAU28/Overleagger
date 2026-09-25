@@ -78,10 +78,10 @@ export function seedBuckExample(p: Project) {
     const hb = addComponent(p, root, 'half-bridge', 150, 100, ctx);
     p.updateElement(root, hb.id, { ref: 'Q1' });
     const l1 = addComponent(p, root, 'inductor', 240, 100, ctx);
-    // Click 1: the inductor current comes in (and the inductor pulses).
+    // Click 1: the inductor current comes in (and the inductor lights up).
     p.updateElement(root, l1.id, {
       params: { value: '$L$' },
-      anims: [anim({ kind: 'emphasis', step: 1, effect: 'pulse' })],
+      anims: [anim({ kind: 'emphasis', step: 1, effect: 'flash', color: '@orange', dur: 900 })],
     });
     const c1 = addComponent(p, root, 'capacitor', 320, 145, ctx, { rot: 1 });
     p.updateElement(root, c1.id, { params: { value: '$C$' } });
@@ -91,7 +91,7 @@ export function seedBuckExample(p: Project) {
     const iL = addComponent(p, root, 'current-arrow', 292, 100, ctx);
     p.updateElement(root, iL.id, {
       params: { value: 'i_L' },
-      anims: [anim({ kind: 'appear', step: 1, effect: 'pop', delay: 150 })],
+      anims: [anim({ kind: 'appear', step: 1, effect: 'flash', color: '@orange', delay: 150 })],
     });
     const vo = addComponent(p, root, 'voltage-arrow', 450, 145, ctx, { rot: 1, mirror: true });
     // Click 2: the output voltage.

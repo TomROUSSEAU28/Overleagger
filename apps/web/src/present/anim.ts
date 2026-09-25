@@ -23,24 +23,17 @@ export interface ElFx {
   transform?: string;
   /** Wipe: the part shown, from the left (0…1). */
   reveal?: number;
-  /** Glow around the element (0…1). */
+  /** Glow around the element (0…1), of `glowColor`. */
   glow?: number;
-}
-
-/** An outline spreading out around an element (juice when something changes). */
-export interface Ring {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  opacity: number;
+  glowColor?: string;
+  /** An animated current waiting for its slide (it starts when the slide is on screen). */
+  idle?: boolean;
 }
 
 export interface AnimFrame {
   /** The slide's elements, with the changes made by the animations (text, colour, options…). */
   elements: Element[];
   fx: Map<Id, ElFx>;
-  rings: Ring[];
   /** Something is still moving: draw again on the next frame. */
   busy: boolean;
 }
@@ -57,15 +50,44 @@ export const DUR: Record<Anim['kind'], number> = {
   text: 1200,
 };
 
-export const APPEAR_EFFECTS = ['fade', 'pop', 'rise', 'zoom', 'wipe'] as const;
-export const EMPHASIS_EFFECTS = ['pulse', 'shake', 'glow'] as const;
+export const APPEAR_EFFECTS = ['fade', 'pop', 'rise', 'zoom', 'wipe', 'flash'] as const;
+export const EMPHASIS_EFFECTS = ['flash', 'pulse', 'shake', 'glow'] as const;
+
+/** Colour of a flash or a glow when the animation sets none. */
+export const HIGHLIGHT = '@red';
+
+/**
+ * Parts of the circuit (drawn on their wires): an effect never scales or moves them away from
+ * their wires. For them, pop / zoom / rise become a fade (pop: a lit-up fade), and pulse / shake
+ * a flash.
+ */
+export function isWired(el: Element): boolean {
+  return (
+    el.type === 'component' ||
+    el.type === 'wire' ||
+    el.type === 'port' ||
+    el.type === 'label' ||
+    el.type === 'block' ||
+    el.type === 'flow'
+  );
+}
+
+/** The effect an animation really plays on this element. */
+export function effectOf(el: Element, a: Pick<Anim, 'kind' | 'effect'>): string {
+  const e = a.effect ?? (a.kind === 'emphasis' ? (isWired(el) ? 'flash' : 'pulse') : 'fade');
+  if (!isWired(el)) return e;
+  if (a.kind === 'appear' || a.kind === 'disappear')
+    return e === 'pop' ? 'flash' : e === 'zoom' || e === 'rise' ? 'fade' : e;
+  if (a.kind === 'emphasis') return e === 'pulse' || e === 'shake' ? 'flash' : e;
+  return e;
+}
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 /** Ease out with a small overshoot: the "pop". */
 const backOut = (t: number) => {
-  const c = 1.9;
+  const c = 1.7;
   return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
 };
 
@@ -132,8 +154,9 @@ function entrance(effect: string | undefined, p: number, fx: ElFx, t: Transform)
   const e = easeOut(p);
   switch (effect) {
     case 'pop':
-      fx.opacity = clamp01(p * 4);
-      t.scale *= 0.3 + 0.7 * backOut(p);
+      // A small, quick bounce (no big zoom).
+      fx.opacity = clamp01(p * 3);
+      t.scale *= 0.7 + 0.3 * backOut(p);
       return;
     case 'rise':
       fx.opacity = e;
@@ -148,6 +171,7 @@ function entrance(effect: string | undefined, p: number, fx: ElFx, t: Transform)
       fx.reveal = easeInOut(p);
       return;
     default:
+      // fade, flash
       fx.opacity = e;
   }
 }
@@ -169,16 +193,14 @@ export interface Clock {
 
 /**
  * The slide at a given moment. `resolve` turns a stored colour ('@red', '#123456', none) into a
- * CSS colour for the current theme; `box` gives the bounding box of an element (for the rings).
+ * CSS colour for the current theme.
  */
 export function evaluate(
   elements: Element[],
   clock: Clock,
   resolve: (c: string | undefined) => string,
-  box: (el: Element) => Rect,
 ): AnimFrame {
   const fx = new Map<Id, ElFx>();
-  const rings: Ring[] = [];
   let busy = false;
   const out = elements.map((orig) => {
     const anims = orig.anims;
@@ -194,6 +216,15 @@ export function evaluate(
     const firstVis = sorted.find((a) => a.kind === 'appear' || a.kind === 'disappear');
     let shown = firstVis?.kind === 'appear' ? 0 : 1;
     let color: string | undefined;
+    // A flash: how lit up the ink is (0…1), and in which colour.
+    let flash = 0;
+    let flashColor = HIGHLIGHT;
+    const lightUp = (k: number, c: string | undefined) => {
+      if (k > flash) {
+        flash = k;
+        flashColor = c ?? HIGHLIGHT;
+      }
+    };
     const tf = textField(el);
     for (const a of sorted) {
       const reached = a.step <= clock.reached;
@@ -217,33 +248,36 @@ export function evaluate(
           el = { ...el, [tf]: '' } as Element;
         continue;
       }
+      const effect = effectOf(el, a);
       switch (a.kind) {
         case 'appear': {
           shown = 1;
           const g: ElFx = {};
-          entrance(a.effect, p, g, tr);
+          entrance(effect, p, g, tr);
           if (g.opacity !== undefined) f.opacity = g.opacity;
           if (g.reveal !== undefined) f.reveal = g.reveal;
-          if (a.effect === 'pop' && p < 1) ring(el, p, box, rings);
+          // Lit up as it comes in, then its own colour.
+          if (effect === 'flash' && p < 1) lightUp(1 - easeOut(p), a.color);
           break;
         }
         case 'disappear': {
           const g: ElFx = {};
-          entrance(a.effect, 1 - p, g, tr);
+          entrance(effect, 1 - p, g, tr);
           shown = p >= 1 ? 0 : 1;
           if (g.opacity !== undefined) f.opacity = g.opacity;
           if (g.reveal !== undefined) f.reveal = g.reveal;
+          if (effect === 'flash' && p < 1) lightUp(easeOut(p), a.color);
           break;
         }
         case 'emphasis':
           if (p < 1) {
             const s = Math.sin(Math.PI * p);
-            if (a.effect === 'shake') tr.x += Math.sin(p * Math.PI * 8) * 5 * (1 - p);
-            else if (a.effect === 'glow') f.glow = s;
-            else {
-              tr.scale *= 1 + 0.14 * s;
-              if (p < 0.6) ring(el, p / 0.6, box, rings);
-            }
+            if (effect === 'shake') tr.x += Math.sin(p * Math.PI * 8) * 4 * (1 - p);
+            else if (effect === 'glow') {
+              f.glow = s;
+              f.glowColor = resolve(a.color ?? HIGHLIGHT);
+            } else if (effect === 'pulse') tr.scale *= 1 + 0.07 * s;
+            else lightUp(s, a.color);
           }
           break;
         case 'color': {
@@ -258,10 +292,8 @@ export function evaluate(
         case 'set':
           if (el.type === 'component' && a.opts) {
             el = { ...el, opts: { ...el.opts, ...a.opts } };
-            if (p < 1) {
-              tr.scale *= 1 + 0.1 * Math.sin(Math.PI * p);
-              ring(el, p, box, rings);
-            }
+            // The part changes in place, and lights up for a moment.
+            if (p < 1) lightUp(0.85 * Math.sin(Math.PI * p), a.color);
           }
           break;
         case 'wave':
@@ -310,6 +342,10 @@ export function evaluate(
           break;
       }
     }
+    if (flash > 0.001) {
+      busy = true;
+      color = mixColor(color ?? resolve(el.style?.color), resolve(flashColor), flash);
+    }
     if (color) el = { ...el, style: { ...el.style, color } } as Element;
     if (!shown) f.opacity = 0;
     if (tr.x || tr.y || tr.scale !== 1 || tr.rot)
@@ -317,8 +353,7 @@ export function evaluate(
     if (Object.keys(f).length) fx.set(el.id, f);
     return el;
   });
-  if (rings.length) busy = true;
-  return { elements: out, fx, rings, busy };
+  return { elements: out, fx, busy };
 }
 
 /** The first part of a text, typed at progress p (LaTeX `$…$` groups appear whole). */
@@ -328,17 +363,4 @@ export function typed(full: string, p: number): string {
   const parts = full.match(/\$[^$]*\$|[\s\S]/g) ?? [];
   const n = Math.round(parts.length * p);
   return parts.slice(0, n).join('');
-}
-
-function ring(el: Element, p: number, box: (el: Element) => Rect, rings: Ring[]) {
-  const b = box(el);
-  const k = easeOut(clamp01(p));
-  const pad = 3 + 16 * k;
-  rings.push({
-    x: b.x - pad,
-    y: b.y - pad,
-    w: b.w + 2 * pad,
-    h: b.h + 2 * pad,
-    opacity: 0.85 * (1 - k),
-  });
 }

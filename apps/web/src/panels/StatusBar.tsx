@@ -23,6 +23,7 @@ const HINTS: Record<ToolId, string> = {
   button: 'Click to place a link button · Ctrl+click a button to follow it',
   waveform: 'Drag to draw an oscillogram / chronogram',
   frame: 'Drag to draw a frame (for presentations and page layout)',
+  flow: 'Click the path of the current, point by point · click its start to close a loop · double-click or Enter to end · / flips the bend',
 };
 
 export function StatusBar() {

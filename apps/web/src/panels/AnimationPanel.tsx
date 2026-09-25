@@ -27,7 +27,14 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useEditor, useSheetElements } from '../editor/context';
-import { slideElements, slideSteps, textField } from '../present/anim';
+import {
+  HIGHLIGHT,
+  effectOf,
+  isWired,
+  slideElements,
+  slideSteps,
+  textField,
+} from '../present/anim';
 import { useUI } from '../store/ui';
 import { INK_NAMES, THEMES, resolveColor } from '../theme';
 import { Field } from './common';
@@ -46,6 +53,7 @@ const KIND_LABEL: Record<AnimKind, string> = {
 const EFFECTS: Partial<Record<AnimKind, [string, string][]>> = {
   appear: [
     ['fade', 'Fade in'],
+    ['flash', 'Fade in, lit up'],
     ['pop', 'Pop'],
     ['rise', 'Rise'],
     ['zoom', 'Zoom in'],
@@ -53,17 +61,29 @@ const EFFECTS: Partial<Record<AnimKind, [string, string][]>> = {
   ],
   disappear: [
     ['fade', 'Fade out'],
+    ['flash', 'Light up, then fade out'],
     ['pop', 'Pop'],
     ['rise', 'Sink'],
     ['zoom', 'Zoom out'],
     ['wipe', 'Wipe'],
   ],
   emphasis: [
+    ['flash', 'Flash (lights up)'],
     ['pulse', 'Pulse'],
     ['shake', 'Shake'],
     ['glow', 'Glow'],
   ],
 };
+
+/**
+ * The effects offered for an element: parts of the circuit are never scaled or moved away from
+ * their wires (no pop, zoom, rise, pulse, shake).
+ */
+function effectsFor(kind: AnimKind, el: Element): [string, string][] | undefined {
+  const all = EFFECTS[kind];
+  if (!all || !isWired(el)) return all;
+  return all.filter(([v]) => v === 'fade' || v === 'flash' || v === 'wipe' || v === 'glow');
+}
 
 const WAVE_KEYS: [NonNullable<Anim['key']>, string, number, number][] = [
   ['duty', 'Duty cycle', 0, 1],
@@ -162,7 +182,9 @@ function AnimCard({
   onRemove: () => void;
 }) {
   const theme = THEMES[useUI((s) => s.theme)];
-  const effects = EFFECTS[a.kind];
+  const effects = effectsFor(a.kind, el);
+  const effect = effectOf(el, a);
+  const lit = effect === 'flash' || effect === 'glow' || a.kind === 'set';
   const opt = a.kind === 'set' ? options.find((o) => a.opts && o.key in a.opts) : undefined;
   const optValue = opt && a.opts ? a.opts[opt.key] : undefined;
   const setOpt = (o: OptionDef, v: OptionValue) => onChange({ opts: { [o.key]: v } });
@@ -183,8 +205,9 @@ function AnimCard({
       </div>
       {effects && (
         <select
-          value={a.effect ?? effects[0]![0]}
+          value={effect}
           onChange={(e) => onChange({ effect: e.target.value })}
+          data-testid="anim-effect"
         >
           {effects.map(([v, l]) => (
             <option key={v} value={v}>
@@ -193,13 +216,13 @@ function AnimCard({
           ))}
         </select>
       )}
-      {a.kind === 'color' && (
+      {(a.kind === 'color' || lit) && (
         <div className="anim-swatches">
           {INK_NAMES.map((n) => (
             <button
               key={n}
               type="button"
-              className={`swatch${a.color === `@${n}` ? ' active' : ''}`}
+              className={`swatch${(a.color ?? (lit ? HIGHLIGHT : undefined)) === `@${n}` ? ' active' : ''}`}
               style={{ background: resolveColor(`@${n}`, theme) }}
               title={n}
               aria-label={n}
@@ -215,7 +238,10 @@ function AnimCard({
               type="number"
               step={10}
               value={a.dx ?? 0}
-              onChange={(e) => onChange({ dx: Number(e.target.value) || 0 })}
+              onChange={(e) => {
+                const v = e.target.valueAsNumber;
+                if (Number.isFinite(v)) onChange({ dx: v });
+              }}
             />
           </Field>
           <Field label="Down (px)">
@@ -223,7 +249,10 @@ function AnimCard({
               type="number"
               step={10}
               value={a.dy ?? 0}
-              onChange={(e) => onChange({ dy: Number(e.target.value) || 0 })}
+              onChange={(e) => {
+                const v = e.target.valueAsNumber;
+                if (Number.isFinite(v)) onChange({ dy: v });
+              }}
             />
           </Field>
         </div>
@@ -274,7 +303,10 @@ function AnimCard({
                   max={opt.max}
                   step={opt.step}
                   value={Number(optValue ?? opt.default)}
-                  onChange={(e) => setOpt(opt, Number(e.target.value))}
+                  onChange={(e) => {
+                    const v = e.target.valueAsNumber;
+                    if (Number.isFinite(v)) setOpt(opt, v);
+                  }}
                 />
               )}
             </Field>
@@ -301,7 +333,10 @@ function AnimCard({
                 type="number"
                 step={0.1}
                 value={a.from ?? 0}
-                onChange={(e) => onChange({ from: Number(e.target.value) })}
+                onChange={(e) => {
+                  const v = e.target.valueAsNumber;
+                  if (Number.isFinite(v)) onChange({ from: v });
+                }}
                 data-testid="anim-from"
               />
             </Field>
@@ -310,7 +345,10 @@ function AnimCard({
                 type="number"
                 step={0.1}
                 value={a.to ?? 1}
-                onChange={(e) => onChange({ to: Number(e.target.value) })}
+                onChange={(e) => {
+                  const v = e.target.valueAsNumber;
+                  if (Number.isFinite(v)) onChange({ to: v });
+                }}
                 data-testid="anim-to"
               />
             </Field>
@@ -362,7 +400,10 @@ function AnimCard({
                 type="number"
                 step={0.05}
                 value={a.from ?? 0}
-                onChange={(e) => onChange({ from: Number(e.target.value) })}
+                onChange={(e) => {
+                  const v = e.target.valueAsNumber;
+                  if (Number.isFinite(v)) onChange({ from: v });
+                }}
                 data-testid="anim-from"
               />
             </Field>
@@ -371,7 +412,10 @@ function AnimCard({
                 type="number"
                 step={0.05}
                 value={a.to ?? 1}
-                onChange={(e) => onChange({ to: Number(e.target.value) })}
+                onChange={(e) => {
+                  const v = e.target.valueAsNumber;
+                  if (Number.isFinite(v)) onChange({ to: v });
+                }}
                 data-testid="anim-to"
               />
             </Field>
@@ -440,7 +484,7 @@ function AnimCard({
 function makeAnim(kind: AnimKind, el: Element, step: number, options: OptionDef[]): Anim {
   const a: Anim = { id: newId(), kind, step };
   if (kind === 'appear' || kind === 'disappear') a.effect = el.type === 'line' ? 'wipe' : 'fade';
-  if (kind === 'emphasis') a.effect = 'pulse';
+  if (kind === 'emphasis') a.effect = isWired(el) ? 'flash' : 'pulse';
   if (kind === 'color') a.color = '@red';
   if (kind === 'move') a.dx = 40;
   if (kind === 'text') a.effect = 'typewriter';

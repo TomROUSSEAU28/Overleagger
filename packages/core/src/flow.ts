@@ -123,6 +123,8 @@ export function flowPositions(
   phase: number,
 ): { s: number; alpha: number }[] {
   if (length <= 0) return [];
+  // At most 500 symbols, whatever the spacing (a very long path stays light to draw).
+  spacing = Math.max(4, spacing, length / 500);
   const out: { s: number; alpha: number }[] = [];
   if (closed) {
     // A whole number of symbols on the loop, so that it turns without a seam.

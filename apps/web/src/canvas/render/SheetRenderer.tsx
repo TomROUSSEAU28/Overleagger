@@ -114,8 +114,10 @@ function fxStyle(f: ElFx | undefined): CSSProperties | undefined {
   if (f.opacity !== undefined) style.opacity = f.opacity;
   if (f.transform) style.transform = f.transform;
   if (f.reveal !== undefined) style.clipPath = `inset(-40px ${(1 - f.reveal) * 100}% -40px -40px)`;
-  if (f.glow)
-    style.filter = `drop-shadow(0 0 ${2 + 7 * f.glow}px rgba(214, 40, 40, ${0.9 * f.glow}))`;
+  if (f.glow) {
+    const c = f.glowColor ?? 'rgb(214, 40, 40)';
+    style.filter = `drop-shadow(0 0 ${1.5 + 5 * f.glow}px color-mix(in srgb, ${c} ${Math.round(80 * f.glow)}%, transparent))`;
+  }
   return style;
 }
 
@@ -156,7 +158,7 @@ export const SheetRenderer = memo(function SheetRenderer({
             <ElementView el={el} o={o} fx={fx.get(el.id)} />
           </g>
         ) : (
-          <ElementView key={el.id} el={el} o={o} />
+          <ElementView key={el.id} el={el} o={o} fx={fx?.get(el.id)} />
         ),
       )}
       <Junctions points={conn.junctions} colors={colors} interactive={o.interactive} />

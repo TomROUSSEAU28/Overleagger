@@ -74,6 +74,8 @@ describe('current flow', () => {
     const a = flowPositions(400, true, 30, 5).map((p) => p.s);
     const b = flowPositions(400, true, 30, 5 + 400 / 13).map((p) => p.s);
     expect(a).toEqual(b.map((v) => expect.closeTo(v, 6)));
+    // However small the spacing, a very long path gets at most ~500 symbols.
+    expect(flowPositions(20000, false, 4, 0).length).toBeLessThanOrEqual(501);
     const open = flowPositions(100, false, 20, 0);
     expect(open[0]!.alpha).toBe(0);
     expect(open.every((p) => p.s >= 0 && p.s <= 100)).toBe(true);

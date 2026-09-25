@@ -15,6 +15,12 @@ import { useUI } from '../store/ui';
 import { THEMES, resolveColor } from '../theme';
 import { Field } from './common';
 
+/** A number typed in a field (nothing while it is not one yet, like a lone "-"). */
+function num(e: { target: HTMLInputElement }, set: (v: number) => void) {
+  const v = e.target.valueAsNumber;
+  if (Number.isFinite(v)) set(v);
+}
+
 const SIGNALS: [FlowSignal, string][] = [
   ['dc', 'DC (constant)'],
   ['sine', 'Sine (AC)'],
@@ -59,7 +65,7 @@ export function FlowProps({ el }: { el: FlowElement }) {
             type="number"
             step={0.1}
             value={el.current}
-            onChange={(e) => upd({ current: Number(e.target.value) || 0 })}
+            onChange={(e) => num(e, (current) => upd({ current }))}
             data-testid="flow-current"
           />
         </Field>
@@ -95,7 +101,7 @@ export function FlowProps({ el }: { el: FlowElement }) {
               min={0.05}
               step={0.1}
               value={period}
-              onChange={(e) => upd({ period: Math.max(0.05, Number(e.target.value) || 0.05) })}
+              onChange={(e) => num(e, (v) => upd({ period: Math.max(0.05, v) }))}
             />
           </Field>
           <Field label="Offset (A)">
@@ -103,7 +109,7 @@ export function FlowProps({ el }: { el: FlowElement }) {
               type="number"
               step={0.1}
               value={el.offset ?? 0}
-              onChange={(e) => upd({ offset: Number(e.target.value) || undefined })}
+              onChange={(e) => num(e, (v) => upd({ offset: v || undefined }))}
             />
           </Field>
         </div>
@@ -130,7 +136,14 @@ export function FlowProps({ el }: { el: FlowElement }) {
               title={l}
               aria-label={l}
               aria-pressed={el.symbol === s}
-              onClick={() => upd({ symbol: s, size: undefined })}
+              onClick={() =>
+                upd({
+                  symbol: s,
+                  size: undefined,
+                  // Electrons move against the current, positive charges with it.
+                  electrons: s === 'electron' ? true : s === 'plus' ? undefined : el.electrons,
+                })
+              }
               data-testid={`flow-symbol-${s}`}
             >
               <SymbolIcon symbol={s} color={color} paper={theme.paper} />

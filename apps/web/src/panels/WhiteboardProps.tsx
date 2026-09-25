@@ -349,6 +349,7 @@ export function FrameProps({ el }: { el: FrameElement }) {
   );
 }
 
+/** A number typed in a field ("" while one is being typed, like a lone "-", is skipped). */
 function num(v: string, def: number) {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
@@ -397,7 +398,7 @@ function TraceEditor({
             type="number"
             step={0.1}
             value={t.amp}
-            onChange={(e) => set({ amp: num(e.target.value, 1) })}
+            onChange={(e) => e.target.value !== '' && set({ amp: num(e.target.value, 1) })}
           />
         </Field>
         <Field label="Offset">
@@ -405,7 +406,7 @@ function TraceEditor({
             type="number"
             step={0.1}
             value={t.offset}
-            onChange={(e) => set({ offset: num(e.target.value, 0) })}
+            onChange={(e) => e.target.value !== '' && set({ offset: num(e.target.value, 0) })}
           />
         </Field>
       </div>
@@ -417,7 +418,7 @@ function TraceEditor({
               min={0.25}
               step={0.25}
               value={t.periods}
-              onChange={(e) => set({ periods: num(e.target.value, 2) })}
+              onChange={(e) => e.target.value !== '' && set({ periods: num(e.target.value, 2) })}
             />
           </Field>
           <Field label="Phase (°)">
@@ -425,7 +426,7 @@ function TraceEditor({
               type="number"
               step={15}
               value={t.phase}
-              onChange={(e) => set({ phase: num(e.target.value, 0) })}
+              onChange={(e) => e.target.value !== '' && set({ phase: num(e.target.value, 0) })}
             />
           </Field>
         </div>
