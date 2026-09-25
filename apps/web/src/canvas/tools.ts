@@ -10,6 +10,7 @@ import {
   elementBBox,
   expandSelection,
   nearestSegment,
+  wirePieces,
   normalizeWire,
   onSegmentInterior,
   pinAt,
@@ -256,9 +257,17 @@ export class ToolController {
       const el = elements.find((e) => e.id === unit);
       // A click on the selected wire picks the segment under the pointer; once a segment is
       // picked, dragging the wire moves the segment grabbed (not the whole wire).
+      // (Pieces: the segments cut at the junctions on them.)
       const seg =
         el?.type === 'wire' && onlyThis
-          ? { wireId: el.id, index: nearestSegment(el, p.world.x, p.world.y) }
+          ? {
+              wireId: el.id,
+              index: nearestSegment(
+                { ...el, pts: wirePieces(elements, el, ed.ctx) },
+                p.world.x,
+                p.world.y,
+              ),
+            }
           : null;
       this.clickSegment = seg;
       this.segment = seg && this.ui.wireSegment?.wireId === seg.wireId ? seg : null;
@@ -440,14 +449,18 @@ export class ToolController {
         const nw = changed[0];
         if (w?.type !== 'wire' || nw?.type !== 'wire') return;
         ed.applyElements(changed);
-        // The dragged segment stays picked (its index may have changed): find its middle.
+        // The dragged piece stays picked (its index may have changed): find its middle.
         const i = 2 * s.index;
-        const [ax, ay, bx, by] = w.pts.slice(i, i + 4) as [number, number, number, number];
+        const before = wirePieces(elements, w, ed.ctx);
+        const [ax, ay, bx, by] = before.slice(i, i + 4) as [number, number, number, number];
         const at = {
           x: (ax + bx) / 2 + (ax === bx || ay !== by ? d.dx : 0),
           y: (ay + by) / 2 + (ay === by || ax !== bx ? d.dy : 0),
         };
-        ui.set({ wireSegment: { wireId: nw.id, index: nearestSegment(nw, at.x, at.y) } });
+        const pieces = wirePieces(ed.elements(), nw, ed.ctx);
+        ui.set({
+          wireSegment: { wireId: nw.id, index: nearestSegment({ ...nw, pts: pieces }, at.x, at.y) },
+        });
         return;
       }
       case 'maybe-drag':
@@ -560,9 +573,13 @@ export class ToolController {
     const unit = topLevelUnit(ed.elements(), el.id);
     if (el.type === 'wire' && unit === el.id) {
       // A quick second click on a wire picks the segment under the pointer.
+      const pieces = wirePieces(ed.elements(), el, ed.ctx);
       ui.set({
         selection: [el.id],
-        wireSegment: { wireId: el.id, index: nearestSegment(el, p.world.x, p.world.y) },
+        wireSegment: {
+          wireId: el.id,
+          index: nearestSegment({ ...el, pts: pieces }, p.world.x, p.world.y),
+        },
       });
       return;
     }

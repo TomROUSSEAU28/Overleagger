@@ -14,6 +14,7 @@ import {
   lineControlPoint,
   rectUnion,
   snap,
+  wirePieces,
   type ComponentElement,
   type Element,
   type FrameElement,
@@ -602,47 +603,93 @@ function Brackets({ r, color, sw, len }: { r: Rect; color: string; sw: number; l
   );
 }
 
-/** The picked segment of a selected wire: drawn strong, with a square at each end. */
-function PickedSegment({
+/**
+ * A selected wire, drawn like a drafting mark (widths stay the same at any zoom): a soft halo
+ * with small squares on its corners and ends; with a picked piece, the rest fades and the piece
+ * is traced over, with a tick across each of its ends.
+ */
+/** Piece `i` of a wire's pieces ([ax, ay, bx, by]), if it exists. */
+const pieceOf = (pts: number[], i: number) =>
+  2 * i + 3 < pts.length ? pts.slice(2 * i, 2 * i + 4) : null;
+
+function WireSelection({
   pts,
-  index,
+  piece,
   color,
   paper,
   sw,
 }: {
   pts: number[];
-  index: number;
+  /** The picked piece, as [ax, ay, bx, by]. */
+  piece: number[] | null;
   color: string;
   paper: string;
   sw: number;
 }) {
-  const [ax, ay, bx, by] = pts.slice(2 * index, 2 * index + 4) as [number, number, number, number];
-  const h = 3.5 * sw;
+  const h = 2.6 * sw;
+  const corners: [number, number][] = [];
+  for (let i = 0; i < pts.length; i += 2) corners.push([pts[i]!, pts[i + 1]!]);
+  const halo = (d: number[], width: number, opacity: number) => (
+    <polyline
+      points={d.join(' ')}
+      fill="none"
+      stroke={color}
+      strokeOpacity={opacity}
+      strokeWidth={width * sw}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  );
+  if (!piece) {
+    return (
+      <g>
+        {halo(pts, 9, 0.22)}
+        {corners.map(([x, y]) => (
+          <rect
+            key={`${x},${y}`}
+            x={x - h}
+            y={y - h}
+            width={2 * h}
+            height={2 * h}
+            fill={paper}
+            stroke={color}
+            strokeWidth={1.2 * sw}
+          />
+        ))}
+      </g>
+    );
+  }
+  const [ax, ay, bx, by] = piece as [number, number, number, number];
+  const len = Math.hypot(bx - ax, by - ay) || 1;
+  // Unit normal of the piece: the ticks across its ends.
+  const nx = (-(by - ay) / len) * 6 * sw;
+  const ny = ((bx - ax) / len) * 6 * sw;
   return (
     <g data-testid="picked-segment">
+      {halo(pts, 9, 0.08)}
+      {halo(piece, 10, 0.25)}
       <line
         x1={ax}
         y1={ay}
         x2={bx}
         y2={by}
         stroke={color}
-        strokeOpacity={0.7}
-        strokeWidth={7}
+        strokeWidth={2 * sw}
         strokeLinecap="round"
       />
       {[
         [ax, ay],
         [bx, by],
       ].map(([x, y]) => (
-        <rect
+        <line
           key={`${x},${y}`}
-          x={x! - h}
-          y={y! - h}
-          width={2 * h}
-          height={2 * h}
-          fill={paper}
+          x1={x! - nx}
+          y1={y! - ny}
+          x2={x! + nx}
+          y2={y! + ny}
           stroke={color}
-          strokeWidth={1.2 * sw}
+          strokeWidth={1.6 * sw}
+          strokeLinecap="round"
         />
       ))}
     </g>
@@ -869,26 +916,18 @@ function Overlay({ elements, o, zoom }: { elements: Element[]; o: RenderOptions;
         <HiddenBadges elements={elements} o={o} zoom={zoom} />
         {boxes.map((b) =>
           b.wire ? (
-            <g key={b.el.id}>
-              <polyline
-                points={b.wire.join(' ')}
-                fill="none"
-                stroke={sel}
-                strokeOpacity={wireSegment?.wireId === b.el.id ? 0.18 : 0.45}
-                strokeWidth={6}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {wireSegment?.wireId === b.el.id && 2 * wireSegment.index + 3 < b.wire.length && (
-                <PickedSegment
-                  pts={b.wire}
-                  index={wireSegment.index}
-                  color={sel}
-                  paper={t.paper}
-                  sw={sw}
-                />
-              )}
-            </g>
+            <WireSelection
+              key={b.el.id}
+              pts={b.wire}
+              piece={
+                wireSegment?.wireId === b.el.id && b.el.type === 'wire'
+                  ? pieceOf(wirePieces(elements, b.el, o.ctx), wireSegment.index)
+                  : null
+              }
+              color={sel}
+              paper={t.paper}
+              sw={sw}
+            />
           ) : (
             <g key={b.el.id}>
               <rect

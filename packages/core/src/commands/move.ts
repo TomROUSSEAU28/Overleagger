@@ -123,7 +123,97 @@ function relocate(e: WireEdit, x: number, y: number): Pt {
   const [a, b] = e.moving(x, y) ? [moved, here] : [here, moved];
   if (onWire(e.pts, a.x, a.y)) return a;
   if (onWire(e.pts, b.x, b.y)) return b;
-  return a;
+  // The wire got shorter past it: hold on to the nearest point of the wire.
+  return nearestOnWire(e.pts, a.x, a.y);
+}
+
+/** Point of the wire closest to (x, y) (on the grid when the wire is). */
+function nearestOnWire(pts: number[], x: number, y: number): Pt {
+  let best = { x: pts[0]!, y: pts[1]! };
+  let bestD = Infinity;
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const [ax, ay, bx, by] = [pts[i]!, pts[i + 1]!, pts[i + 2]!, pts[i + 3]!];
+    const l2 = (bx - ax) ** 2 + (by - ay) ** 2;
+    const t = l2 ? Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / l2)) : 0;
+    let px = ax + t * (bx - ax);
+    let py = ay + t * (by - ay);
+    // Orthogonal segments: snap along them to the grid, so the junction stays on the grid.
+    if (ay === by) px = Math.min(Math.max(snap(px, GRID), Math.min(ax, bx)), Math.max(ax, bx));
+    if (ax === bx) py = Math.min(Math.max(snap(py, GRID), Math.min(ay, by)), Math.max(ay, by));
+    const d = Math.hypot(px - x, py - y);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: px, y: py };
+    }
+  }
+  return best;
+}
+
+/**
+ * First connection point along a wire, from its start: a pin or a wire end in the middle of a
+ * segment, or on one of its bends. Splits the wire there: `head` from the start to that point,
+ * `tail` from that point to the end.
+ */
+function firstBreak(p: number[], conns: Pt[]): { head: number[]; tail: number[] } | null {
+  for (let i = 0; i + 3 < p.length; i += 2) {
+    const [ax, ay, bx, by] = [p[i]!, p[i + 1]!, p[i + 2]!, p[i + 3]!];
+    let best: Pt | null = null;
+    let bestD = Infinity;
+    for (const c of conns) {
+      if (!onSegmentInterior(c.x, c.y, ax, ay, bx, by)) continue;
+      const d = Math.hypot(c.x - ax, c.y - ay);
+      if (d < bestD) {
+        best = c;
+        bestD = d;
+      }
+    }
+    if (best)
+      return {
+        head: [...p.slice(0, i + 2), best.x, best.y],
+        tail: [best.x, best.y, ...p.slice(i + 2)],
+      };
+    const lastSeg = i + 4 >= p.length;
+    if (!lastSeg && conns.some((c) => samePt(c.x, c.y, bx, by)))
+      return { head: p.slice(0, i + 4), tail: p.slice(i + 2) };
+  }
+  return null;
+}
+
+/**
+ * Move the start of a wire by (dx, dy), keeping it orthogonal. Only the stretch before its first
+ * connection point bends: what is connected further along (T junctions, pins) stays on it.
+ */
+function stretchStart(pts: number[], dx: number, dy: number, conns: Pt[]): number[] {
+  const cut = firstBreak(pts, conns);
+  if (!cut) return reversePts(moveWireEnd(reversePts(pts), dx, dy));
+  const head = reversePts(moveWireEnd(reversePts(cut.head), dx, dy));
+  return normalizeWire([...head, ...cut.tail.slice(2)]);
+}
+
+const stretchEnd = (pts: number[], dx: number, dy: number, conns: Pt[]) =>
+  reversePts(stretchStart(reversePts(pts), dx, dy, conns));
+
+/** Points where things connect: every pin (net labels too) and every wire end. */
+function connectionPoints(elements: Element[], ctx: SheetContext): Pt[] {
+  const out: Pt[] = [];
+  const seen = new Set<string>();
+  const add = (x: number, y: number) => {
+    const k = ptKey(x, y);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push({ x, y });
+    }
+  };
+  for (const el of elements) {
+    if (el.type === 'wire') {
+      const n = el.pts.length;
+      if (n >= 4) {
+        add(el.pts[0]!, el.pts[1]!);
+        add(el.pts[n - 2]!, el.pts[n - 1]!);
+      }
+    } else if (el.type !== 'group') for (const p of elementPins(el, ctx)) add(p.x, p.y);
+  }
+  return out;
 }
 
 /**
@@ -136,7 +226,9 @@ function attachedFollow(
   skip: Set<Id>,
   pinTarget: (x: number, y: number) => Pt | null,
   edits: WireEdit[],
+  ctx: SheetContext,
 ): Element[] {
+  const conns = connectionPoints(elements, ctx);
   const target = (x: number, y: number): Pt | null => {
     let t = pinTarget(x, y);
     if (!t) {
@@ -160,13 +252,15 @@ function attachedFollow(
           continue;
         }
       }
+      // The wire's own ends are not in the way.
+      const own = conns.filter(
+        (c) =>
+          !samePt(c.x, c.y, el.pts[0]!, el.pts[1]!) &&
+          !samePt(c.x, c.y, el.pts[n - 2]!, el.pts[n - 1]!),
+      );
       let pts = el.pts;
-      if (e) pts = moveWireEnd(pts, e.x - pts[n - 2]!, e.y - pts[n - 1]!);
-      if (s) {
-        const r = reversePts(pts);
-        const m = r.length;
-        pts = reversePts(moveWireEnd(r, s.x - r[m - 2]!, s.y - r[m - 1]!));
-      }
+      if (e) pts = stretchEnd(pts, e.x - pts[n - 2]!, e.y - pts[n - 1]!, own);
+      if (s) pts = stretchStart(pts, s.x - pts[0]!, s.y - pts[1]!, own);
       out.push({ ...el, pts });
     } else if (el.type === 'label') {
       const t = target(el.x, el.y);
@@ -182,6 +276,28 @@ function pinKeys(els: Element[], ctx: SheetContext): Set<string> {
   for (const el of els)
     if (el.type !== 'wire' && el.type !== 'group')
       for (const p of elementPins(el, ctx)) out.add(ptKey(p.x, p.y));
+  return out;
+}
+
+/**
+ * The pieces of a wire a click picks: its segments, cut where something connects in their
+ * middle (a T junction, a pin, a net label). Returns the wire's points with those cuts added.
+ */
+export function wirePieces(elements: Element[], w: WireElement, ctx: SheetContext): number[] {
+  const n = w.pts.length;
+  const conns = connectionPoints(elements, ctx).filter(
+    (c) =>
+      !samePt(c.x, c.y, w.pts[0]!, w.pts[1]!) && !samePt(c.x, c.y, w.pts[n - 2]!, w.pts[n - 1]!),
+  );
+  const out = [w.pts[0]!, w.pts[1]!];
+  for (let i = 2; i < n; i += 2) {
+    const [ax, ay, bx, by] = [w.pts[i - 2]!, w.pts[i - 1]!, w.pts[i]!, w.pts[i + 1]!];
+    const cuts = conns
+      .filter((c) => onSegmentInterior(c.x, c.y, ax, ay, bx, by))
+      .sort((c, d) => Math.hypot(c.x - ax, c.y - ay) - Math.hypot(d.x - ax, d.y - ay));
+    for (const c of cuts) out.push(c.x, c.y);
+    out.push(bx, by);
+  }
   return out;
 }
 
@@ -255,7 +371,7 @@ export function computeMove(
   }
   const pinTarget = (x: number, y: number) =>
     movedPins.has(ptKey(x, y)) ? { x: x + dx, y: y + dy } : null;
-  for (const f of attachedFollow(elements, ids, pinTarget, edits)) out.set(f.id, f);
+  for (const f of attachedFollow(elements, ids, pinTarget, edits, ctx)) out.set(f.id, f);
   // Connectors attached to moved shapes follow them.
   for (const l of followConnectors(elements, [...out.values()])) out.set(l.id, l);
   return [...out.values()];
@@ -286,16 +402,39 @@ export function dragSegment(
   const mx = horizontal ? 0 : dx;
   const my = vertical ? 0 : dy;
   if (horizontal && vertical) return pts;
-  const moved = [...pts];
-  moved[2 * seg] = ax + mx;
-  moved[2 * seg + 1] = ay + my;
-  moved[2 * seg + 2] = bx + mx;
-  moved[2 * seg + 3] = by + my;
-  let out = moved;
-  // Keep the wire's end points fixed.
-  if (seg === n - 2 && keepEnd) out = [...out, bx, by];
-  if (seg === 0 && keepStart) out = [ax, ay, ...out];
+  const { keepA, keepB } = segmentKeeps(pts, seg, keepStart, keepEnd);
+  let out = [...pts];
+  out[2 * seg] = ax + mx;
+  out[2 * seg + 1] = ay + my;
+  out[2 * seg + 2] = bx + mx;
+  out[2 * seg + 3] = by + my;
+  // Ends that stay (wire ends, junctions in a straight run) get a leg to the moved piece.
+  if (keepB) out = [...out.slice(0, 2 * seg + 4), bx, by, ...out.slice(2 * seg + 4)];
+  if (keepA) out = [...out.slice(0, 2 * seg), ax, ay, ...out.slice(2 * seg)];
   return normalizeWire(out);
+}
+
+/**
+ * Which ends of segment `seg` stay when it is dragged: the wire's own ends as asked, and the
+ * points where the wire goes on straight (a cut made at a junction); real bends move with it.
+ */
+function segmentKeeps(pts: number[], seg: number, keepStart: boolean, keepEnd: boolean) {
+  const n = pts.length / 2;
+  const straight = (i: number, j: number, k: number) => {
+    const [px, py, qx, qy, rx, ry] = [
+      pts[2 * i]!,
+      pts[2 * i + 1]!,
+      pts[2 * j]!,
+      pts[2 * j + 1]!,
+      pts[2 * k]!,
+      pts[2 * k + 1]!,
+    ];
+    return Math.abs((qx - px) * (ry - qy) - (qy - py) * (rx - qx)) < EPS;
+  };
+  return {
+    keepA: seg === 0 ? keepStart : straight(seg - 1, seg, seg + 1),
+    keepB: seg === n - 2 ? keepEnd : straight(seg, seg + 1, seg + 2),
+  };
 }
 
 /**
@@ -312,8 +451,10 @@ export function computeSegmentDrag(
   dy: number,
   ctx: SheetContext,
 ): Element[] {
-  const w = elements.find((e): e is WireElement => e.id === wireId && e.type === 'wire');
-  if (!w || (!dx && !dy)) return [];
+  const orig = elements.find((e): e is WireElement => e.id === wireId && e.type === 'wire');
+  if (!orig || (!dx && !dy)) return [];
+  // `seg` counts the pieces of the wire (segments cut at junctions).
+  const w = { ...orig, pts: wirePieces(elements, orig, ctx) };
   const n = w.pts.length / 2;
   if (seg < 0 || seg >= n - 1) return [];
   const [ax, ay, bx, by] = w.pts.slice(2 * seg, 2 * seg + 4) as [number, number, number, number];
@@ -331,16 +472,17 @@ export function computeSegmentDrag(
   const keepStart = seg === 0 && touches(ax, ay);
   const keepEnd = seg === n - 2 && touches(bx, by);
   const pts = dragSegment(w, seg, dx, dy, keepStart, keepEnd);
+  const { keepA, keepB } = segmentKeeps(w.pts, seg, keepStart, keepEnd);
   const edit: WireEdit = {
     old: w.pts,
     pts,
     d,
     moving: (x, y) =>
-      (samePt(x, y, ax, ay) && !keepStart) ||
-      (samePt(x, y, bx, by) && !keepEnd) ||
+      (samePt(x, y, ax, ay) && !keepA) ||
+      (samePt(x, y, bx, by) && !keepB) ||
       onSegmentInterior(x, y, ax, ay, bx, by),
   };
-  return [{ ...w, pts }, ...attachedFollow(elements, new Set([w.id]), () => null, [edit])];
+  return [{ ...orig, pts }, ...attachedFollow(elements, new Set([w.id]), () => null, [edit], ctx)];
 }
 
 /** What remains of a wire once its segment `seg` is removed: 0, 1 or 2 pieces. */
@@ -554,7 +696,7 @@ export function followPins(all: Element[], changed: Element[], ctx: SheetContext
     }
     return null;
   };
-  return attachedFollow(all, changedIds, target, []);
+  return attachedFollow(all, changedIds, target, [], ctx);
 }
 
 /** True when the point is one of the end points of the wire. */

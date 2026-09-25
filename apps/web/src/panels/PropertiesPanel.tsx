@@ -836,9 +836,9 @@ function WireProps({ el }: { el: WireElement }) {
         </select>
       </Field>
       <p className="muted small">
-        Drag the wire to move it: what is attached to it follows. Click it again to pick one
-        segment, then drag it or press Delete. Junction dots appear automatically where 3 or more
-        connections meet.
+        Drag the wire to move it: what is attached to it follows. Click it again to pick one piece
+        (cut at the junctions), then drag it or press Delete. Junction dots appear automatically
+        where 3 or more connections meet.
       </p>
     </>
   );

@@ -21,6 +21,8 @@ import {
   ungroupElements,
   computeMove,
   removeSegment,
+  normalizeWire,
+  wirePieces,
   alignUnits,
   distributeUnits,
   followPins,
@@ -174,8 +176,11 @@ export class EditorController {
     const seg = this.ui.wireSegment;
     if (!seg || ids.length !== 1 || ids[0] !== seg.wireId) return false;
     const w = this.project.getElement(this.sheetId, seg.wireId);
-    if (w?.type !== 'wire' || 2 * seg.index + 3 >= w.pts.length) return false;
-    const [first, second] = removeSegment(w.pts, seg.index);
+    if (w?.type !== 'wire') return false;
+    // The picked piece: segments are cut at the junctions on them.
+    const pieces = wirePieces(this.elements(), w, this.ctx);
+    if (2 * seg.index + 3 >= pieces.length) return false;
+    const [first, second] = removeSegment(pieces, seg.index).map(normalizeWire);
     this.commit(() => {
       if (!first) {
         deleteElements(this.project, this.sheetId, [w.id]);

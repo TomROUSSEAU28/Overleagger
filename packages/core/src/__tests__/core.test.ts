@@ -13,6 +13,7 @@ import {
   computeMove,
   computeSegmentDrag,
   removeSegment,
+  wirePieces,
   reorder,
   copyElements,
   createBlock,
@@ -295,16 +296,26 @@ describe('moving', () => {
     expect(changed.find((e) => e.id === l.id)).toMatchObject({ x: 40, y: 20 });
   });
 
-  it('drags a segment with the wires attached to it', () => {
+  it('drags one piece of a wire: segments are cut at junctions', () => {
     const { p, sheet, ctx, wire } = setup();
     addComponent(p, sheet, 'resistor', 0, 0, ctx());
     addComponent(p, sheet, 'resistor', 260, 0, ctx());
     const w = wire(30, 0, 230, 0);
     const t = wire(100, 0, 100, 60);
+    // The piece from the resistor to the junction moves; the junction stays, with a leg.
     const changed = computeSegmentDrag(p.getElements(sheet), w.id, 0, 0, -20, ctx());
-    expect((changed[0] as WireElement).pts).toEqual([30, 0, 30, -20, 230, -20, 230, 0]);
-    const nt = changed.find((e) => e.id === t.id) as WireElement;
-    expect(nt.pts.slice(0, 2)).toEqual([100, -20]);
+    expect((changed[0] as WireElement).pts).toEqual([30, 0, 30, -20, 100, -20, 100, 0, 230, 0]);
+    expect(changed.find((e) => e.id === t.id)).toBeUndefined();
+    expect(wirePieces(p.getElements(sheet), w, ctx())).toEqual([30, 0, 100, 0, 230, 0]);
+  });
+
+  it('drags a segment with the wires attached to its bends', () => {
+    const { p, sheet, ctx, wire } = setup();
+    const w = wire(0, 0, 100, 0, 100, 100, 200, 100);
+    const t = wire(100, 100, 100, 160);
+    const changed = computeSegmentDrag(p.getElements(sheet), w.id, 1, 40, 0, ctx());
+    expect((changed[0] as WireElement).pts).toEqual([0, 0, 140, 0, 140, 100, 200, 100]);
+    expect((changed.find((e) => e.id === t.id) as WireElement).pts.slice(0, 2)).toEqual([140, 100]);
   });
 
   it('lets the free end of a segment go with it', () => {

@@ -127,12 +127,12 @@ test('version, what is new, manual and changelog', async ({ page }) => {
   const chip = page.getByTestId('version-chip');
   await expect(chip).toHaveClass(/fresh/);
   await chip.click();
-  await expect(page.getByTestId('whatsnew')).toContainText('Animated presentations');
+  await expect(page.getByTestId('whatsnew')).toContainText('First open beta');
   await expect(chip).not.toHaveClass(/fresh/);
   await page.goto('/manual/');
   await expect(page.getByTestId('manual')).toContainText('How to use Circuit Notebook');
   await expect(page.locator('[data-version]').first()).toContainText('beta');
   await page.goto('/changelog/');
-  await expect(page.locator('.release')).toHaveCount(9);
+  await expect(page.locator('.release')).toHaveCount(1);
   await expect(page.locator('.release').first()).toContainText('current version');
 });
