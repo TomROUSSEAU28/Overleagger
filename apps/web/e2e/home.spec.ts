@@ -129,6 +129,18 @@ test('version, what is new, manual and changelog', async ({ page }) => {
   await chip.click();
   await expect(page.getByTestId('whatsnew')).toContainText('First open beta');
   await expect(chip).not.toHaveClass(/fresh/);
+  // Its links open the manual and the versions (in a new tab, the dialog stays).
+  for (const [name, path] of [
+    ['User manual', '/manual/'],
+    ['All versions', '/changelog/'],
+  ] as const) {
+    const opened = page.context().waitForEvent('page');
+    await page.getByRole('link', { name }).click();
+    const tab = await opened;
+    await expect(tab).toHaveURL(new RegExp(`${path}$`));
+    await tab.close();
+    await expect(page.getByTestId('whatsnew')).toBeVisible();
+  }
   await page.goto('/manual/');
   await expect(page.getByTestId('manual')).toContainText('How to use Circuit Notebook');
   await expect(page.locator('[data-version]').first()).toContainText('beta');

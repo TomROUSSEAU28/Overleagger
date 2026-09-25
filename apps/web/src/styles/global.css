@@ -3256,7 +3256,10 @@ body.resizing-panel {
   width: 34px;
   height: 34px;
 }
-/* Dialogs fill the width of a phone. */
+/* Dialogs fill the width of a phone, and fit its height (no gap above them). */
+.editor.phone .modal-backdrop {
+  padding-top: 12px;
+}
 .editor.phone .modal {
   width: calc(100vw - 16px);
   max-width: none;
@@ -3606,11 +3609,22 @@ body.resizing-panel {
     animation: none;
   }
 }
+/* Only the dialog's body scrolls; the links stay at its bottom, always in view. */
 .whatsnew {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  max-height: min(70vh, 640px);
-  overflow: auto;
+}
+.whatsnew .wn-links {
+  position: sticky;
+  bottom: -14px;
+  margin: 0 -16px -14px;
+  padding: 10px 16px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+.whatsnew > .btn {
+  align-self: flex-start;
 }
 .wn-release {
   padding: 10px 14px;
