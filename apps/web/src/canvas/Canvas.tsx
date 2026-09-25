@@ -693,9 +693,9 @@ function AnimBadges({
   const labels = useMemo(() => {
     const out = new Map<string, string>();
     if (!elements.some((e) => e.anims?.length)) return out;
-    const frames = elements.filter((e): e is FrameElement => e.type === 'frame');
+    const frames = elements.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent);
     const groups = frames.length
-      ? frames.map((f) => slideElements(elements, { x: f.x, y: f.y, w: f.w, h: f.h }, o.ctx))
+      ? frames.map((f) => slideElements(elements, f.id, o.ctx))
       : [slideElements(elements, null, o.ctx)];
     for (const els of groups) {
       const steps = slideSteps(els);

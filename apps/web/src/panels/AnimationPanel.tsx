@@ -4,10 +4,8 @@
  * and build order of a frame. Kept out of the way: folded until opened.
  */
 import {
-  elementBBox,
   framesInSlideOrder,
   newId,
-  rectsIntersect,
   type Anim,
   type AnimKind,
   type Element,
@@ -32,6 +30,7 @@ import {
   effectOf,
   isWired,
   slideElements,
+  slideOwners,
   slideSteps,
   textField,
 } from '../present/anim';
@@ -116,16 +115,11 @@ function kindsFor(el: Element, options: OptionDef[]): AnimKind[] {
   return out;
 }
 
-/** The slide an element is on: the first frame it touches (slide order), else its sheet. */
+/** The slide an element is on: its frame (see `slideOwners`), else its sheet. */
 function slideAround(el: Element, all: Element[], ctx: ReturnType<typeof useEditor>['ctx']) {
-  const box = elementBBox(el, ctx, all);
-  const frames = framesInSlideOrder(
-    all.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent),
-  );
-  const frame =
-    el.type === 'frame' ? el : frames.find((f) => rectsIntersect(f, box) && f.id !== el.id);
-  const rect = frame ? { x: frame.x, y: frame.y, w: frame.w, h: frame.h } : null;
-  return { frame, elements: slideElements(all, rect, ctx) };
+  const id = el.type === 'frame' ? el.id : slideOwners(all, ctx).get(el.id);
+  const frame = all.find((e): e is FrameElement => e.type === 'frame' && e.id === id);
+  return { frame, elements: slideElements(all, frame?.id, ctx) };
 }
 
 /** Start the presentation on the slide showing this element. */

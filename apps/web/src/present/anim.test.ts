@@ -1,6 +1,14 @@
-import type { Element } from '@overleagger/core';
+import { Project, makeContext, type Element } from '@overleagger/core';
 import { describe, expect, it } from 'vitest';
-import { evaluate, mixColor, slideSteps, typed, type Clock } from './anim';
+import {
+  evaluate,
+  mixColor,
+  slideElements,
+  slideOwners,
+  slideSteps,
+  typed,
+  type Clock,
+} from './anim';
 
 const resolve = (c: string | undefined) => c ?? '#000000';
 const at = (reached: number, started: [number, number][], now: number): Clock => ({
@@ -172,5 +180,51 @@ describe('presentation animations', () => {
     const k = Number(/scale\(([\d.]+)\)/.exec(mid.fx.get('t')?.transform ?? '')?.[1]);
     expect(k).toBeGreaterThan(1);
     expect(k).toBeLessThanOrEqual(1.07);
+  });
+
+  it('an overview, then a zoom: what is inside the zoom plays on the zoom', () => {
+    const p = Project.create('T');
+    const sheet = p.rootSheetId;
+    const box = (x: number, y: number) =>
+      p.addElement(sheet, { type: 'shape', kind: 'rect', x, y, w: 20, h: 20 }).id;
+    const overview = p.addElement(sheet, {
+      type: 'frame',
+      x: 0,
+      y: 0,
+      w: 400,
+      h: 300,
+      name: 'Overview',
+    }).id;
+    const zoom = p.addElement(sheet, {
+      type: 'frame',
+      x: 10,
+      y: 10,
+      w: 100,
+      h: 80,
+      name: 'Zoom',
+    }).id;
+    const side = p.addElement(sheet, {
+      type: 'frame',
+      x: 380,
+      y: 0,
+      w: 200,
+      h: 100,
+      name: 'Side',
+    }).id;
+    const inZoom = box(40, 30);
+    const onlyOverview = box(200, 200);
+    // Across the edge of the overview and the side frame: its centre is in the side frame.
+    const across = box(385, 40);
+    const outside = box(900, 900);
+    const all = p.getElements(sheet);
+    const ctx = makeContext(p);
+    const owners = slideOwners(all, ctx);
+    expect(owners.get(inZoom)).toBe(zoom);
+    expect(owners.get(onlyOverview)).toBe(overview);
+    expect(owners.get(across)).toBe(side);
+    expect(owners.has(outside)).toBe(false);
+    expect(slideElements(all, zoom, ctx).map((e) => e.id)).toEqual([inZoom]);
+    // A sheet without frames: all its elements.
+    expect(slideElements(all, null, ctx)).toHaveLength(4);
   });
 });

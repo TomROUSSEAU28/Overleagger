@@ -8,11 +8,12 @@
  */
 import {
   elementBBox,
+  framesInSlideOrder,
   rectsIntersect,
   type Anim,
   type Element,
+  type FrameElement,
   type Id,
-  type Rect,
   type SheetContext,
 } from '@overleagger/core';
 
@@ -91,14 +92,45 @@ const backOut = (t: number) => {
   return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
 };
 
-/** Elements of a slide: those touching the frame (or the whole sheet), frames excepted. */
-export function slideElements(all: Element[], rect: Rect | null, ctx: SheetContext): Element[] {
-  return all.filter(
-    (e) =>
-      e.type !== 'frame' &&
-      e.type !== 'group' &&
-      (!rect || rectsIntersect(rect, elementBBox(e, ctx, all))),
+/**
+ * The frame (slide) of each element of a sheet, where its animations play: the smallest frame
+ * around its centre (a frame zooming on a part of an overview holds what is inside it), else
+ * the first frame it touches (slide order). Frames hidden from the presentation are no slides.
+ */
+export function slideOwners(all: Element[], ctx: SheetContext): Map<Id, Id> {
+  const frames = framesInSlideOrder(
+    all.filter((e): e is FrameElement => e.type === 'frame' && !e.noPresent),
   );
+  const out = new Map<Id, Id>();
+  if (!frames.length) return out;
+  for (const e of all) {
+    if (e.type === 'frame' || e.type === 'group') continue;
+    const b = elementBBox(e, ctx, all);
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    let best: FrameElement | undefined;
+    for (const f of frames)
+      if (cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h)
+        if (!best || f.w * f.h < best.w * best.h) best = f;
+    best ??= frames.find((f) => rectsIntersect(f, b));
+    if (best) out.set(e.id, best.id);
+  }
+  return out;
+}
+
+/**
+ * Elements whose animations play on a slide: those of its frame (see `slideOwners`), or the
+ * whole sheet for a sheet without frames. Frames and groups excepted.
+ */
+export function slideElements(
+  all: Element[],
+  frameId: Id | null | undefined,
+  ctx: SheetContext,
+): Element[] {
+  const els = all.filter((e) => e.type !== 'frame' && e.type !== 'group');
+  if (!frameId) return els;
+  const owners = slideOwners(all, ctx);
+  return els.filter((e) => owners.get(e.id) === frameId);
 }
 
 /** Click steps of a slide (1, 2… in order; step 0 plays as the slide opens). */

@@ -117,11 +117,7 @@ export function Presentation() {
   const elements = useMemo(() => visibleFor(sheetElements, 'present'), [sheetElements]);
   /** Elements of a slide (those touching its frame, or the whole sheet). */
   const slideOf = (sl: Slide) =>
-    slideElements(
-      visibleFor(ed.project.getElements(sl.sheetId), 'present'),
-      sl.frameId ? sl.rect : null,
-      ed.ctx,
-    );
+    slideElements(visibleFor(ed.project.getElements(sl.sheetId), 'present'), sl.frameId, ed.ctx);
   // Click steps of the slide on screen (it is only animated once the camera shows its sheet).
   const steps = useMemo(
     () => (slide && slide.sheetId === sheetId ? slideSteps(slideOf(slide)) : []),
@@ -211,6 +207,8 @@ export function Presentation() {
   // Build steps of the current slide: 0 = as it opens, then one per click.
   const [level, setLevel] = useState(0);
   const started = useRef(new Map<number, number>([[0, performance.now() + 150]]));
+  /** Animated currents flowing at the last frame (they go on through a glide). */
+  const flowsOn = useRef(new Set<Id>());
   const [now, setNow] = useState(() => performance.now());
 
   /** A tween driven by requestAnimationFrame (skipped when animations are off). */
@@ -558,8 +556,7 @@ export function Presentation() {
     const m = new Map<Id, number>();
     slides.forEach((sl, i) => {
       if (sl.sheetId !== sheetId) return;
-      for (const e of slideElements(elements, sl.frameId ? sl.rect : null, ed.ctx))
-        if (!m.has(e.id)) m.set(e.id, i);
+      for (const e of slideElements(elements, sl.frameId, ed.ctx)) if (!m.has(e.id)) m.set(e.id, i);
     });
     return m;
   }, [slides, sheetId, elements, ed.ctx]);
@@ -567,20 +564,19 @@ export function Presentation() {
   // The animations: the current slide at its step, the slides before all played, the ones after
   // not started yet (seen while the camera glides past them).
   const played: AnimFrame = useMemo(() => {
-    // Animated currents wait for their slide (on screen, the camera arrived), then start; those
-    // of the slides already shown go on flowing (an overview, then a zoom on a part of it).
+    // Animated currents start once the camera has arrived on their sheet (a hidden one waits
+    // until it appears); those already flowing go on while the camera glides to another slide
+    // of the sheet (an overview, then a zoom on a part of it).
     const onSheet = slide?.sheetId === sheetId;
     const arrivedHere = onSheet && started.current.get(0) !== Infinity;
     const idleFlows = (fx: Map<Id, ElFx>) => {
+      const on = new Set<Id>();
       for (const e of drawn) {
         if (e.type !== 'flow') continue;
-        const i = slideOfEl.get(e.id);
-        const waits =
-          !onSheet ||
-          (i !== undefined && i > index) ||
-          ((i === undefined || i === index) && !arrivedHere);
-        if (waits) fx.set(e.id, { ...fx.get(e.id), idle: true });
+        if (onSheet && (arrivedHere || flowsOn.current.has(e.id))) on.add(e.id);
+        else fx.set(e.id, { ...fx.get(e.id), idle: true });
       }
+      flowsOn.current = on;
       return fx;
     };
     const animated = drawn.filter((e) => e.anims?.length);
