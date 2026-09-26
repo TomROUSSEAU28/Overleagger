@@ -40,6 +40,8 @@ export interface Config {
    * sent; VERIFY_EMAIL=false turns it off).
    */
   verifyEmail: boolean;
+  /** Time zone of the days in the site's usage statistics (admin page). */
+  timeZone: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -47,6 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cors = (env.CORS_ORIGINS ?? '*').trim();
   return {
     verifyEmail: Boolean(env.SMTP_HOST) && env.VERIFY_EMAIL !== 'false',
+    timeZone: env.TIME_ZONE ?? 'Europe/Paris',
     port,
     host: env.HOST ?? '0.0.0.0',
     dbFile: env.DB_FILE ?? './data/circuit-notebook.sqlite',

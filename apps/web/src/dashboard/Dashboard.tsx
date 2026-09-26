@@ -45,7 +45,7 @@ import {
   renameProject,
   type ProjectEntry,
 } from '../storage/projects';
-import { SUPPORT_URL } from '../site';
+import { SUPPORT_URL, track } from '../site';
 import { useUI } from '../store/ui';
 
 /** "On the server: 3 / 5 projects · 1.2 MB" (projects you own, during the beta). */
@@ -101,6 +101,7 @@ function NewProjectDialog({
   const create = async () => {
     const title = name.trim() || DEFAULT_NAME;
     const seed = from === 'buck' ? seedBuckExample : undefined;
+    track(seed ? 'open-example' : 'new-project');
     if (where === 'cloud') {
       try {
         const p = Project.create(title, standard);
@@ -383,6 +384,7 @@ export function Dashboard() {
   };
 
   const openExample = async () => {
+    track('open-example');
     const id = await createProject('Buck converter example', 'IEC', seedBuckExample);
     navigate(`/p/${id}`);
   };

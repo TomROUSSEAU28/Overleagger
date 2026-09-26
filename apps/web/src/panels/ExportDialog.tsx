@@ -7,6 +7,7 @@ import { download, encodeProjectOlg, safeFileName } from '../storage/olg';
 import { useUI } from '../store/ui';
 import { THEMES, type ThemeName } from '../theme';
 import { Field, Modal } from './common';
+import { track } from '../site';
 
 export function ExportDialog() {
   const ed = useEditor();
@@ -49,6 +50,7 @@ export function ExportDialog() {
 
   const svg = () =>
     run('SVG', async () => {
+      track('export-svg');
       const { renderSheetSvg } = await import('../export/render');
       const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, {
         ...opts,
@@ -59,6 +61,7 @@ export function ExportDialog() {
     });
   const png = () =>
     run('PNG', async () => {
+      track('export-png');
       const { renderSheetSvg, svgToPngBlob } = await import('../export/render');
       const r = await renderSheetSvg(ed.project, ed.ctx, ed.sheetId, {
         ...opts,
@@ -75,12 +78,14 @@ export function ExportDialog() {
     });
   const pdf = () =>
     run('PDF', async () => {
+      track('export-pdf');
       const { exportPdf } = await import('../export/pdf');
       const r = await exportPdf(ed.project, ed.ctx, opts);
       download(r.blob, `${safeFileName(meta.name)}.pdf`);
     });
   const makeTikz = (full = standalone) =>
     run('CircuiTikZ', async () => {
+      track('export-tikz');
       const { sheetToCircuitikz } = await import('../export/circuitikz');
       setTikz(
         sheetToCircuitikz(ed.project, ed.ctx, ed.sheetId, {
@@ -92,6 +97,7 @@ export function ExportDialog() {
     });
   const olg = () =>
     run('OLG', async () => {
+      track('export-file');
       download(
         new Blob([encodeProjectOlg(ed.project) as BlobPart], { type: 'application/zip' }),
         `${safeFileName(meta.name)}.olg`,

@@ -2899,6 +2899,131 @@ body.resizing-panel {
   color: var(--accent);
   align-self: flex-start;
 }
+/* Admin: visitors (anonymous usage statistics). */
+.usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.usage-head h2 {
+  margin: 0;
+}
+.usage .seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.usage .seg button {
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.usage .seg button + button {
+  border-left: 1px solid var(--border);
+}
+.usage .seg button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.usage-chart {
+  position: relative;
+  margin: 4px 0 18px;
+}
+.usage-chart svg {
+  display: block;
+}
+.usage .admin-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.usage-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.usage-base {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.usage-axis {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.usage-bar {
+  fill: var(--accent);
+  transition: opacity 0.12s;
+}
+.usage-bar.dim {
+  opacity: 0.35;
+}
+.usage-tip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: var(--shadow, 0 4px 14px rgba(0, 0, 0, 0.12));
+  font-size: 12.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.usage-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px 24px;
+}
+.usage-list h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.usage-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.usage-list li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: 13.5px;
+}
+.usage-list li + li {
+  margin-top: 2px;
+}
+/* The share of each line, drawn behind its text. */
+.usage-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent-soft);
+}
+.usage-name,
+.usage-list b {
+  position: relative;
+}
+.usage-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-list b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .admin-page .people-card {
   margin-bottom: 20px;
 }

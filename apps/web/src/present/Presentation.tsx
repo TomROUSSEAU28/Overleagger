@@ -25,6 +25,7 @@ import { useEditor, useSheetElements } from '../editor/context';
 import { useUI } from '../store/ui';
 import { resolveColor, THEMES } from '../theme';
 import { evaluate, slideElements, slideSteps, type AnimFrame, type Clock, type ElFx } from './anim';
+import { track } from '../site';
 
 type Mode = 'point' | 'laser' | 'pen';
 type Box = { x: number; y: number; w: number; h: number };
@@ -165,6 +166,9 @@ export function Presentation() {
       () => (full.current = true),
       () => undefined,
     );
+  }, []);
+  useEffect(() => {
+    track('present');
   }, []);
   useEffect(() => {
     enterFullscreen();

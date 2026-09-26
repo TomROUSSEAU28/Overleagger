@@ -12,11 +12,13 @@ import { PeoplePage } from './cloud/PeoplePage';
 import { Gallery } from './gallery/Gallery';
 import { parseHash, useHash } from './router';
 import { useUserLib } from './storage/userLibrary';
+import { track } from './site';
 import { useUI } from './store/ui';
 
 /** `#/example`: create the buck converter example and open it (link from the homepage). */
 function ExamplePage() {
   useEffect(() => {
+    track('open-example');
     void createProject('Buck converter example', 'IEC', seedBuckExample).then((id) =>
       location.replace(`#/p/${id}`),
     );
@@ -35,6 +37,7 @@ export function App() {
     document.documentElement.dataset.anim = animations ? 'on' : 'off';
   }, [animations]);
   useEffect(() => {
+    track('view', '/app/');
     void useUserLib.getState().load();
     void useCloud.getState().init();
     startLibrarySync();

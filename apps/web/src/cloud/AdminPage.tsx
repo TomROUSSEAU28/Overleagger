@@ -8,6 +8,7 @@ import { Logo } from '../brand/Logo';
 import { ThemePicker } from '../panels/ThemePicker';
 import { useUI } from '../store/ui';
 import { AccountMenu } from './AccountUI';
+import { UsageSection } from './AdminUsage';
 import { api, useCloud } from './cloud';
 import { formatBytes } from './quota';
 
@@ -252,6 +253,7 @@ export function AdminPage() {
               </p>
             )}
           </section>
+          <UsageSection />
           {stats && (
             <section className="admin-tiles" data-testid="admin-stats">
               <Tile

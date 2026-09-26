@@ -2,6 +2,10 @@
  * Homepage: tiny progressive enhancements only (the page is plain HTML, readable without JS).
  */
 import './landing.css';
+import { track } from '../site';
+
+// Anonymous statistics: this page was seen (see site.ts).
+track('view', location.pathname.replace(/index\.html$/, '').replace(/([^/])$/, '$1/'));
 
 // Sections fade in as they come into view (skipped when reduced motion is asked).
 const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

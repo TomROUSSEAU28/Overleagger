@@ -26,6 +26,7 @@ import { createCollab, visibleParts } from './collab';
 import { isAdminEmail, type Config } from './config';
 import { Store, type CodePurpose, type UserRow } from './db';
 import { createMailer } from './mail';
+import { createUsage } from './usage';
 
 const publicUser = (u: UserRow) => ({
   id: u.id,
@@ -57,6 +58,7 @@ export async function createApp(
 ) {
   const store = new Store(config.dbFile);
   const mailer = createMailer(config, options.mailTransport);
+  const usage = createUsage(store, config.timeZone);
   const collab = createCollab(store, config);
   const backups = startBackups(store.db, config);
   // Contact messages are kept one year at most (privacy policy), old codes are dropped: checked
@@ -178,6 +180,23 @@ export async function createApp(
     reset: Boolean(config.smtp),
     ...(config.contactEmail ? { contact: config.contactEmail } : {}),
   }));
+
+  // Anonymous statistics of the site's use (see usage.ts): a page seen, an action in the app.
+  app.post('/api/hit', async (req, reply) => {
+    const b = (req.body ?? {}) as { e?: unknown; p?: unknown; r?: unknown; s?: unknown };
+    const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : undefined);
+    usage.hit({
+      event: str(b.e, 30) ?? '',
+      page: str(b.p, 80),
+      ref: str(b.r, 300),
+      campaign: str(b.s, 40),
+      ip: req.ip,
+      ua: str(req.headers['user-agent'], 400) ?? '',
+      country: str(req.headers['cf-ipcountry'], 2),
+      host: req.hostname.split(':')[0] ?? '',
+    });
+    return reply.status(204).send();
+  });
 
   // Contact form of the homepage (no account needed) --------------------------
 
@@ -970,6 +989,13 @@ export async function createApp(
       limits: { maxProjects: config.maxProjects, maxProjectBytes: config.maxProjectBytes },
       biggest: store.biggestProjects(),
     };
+  });
+
+  /** How the site is used, with or without an account (anonymous daily counts). */
+  app.get('/api/admin/usage', async (req) => {
+    requireAdmin(req);
+    const days = Math.min(365, Math.max(1, Number((req.query as { days?: string }).days) || 30));
+    return usage.report(days);
   });
 
   app.get('/api/admin/users', async (req) => {

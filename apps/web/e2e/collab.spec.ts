@@ -341,6 +341,8 @@ test('beta limits: a few projects on the server, the rest in this browser; admin
   await boss.getByTestId('account-menu').click();
   await boss.getByTestId('open-admin').click();
   await expect(boss.getByTestId('admin-stats')).toContainText('Accounts');
+  // Visitors with or without an account (anonymous counts).
+  await expect(boss.getByTestId('admin-usage')).toContainText('Visitors today');
   const row = boss.getByTestId('admin-users').locator('tr', { hasText: `ida.${stamp}` });
   await expect(row).toContainText('1');
   await row.getByTestId('admin-limit').fill('5');

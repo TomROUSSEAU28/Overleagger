@@ -5,7 +5,8 @@
  * project: its root and each sheet; `documents` held the single document of old projects), versions,
  * libraries (each user's personal symbols and templates), friends, teams, team_members and
  * project_teams (a team added to a project: all its members get the role), codes (the codes
- * e-mailed to confirm an address or choose a new password).
+ * e-mailed to confirm an address or choose a new password), usage (anonymous daily counts of
+ * the site's use: visitors, pages, sources, countries, devices, actions).
  */
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -34,6 +35,13 @@ export interface UserRow {
 }
 
 export type CodePurpose = 'signup' | 'reset';
+
+/**
+ * What the usage counts are about: visitors (one a day each), page views (by page), and for
+ * each visitor of the day where they came from, their country and their kind of device;
+ * actions in the app (by name).
+ */
+export type UsageMetric = 'visitors' | 'views' | 'source' | 'country' | 'device' | 'action';
 
 export interface CodeRow {
   email: string;
@@ -152,6 +160,13 @@ CREATE TABLE IF NOT EXISTS messages (
   body TEXT NOT NULL,
   user_id TEXT,
   read_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS usage (
+  day TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  key TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, metric, key)
 );
 CREATE TABLE IF NOT EXISTS codes (
   email TEXT NOT NULL,
@@ -356,6 +371,24 @@ export class Store {
 
   setPassword(userId: string, passwordHash: string) {
     this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+  }
+
+  // Anonymous usage (daily counts, nothing about a person) --------------------
+
+  /** Add 1 to a daily count (`day` as YYYY-MM-DD). */
+  count(day: string, metric: UsageMetric, key = '') {
+    this.db
+      .prepare(
+        'INSERT INTO usage (day, metric, key, n) VALUES (?, ?, ?, 1) ON CONFLICT (day, metric, key) DO UPDATE SET n = n + 1',
+      )
+      .run(day, metric, key);
+  }
+
+  /** The counts from `since` (YYYY-MM-DD) on. */
+  usage(since: string): { day: string; metric: UsageMetric; key: string; n: number }[] {
+    return this.db
+      .prepare('SELECT day, metric, key, n FROM usage WHERE day >= ? ORDER BY day')
+      .all(since) as { day: string; metric: UsageMetric; key: string; n: number }[];
   }
 
   // E-mailed codes -----------------------------------------------------------
