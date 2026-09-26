@@ -719,6 +719,7 @@ export function Dashboard() {
         <a href="../#contact" data-testid="feedback">
           Send feedback
         </a>
+        <a href="../#follow">Follow</a>
         <span className="muted">
           {user
             ? 'Local projects stay in this browser until you share them.'

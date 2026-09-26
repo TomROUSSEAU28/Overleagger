@@ -1181,6 +1181,76 @@ main > section {
   stroke-linejoin: round;
 }
 
+/* Social networks: labelled pills at the end of the page, bare icons in the footer. */
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.follow {
+  margin-top: 64px;
+}
+.follow-note {
+  margin: 0 0 14px;
+  font-family: var(--hand);
+  font-size: 23px;
+  color: var(--pen);
+}
+.socials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.socials a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  text-decoration: none;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.socials a:hover,
+.socials a:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.socials svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.foot .socials {
+  gap: 4px;
+}
+.foot .socials a {
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.foot .socials span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Footer */
 .foot {
   display: flex;
