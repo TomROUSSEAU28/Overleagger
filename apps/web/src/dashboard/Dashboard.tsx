@@ -141,7 +141,7 @@ function NewProjectDialog({
             onClick={() => pick('buck')}
             icon={<Zap size={20} />}
             title="Example: buck converter"
-            text="Power stage, PI controller in a sub-sheet, LaTeX labels."
+            text="A presentation: animated currents, zooms, waveforms, design steps, PI controller."
             testId="start-example"
           />
         </div>
