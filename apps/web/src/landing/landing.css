@@ -1583,9 +1583,9 @@ main > section {
 
 .manual-page {
   display: grid;
-  grid-template-columns: 220px minmax(0, 760px);
+  grid-template-columns: 240px minmax(0, 760px);
   justify-content: center;
-  gap: 40px;
+  gap: 44px;
   padding: 0 20px;
 }
 .manual-page .legal {
@@ -1593,30 +1593,171 @@ main > section {
   padding-left: 0;
   padding-right: 0;
 }
-.manual-toc {
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The side column: the search box, then the contents, following the reading. */
+.manual-side {
   position: sticky;
   top: 84px;
   align-self: start;
-  padding-top: 72px;
+  padding: 72px 4px 24px 0;
   font-size: 15px;
+}
+/* The contents scroll on their own when the window is short (the search results can then
+   spread over the text). */
+.manual-toc nav {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+.manual-search {
+  position: relative;
+  margin-bottom: 22px;
+}
+.manual-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 34px 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.manual-search input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.manual-q-key {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  font-size: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.manual-search input:focus + .manual-q-key {
+  display: none;
+}
+.manual-results {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  top: calc(100% + 6px);
+  width: min(420px, calc(100vw - 40px));
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.manual-results li + li {
+  margin-top: 2px;
+}
+.manual-results a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.manual-results b {
+  display: block;
+  font-weight: 600;
+}
+.manual-results span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.manual-results mark,
+mark.manual-hit {
+  background: rgba(255, 205, 64, 0.55);
+  color: inherit;
+  border-radius: 2px;
+}
+.manual-results li[aria-selected] a,
+.manual-results a:hover {
+  background: rgba(47, 93, 158, 0.1);
+}
+.manual-results .none {
+  padding: 8px 10px;
+  color: var(--muted);
+}
+.manual-toc summary {
+  list-style: none;
+  cursor: default;
+  margin-bottom: 8px;
+}
+.manual-toc summary::-webkit-details-marker {
+  display: none;
 }
 .manual-toc ol {
   margin: 0;
-  padding-left: 1.3em;
+  padding: 0;
+  list-style: none;
+  counter-reset: toc;
   border-left: 1px solid var(--line);
 }
-.manual-toc li {
-  padding: 3px 0 3px 4px;
+.manual-toc > nav > ol > li {
+  counter-increment: toc;
 }
 .manual-toc a {
+  display: block;
+  margin-left: -1px;
+  padding: 3px 0 3px 12px;
+  border-left: 2px solid transparent;
   color: var(--ink);
   text-decoration: none;
+  line-height: 1.35;
+}
+.manual-toc > nav > ol > li > a::before {
+  content: counter(toc) '. ';
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .manual-toc a:hover {
   color: var(--accent);
 }
+.manual-toc a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+/* Subsections: smaller, indented. */
+.manual-toc ol ol {
+  border-left: 0;
+  margin: 0 0 4px;
+}
+.manual-toc ol ol a {
+  padding-left: 26px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.manual-toc ol ol a.active {
+  color: var(--accent);
+}
 .manual section {
   scroll-margin-top: 84px;
+}
+.manual h3[id] {
+  scroll-margin-top: 90px;
+}
+.manual h3 {
+  font-size: 20px;
+  margin: 1.6em 0 0.4em;
 }
 .manual td:first-child {
   white-space: nowrap;
@@ -1626,14 +1767,106 @@ main > section {
 .manual p kbd {
   font-size: 0.82em;
 }
+/* Screenshots, open full size in a new tab. */
+.manual-shot {
+  margin: 22px 0 20px;
+}
+.manual-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow:
+    0 1px 2px rgba(40, 32, 20, 0.06),
+    0 8px 24px rgba(40, 32, 20, 0.1);
+  background: var(--card);
+}
+.manual-shot a {
+  display: block;
+  cursor: zoom-in;
+}
+.manual-shot figcaption {
+  margin-top: 8px;
+  font-size: 14.5px;
+  font-style: italic;
+  color: var(--muted);
+  text-align: center;
+}
+.manual-shot-phone img {
+  width: auto;
+  max-width: 100%;
+  max-height: 440px;
+  margin: 0 auto;
+}
+.manual-top {
+  margin-top: 40px;
+  text-align: right;
+  font-size: 15px;
+}
 @media (max-width: 900px) {
   .manual-page {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
-  .manual-toc {
+  /* On a phone: one thin bar under the site's header, the search and a Contents button
+     whose list drops down over the text. */
+  .manual-side {
+    position: sticky;
+    top: var(--nav-h, 60px);
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 -20px;
+    padding: 8px 20px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .manual-search {
+    flex: 1;
+    margin: 0;
     position: static;
-    padding-top: 32px;
+  }
+  .manual-search input {
+    padding: 7px 10px;
+  }
+  .manual-q-key {
+    display: none;
+  }
+  .manual-results {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+  .manual-toc summary {
+    cursor: pointer;
+    margin: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .manual-toc summary::after {
+    content: ' ▾';
+  }
+  .manual-toc[open] summary::after {
+    content: ' ▴';
+  }
+  .manual-toc nav {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: calc(100% + 6px);
+    max-height: 65vh;
+    overflow-y: auto;
+    padding: 8px 10px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
   }
   .manual td:first-child {
     white-space: normal;

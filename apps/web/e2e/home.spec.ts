@@ -144,6 +144,21 @@ test('version, what is new, manual and changelog', async ({ page }) => {
   await page.goto('/manual/');
   await expect(page.getByTestId('manual')).toContainText('How to use Circuit Notebook');
   await expect(page.locator('[data-version]').first()).toContainText('beta');
+  // Its search: "/" goes to the box, results come as you type, Enter opens the first one with
+  // the words found marked in the text.
+  await page.keyboard.press('/');
+  await page.keyboard.type('laser pointer');
+  const results = page.getByTestId('manual-results');
+  await expect(results.locator('li').first()).toContainText('Presenting');
+  await page.keyboard.press('Enter');
+  await expect(results).toBeHidden();
+  await expect(page.locator('#present mark.manual-hit').first()).toBeInViewport();
+  await page.getByTestId('manual-search').fill('zzzz');
+  await expect(results).toContainText('Nothing found');
+  // Its contents follow the reading.
+  await page.getByTestId('manual-search').fill('');
+  await page.locator('.manual-toc a[href="#export"]').click();
+  await expect(page.locator('.manual-toc a[href="#export"]')).toHaveClass(/active/);
   await page.goto('/changelog/');
   await expect(page.locator('.release')).toHaveCount(1);
   await expect(page.locator('.release').first()).toContainText('current version');

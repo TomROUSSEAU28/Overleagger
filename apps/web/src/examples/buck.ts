@@ -493,7 +493,7 @@ export function seedBuckExample(p: Project) {
       h: 104,
       color: '@pink',
       noPresent: true,
-      text: 'Editor only\nThis note is hidden from the presentation (Arrange → Hide from presentation).',
+      text: 'Editor only\nThis note is hidden from the presentation (right panel: Show in → Presentation).',
     });
     p.addElement(root, {
       type: 'text',
